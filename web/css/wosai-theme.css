@@ -1,0 +1,410 @@
+/* ═══════════════════════════════════════════════════════════════════
+   wosai-theme.css — WOSAI 共享组件样式 + 全局修正
+   所有 WOSAI 面板内复用组件在此统一维护，各节点 JS 只注入节点特有样式
+
+   依赖：必须先加载 wosai-variables.css
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══ 统一字体栈 ═══ */
+:root {
+  --ws-font-family: "PingFang SC", "Microsoft YaHei", system-ui,
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ws-font-mono: "Cascadia Code", "JetBrains Mono", "Consolas",
+    "SF Mono", monospace;
+}
+
+/* ═══ Canvas Note 全局修正 ═══ */
+.wosai-node-note textarea {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  resize: none !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+  font-family: inherit;
+  line-height: inherit;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.wosai-node-note textarea::selection {
+  background: rgba(100, 150, 255, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   面板 (Panel)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-panel {
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  color: var(--ws-text);
+  font-family: var(--ws-font-family);
+  font-size: var(--ws-text-base);
+  box-shadow: var(--ws-shadow-panel);
+  border-radius: var(--ws-panel-radius);
+  padding: var(--ws-panel-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--ws-gap);
+  user-select: none;
+}
+
+/* ── 面板独立主题切换 ── */
+[data-wosai-panel] {
+  color-scheme: dark;
+}
+[data-wosai-panel][data-theme="light"] {
+  color-scheme: light;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   按钮 (Button) — 空状态
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ws-surface-2);
+  border: var(--ws-border-width) solid var(--ws-border);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  border-radius: var(--ws-radius);
+  font-size: var(--ws-text-base);
+  font-family: inherit;
+  transition: background var(--ws-transition),
+              border-color var(--ws-transition),
+              color var(--ws-transition),
+              transform var(--ws-transition-fast);
+  padding: 4px 8px;
+  gap: var(--ws-gap-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wosai-btn:hover {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-btn:active {
+  filter: brightness(0.85);
+  transition: none;
+}
+
+/* ── 选中态 ── */
+.wosai-btn.wosai-active,
+.wosai-btn.on,
+.wosai-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-btn.wosai-active:active,
+.wosai-btn.on:active,
+.wosai-btn.active:active {
+  filter: brightness(0.85);
+}
+
+/* ── 尺寸变体 ── */
+.wosai-btn--sm {
+  height: var(--ws-btn-h-xs);
+  font-size: var(--ws-text-sm);
+  padding: 2px 6px;
+}
+
+.wosai-btn--lg {
+  height: var(--ws-btn-h);
+  font-size: var(--ws-text-md);
+  padding: 6px 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   标签按钮 (Tag / Chip)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-tag-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ws-surface-2);
+  border: var(--ws-border-width) solid var(--ws-border);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  border-radius: var(--ws-radius);
+  font-size: var(--ws-text-sm);
+  font-family: inherit;
+  transition: background var(--ws-transition),
+              border-color var(--ws-transition),
+              color var(--ws-transition),
+              transform var(--ws-transition-fast);
+  padding: 4px 8px;
+  gap: var(--ws-gap-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wosai-tag-btn:hover {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-tag-btn.wosai-active,
+.wosai-tag-btn.on,
+.wosai-tag-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-tag-btn:active,
+.wosai-tag-btn.wosai-active:active,
+.wosai-tag-btn.on:active {
+  filter: brightness(0.85);
+  transition: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   段控件 (Segmented Control)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-seg {
+  display: inline-flex;
+  align-items: center;
+  background: var(--ws-seg-bg);
+  border-radius: var(--ws-seg-radius);
+  padding: var(--ws-seg-pad);
+  gap: var(--ws-seg-gap);
+}
+
+.wosai-seg-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  border-radius: calc(var(--ws-seg-radius) - var(--ws-seg-pad));
+  font-size: var(--ws-text-sm);
+  font-family: inherit;
+  padding: 4px 10px;
+  line-height: 1;
+  transition: background var(--ws-transition),
+              color var(--ws-transition),
+              transform var(--ws-transition-fast);
+  white-space: nowrap;
+}
+
+.wosai-seg-item:hover:not(.wosai-seg-active) {
+  color: var(--ws-text);
+}
+
+.wosai-seg-item.wosai-seg-active,
+.wosai-seg-item.on,
+.wosai-seg-item.active {
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-seg-item:active {
+  filter: brightness(0.85);
+  transition: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   图标按钮 (Icon Button) — 主题切换、折叠等
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  border-radius: var(--ws-radius);
+  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  transition: color var(--ws-transition),
+              background var(--ws-transition);
+}
+
+.wosai-icon-btn:hover {
+  color: var(--ws-text);
+  background: var(--ws-surface-2);
+}
+
+.wosai-icon-btn:active {
+  filter: brightness(0.85);
+  transition: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   滑块 (Slider) — 通用输入范围
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--ws-slider-bg);
+  cursor: pointer;
+  outline: none;
+  transition: background var(--ws-transition);
+}
+
+.wosai-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-slider-thumb);
+  cursor: pointer;
+  border: 2px solid var(--ws-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  transition: none;
+}
+.wosai-slider::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(221, 111, 74, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   输入框 (Input / Textarea)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-input {
+  background: var(--ws-input-bg);
+  border: var(--ws-border-width) solid var(--ws-input-border);
+  color: var(--ws-input-text);
+  font-family: inherit;
+  font-size: var(--ws-text-base);
+  border-radius: var(--ws-radius);
+  padding: 4px 8px;
+  outline: none;
+  transition: border-color var(--ws-transition),
+              box-shadow var(--ws-transition);
+}
+
+.wosai-input::placeholder {
+  color: var(--ws-text-placeholder);
+}
+
+.wosai-input:focus {
+  border-color: var(--ws-accent);
+  box-shadow: var(--ws-input-focus-ring);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   版权信息
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-copyright {
+  text-align: center;
+  font-size: var(--ws-text-2xs);
+  color: var(--ws-text-muted);
+  letter-spacing: 0.02em;
+  padding-top: var(--ws-gap-xs);
+  margin-top: var(--ws-gap-xs);
+  /* 无分割线 — 项目约定 */
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   标签/徽章 (Badge)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ws-accent-dim);
+  color: var(--ws-accent);
+  font-size: var(--ws-text-xs);
+  border-radius: var(--ws-radius-sm);
+  padding: 2px 6px;
+  line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   工具提示 (Tooltip)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-tooltip {
+  position: relative;
+}
+
+.wosai-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ws-surface-3);
+  color: var(--ws-text);
+  font-size: var(--ws-text-xs);
+  padding: 4px 8px;
+  border-radius: var(--ws-radius);
+  border: 1px solid var(--ws-border);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--ws-transition-fast);
+  z-index: 10;
+}
+
+.wosai-tooltip:hover::after {
+  opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   分割线
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-divider {
+  border: none;
+  border-top: 1px solid var(--ws-border-muted);
+  margin: var(--ws-gap-xs) 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   颜色选择器叠加层 (全局 z-index 容器)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-cp-z {
+  font-family: var(--ws-font-family);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   行控件 (Row control) — label + 输入组合
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ws-gap);
+}
+
+.wosai-row__label {
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-secondary);
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   色点预览 (Color Swatch)
+   ═══════════════════════════════════════════════════════════════════ */
+.wosai-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--ws-radius-sm);
+  border: 1px solid var(--ws-border);
+  flex-shrink: 0;
+}
+
+.wosai-swatch--circle {
+  border-radius: var(--ws-radius-full);
+}

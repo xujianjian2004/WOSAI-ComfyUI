@@ -1,0 +1,11 @@
+# WOSAI-ComfyUI v1.0 — 运行时依赖
+# ─────────────────────────────────
+# 本插件无第三方运行时依赖。
+# 仅使用 Python 标准库（math、importlib 模块），
+# ComfyUI 宿主环境已提供所需的 torch、numpy 等库。
+#
+# 开发 / 测试依赖（可选）：
+#   pip install -e ".[dev]"
+#
+# pytest>=8.0
+# pytest-cov>=5.0

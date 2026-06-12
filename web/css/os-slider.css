@@ -1,0 +1,962 @@
+/* ══════════════════════════════════════════════════════════════════════
+   os-slider.css — OmniSlider 节点样式
+   WOSAI ComfyUI v1.0 | 设计令牌见 wosai-variables.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* === OmniSlider widget container === */
+.os-wrap {
+  position: relative;
+  padding: 6px 0 8px;
+  font-family: var(--ws-font-family);
+  user-select: none;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: max(20px, calc(28px * var(--os-scale, 1)));
+  color: var(--ws-text);
+  border-bottom: none;
+  --os-scale: 1;
+}
+
+.os-ch-add,
+.os-ch-sub {
+  width: 16px;
+  height: calc(16px * var(--os-scale, 1));
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font-size: max(calc(10px * var(--os-scale, 1)), 9px);
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 10;
+  transition: color var(--ws-transition);
+  -webkit-font-smoothing: antialiased;
+}
+.os-ch-add:hover { color: var(--ws-accent); }
+.os-ch-add:active { color: var(--ws-accent-hover); }
+.os-ch-sub:hover { color: var(--ws-danger); }
+.os-ch-sub:active { color: #FF3333; }
+
+/* +/- button custom tooltip */
+.os-ch-add[data-tooltip]:hover::after,
+.os-ctrl-btn[data-tooltip]:hover::after,
+.os-ch-sub[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: var(--ws-radius-sm);
+  background: rgba(0, 0, 0, .88);
+  color: var(--ws-text);
+  font-size: 8.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 99999;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* === Slider row === */
+.os-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Fill style row: button column uses margin-top to align with track center */
+.os-slider-row[data-style="fill"] .os-btn-col {
+  align-self: center;
+  margin-top: calc(24px * var(--os-scale, 1) + 9px);
+}
+
+/* Button column (fixed width, ensures all track ends align) */
+.os-btn-col {
+  flex-shrink: 0;
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Right column: 仅锁按钮（− / + 已收拢到底部控制行） */
+.os-btn-col-right {
+  width: 22px;
+  gap: 0;
+}
+
+/* 底部控制行：单组 − / + */
+.os-ctrl-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 2px;
+}
+.os-ctrl-btn {
+  width: 28px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ws-text-secondary, #a3a3a3);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: color var(--ws-transition), background var(--ws-transition);
+}
+.os-ctrl-btn:hover { color: var(--ws-accent); background: var(--ws-surface-2); }
+
+/* Track wrapper — carries activation ring (box-shadow unaffected by clip-path) */
+.os-track-wrap {
+  flex: 1;
+  min-width: 0;
+  border-radius: 999px;
+  transition: box-shadow var(--ws-transition);
+  box-shadow: 0 0 0 1px var(--ws-border);
+}
+.os-track-wrap:hover:not(.active) {
+  box-shadow: 0 0 0 1px var(--ws-accent), 0 0 12px rgba(221, 111, 74, .15);
+}
+.os-track-wrap.active {
+  box-shadow: 0 0 0 1px var(--ws-surface-3), 0 0 0 2px var(--os-active-color, var(--ws-accent));
+}
+.os-track-wrap.dim { opacity: 0.35; }
+
+/* Fill slider mode: no outer ring, styling handled internally */
+.os-track-wrap[data-style="fill"] { box-shadow: none !important; }
+
+/* Track container — flex row, label centered in colored area, pill fixed width on right */
+.os-track {
+  width: 100%;
+  height: max(calc(24px * var(--os-scale, 1)), 18px);
+  border-radius: 999px;
+  background: var(--ws-surface-2);
+  position: relative;
+  cursor: ew-resize;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+/* Fill bar — absolute positioned bottom layer */
+.os-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  border-radius: 999px 0 0 999px;
+  pointer-events: none;
+  transition: none;
+}
+.os-fill[data-full="1"] { border-radius: 999px; }
+
+/* Circular thumb — white stroke + channel color fill, follows fill position */
+.os-thumb {
+  position: absolute;
+  z-index: 5;
+  top: 50%;
+  width: min(calc(28px * var(--os-scale, 1)), calc(100% - 4px));
+  height: min(calc(28px * var(--os-scale, 1)), calc(100% - 4px));
+  border-radius: 50%;
+  background: var(--os-active-color, var(--ws-accent));
+  border: 3px solid rgba(255, 255, 255, .92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .30);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: none;
+}
+
+/* Label — flex:1 fills the colored area, centered within */
+.os-label-area {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+  font-weight: 400;
+  color: var(--ws-text);
+  font-size: max(calc(14px * var(--os-scale, 1)), 10px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.os-label-area[data-on-fill="1"] {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+
+/* Value pill — fixed width, right side of normal flow */
+.os-val-pill {
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  color: var(--ws-accent);
+  pointer-events: none;
+  padding: 0 10px;
+  border-radius: 0 999px 999px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 400;
+  white-space: nowrap;
+  line-height: 1;
+  font-size: max(calc(13px * var(--os-scale, 1)), 11px);
+  min-width: 44px;
+  box-sizing: border-box;
+}
+.os-val-pill[data-on-fill="1"] {
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .4);
+}
+
+/* === Settings panel (NodeColor design language) === */
+.os-panel {
+  position: fixed;
+  z-index: 100000;
+  background: var(--ws-surface);
+  border: var(--ws-border-width, 1px) solid var(--ws-border);
+  border-radius: var(--ws-panel-radius, 14px);
+  padding: var(--ws-panel-padding, 14px);
+  width: var(--ws-panel-width-sm, 270px);
+  box-shadow: var(--ws-shadow-panel);
+  font-family: var(--ws-font-family);
+  color: var(--ws-text);
+  font-size: var(--ws-text-base);
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ws-gap-md);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Title row */
+.os-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: -2px;
+}
+.os-panel-title {
+  font-size: var(--ws-text-lg);
+  color: var(--ws-text);
+  letter-spacing: .3px;
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+.os-theme-toggle {
+  font-size: var(--ws-text-lg);
+  cursor: pointer;
+  transition: var(--ws-transition);
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+  padding: 2px;
+}
+.os-theme-toggle:hover { opacity: .7; }
+.os-theme-toggle:active { opacity: .5; }
+
+/* Segmented control (type toggle, channel tabs) */
+.os-panel .os-seg {
+  display: flex;
+  background: var(--ws-seg-bg);
+  border-radius: var(--ws-seg-radius);
+  padding: var(--ws-seg-pad);
+  gap: var(--ws-seg-gap);
+}
+.os-seg-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ws-text-secondary);
+  transition: var(--ws-transition);
+  border: none;
+  background: transparent;
+}
+.os-seg-btn.on { background: var(--ws-accent); color: var(--ws-text-on-accent); }
+.os-seg-btn:hover:not(.on) { background: var(--ws-surface-3); color: var(--ws-text); }
+.os-seg-btn.on:hover { filter: brightness(1.1); box-shadow: 0 1px 8px rgba(221, 111, 74, .35); }
+.os-seg-btn:active:not(.on) { background: var(--ws-accent); color: var(--ws-text-on-accent); transition: none; }
+.os-seg-btn:active.on { filter: brightness(.85); box-shadow: none; transition: none; }
+
+/* Fill slider tabs (bottom triangle indicator) */
+.os-fill-tabs { display: flex; gap: var(--ws-gap-sm); flex-wrap: wrap; }
+.os-fill-tab {
+  position: relative;
+  flex: 1;
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--ws-text-sm);
+  font-weight: 500;
+  color: var(--ws-text-secondary);
+  transition: var(--ws-transition);
+  border: none;
+  background: transparent;
+}
+.os-fill-tab.on { background: var(--ws-accent); color: var(--ws-text-on-accent); }
+.os-fill-tab.on::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--ws-accent);
+}
+.os-fill-tab:hover:not(.on) { background: var(--ws-surface-3); color: var(--ws-text); }
+.os-fill-tab.on:hover { filter: brightness(1.1); }
+.os-fill-tab:active:not(.on) { background: var(--ws-accent); color: var(--ws-text-on-accent); transition: none; }
+.os-fill-tab:active.on { filter: brightness(.85); transition: none; }
+
+/* Form row labels */
+.os-row-label {
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-muted);
+  margin-bottom: -6px;
+  padding-left: 2px;
+  font-weight: 500;
+}
+
+/* Text input */
+.os-panel .os-text-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--ws-input-bg);
+  border: none;
+  border-radius: var(--ws-radius-md);
+  color: var(--ws-input-text);
+  font-size: var(--ws-text-md);
+  padding: 7px 10px;
+  outline: none;
+  transition: var(--ws-transition);
+}
+.os-panel .os-text-input:focus { box-shadow: var(--ws-focus-ring); }
+.os-panel .os-text-input::placeholder { color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
+
+/* Three-number inline group (each column has sub-label + input) */
+.os-panel .os-num-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  background: var(--ws-surface-2);
+  border-radius: var(--ws-radius-md);
+  padding: 8px 2px 10px;
+}
+.os-num-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.os-num-sub-label {
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-muted);
+  margin-bottom: 10px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.os-num-inline {
+  width: 52px;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  color: var(--ws-text);
+  font-size: var(--ws-text-lg);
+  text-align: center;
+  padding: 3px 2px;
+  outline: none;
+  border-radius: var(--ws-radius-sm);
+  transition: var(--ws-transition);
+  -moz-appearance: textfield;
+}
+.os-num-inline::-webkit-inner-spin-button,
+.os-num-inline::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.os-num-inline:focus { background: var(--ws-surface-3); box-shadow: 0 0 0 1.5px var(--ws-accent); }
+.os-num-sep {
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+  flex-shrink: 0;
+  padding: 0 1px 8px;
+  pointer-events: none;
+  align-self: flex-end;
+}
+
+/* Scale slider row */
+.os-panel .os-scale-row {
+  display: flex;
+  gap: var(--ws-gap);
+  align-items: center;
+  padding: 3px 8px;
+  background: var(--ws-surface-2);
+  border-radius: var(--ws-radius-md);
+  position: relative;
+}
+.os-scale-row label {
+  font-size: 11px;
+  color: var(--ws-text-secondary);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.os-scale-range {
+  flex: 1;
+  min-width: 0;
+  height: 12px;
+  border-radius: 2px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.os-scale-range::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--ws-surface-3) 0%, var(--os-scale-color, var(--ws-accent)) 100%);
+}
+.os-scale-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ws-accent);
+  border: none;
+  cursor: pointer;
+  margin-top: -4px;
+  transition: transform .12s;
+}
+.os-scale-range::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.os-scale-range::-webkit-slider-thumb:active { transform: scale(1.3); }
+.os-scale-range::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--ws-surface-3) 0%, var(--os-scale-color, var(--ws-accent)) 100%);
+}
+.os-scale-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ws-accent);
+  border: none;
+  cursor: pointer;
+  transition: transform .12s;
+}
+.os-scale-range::-moz-range-thumb:hover { transform: scale(1.15); }
+.os-scale-range::-moz-range-thumb:active { transform: scale(1.3); }
+
+/* ── Max channels number buttons ── */
+.os-maxch-btns {
+  display: flex;
+  gap: 5px;
+  margin-left: 2px;
+  align-items: center;
+  margin-right: 2px;
+  position: relative;
+}
+.os-maxch-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: var(--ws-border-width, 1.5px) solid transparent;   /* 默认无边框 */
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font-size: 10px;
+  font-family: var(--ws-font-family);
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--ws-transition);
+  flex-shrink: 0;
+}
+.os-maxch-btn:hover {
+  border-color: var(--ws-border);   /* 悬浮灰边框 */
+  color: var(--ws-text);
+}
+.os-maxch-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: #fff;
+}
+.os-maxch-btn.active:hover {
+  background: var(--ws-accent);
+  color: #fff;
+}
+
+/* ── Max channels floating tip ── */
+.os-maxch-tip {
+  font-size: 14px;
+  color: var(--ws-accent, #DD6F4A);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .25s ease;
+  pointer-events: none;
+  background: var(--ws-surface);
+  padding: 3px 14px;
+  border-radius: var(--ws-radius-sm);
+  border: 1px solid var(--ws-border);
+  z-index: 100010;
+  box-shadow: var(--ws-shadow-sm);
+  line-height: 1.2;
+}
+
+/* ── Fill slider in-node UI layout ── */
+.os-fill-slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(10px * var(--os-scale, 1));
+  cursor: ew-resize;
+}
+
+/* Text row: label + value horizontally, centered */
+.os-fill-text {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: calc(8px * var(--os-scale, 1));
+  pointer-events: none;
+  padding: calc(2px * var(--os-scale, 1)) 0;
+}
+.os-fill-text-label {
+  font-size: max(calc(14px * var(--os-scale, 1)), 10px);
+  font-weight: 400;
+  color: var(--ws-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.os-fill-text-val {
+  font-size: max(calc(16px * var(--os-scale, 1)), 12px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Thin rail container: overflow:visible ensures thumb isn't clipped */
+.os-fill-rail-wrap {
+  position: relative;
+  height: calc(16px * var(--os-scale, 1));
+  min-height: 12px;
+  margin-right: 0;
+  margin-left: 0;
+}
+
+/* Thin rail itself */
+.os-fill-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+/* Fill progress */
+.os-fill-rf {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px 0 0 999px;
+  pointer-events: none;
+}
+.os-fill-rf[data-full="1"] { border-radius: 999px; }
+
+/* Thumb sphere: absolutely positioned on rail-wrap, not affected by rail overflow */
+.os-fill-thumb-el {
+  position: absolute;
+  top: 50%;
+  width: calc(22px * var(--os-scale, 1));
+  height: calc(22px * var(--os-scale, 1));
+  min-width: 16px;
+  min-height: 16px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, .92);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .40);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: none;
+}
+
+/* Fill slider custom params */
+.os-fill-params { padding: 6px 0 4px; }
+.os-fill-color-input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+
+/* Hidden widget global rules — absolute thrown out of viewport, zero layout + zero interaction */
+.wosai-hidden-widget,
+.wosai-hidden-widget * {
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Color row — circular picker + preset dots */
+.os-color-row { display: flex; align-items: center; gap: var(--ws-gap); }
+.os-color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: 2px solid var(--ws-border);
+  position: relative;
+  transition: border-color var(--ws-transition), box-shadow var(--ws-transition);
+}
+.os-color-dot:hover { border-color: var(--ws-accent); box-shadow: 0 0 0 3px rgba(221, 111, 74, .25); }
+.os-color-dot:active { box-shadow: none; }
+.os-preset-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: box-shadow var(--ws-transition);
+}
+.os-preset-dot:hover { box-shadow: 0 0 0 2px var(--ws-accent); }
+.os-preset-dot:active { box-shadow: 0 0 0 2px var(--ws-accent), 0 0 0 4px var(--ws-surface); }
+.os-preset-dot.on { box-shadow: 0 0 0 2px var(--ws-accent), 0 0 0 4px var(--ws-surface); }
+
+/* Footer buttons */
+.os-footer { display: flex; gap: var(--ws-gap); margin-top: 2px; }
+.os-btn {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: var(--ws-radius-md);
+  border: none;
+  font-size: var(--ws-text-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ws-transition);
+}
+.os-btn-cancel {
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+}
+.os-btn-cancel:hover {
+  background: var(--ws-accent-dim);
+  color: var(--ws-accent);
+  box-shadow: 0 0 0 1.5px var(--ws-accent);
+}
+
+/* Max channels section */
+.os-maxch-section {
+  border-top-color: rgba(128, 128, 128, 0.15) !important;
+}
+[data-theme="dark"] .os-maxch-section {
+  border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+[data-theme="light"] .os-maxch-section {
+  border-top-color: rgba(0, 0, 0, 0.08) !important;
+}
+.os-btn-cancel:active {
+  background: var(--ws-accent);
+  color: #fff;
+  box-shadow: none;
+}
+.os-btn-ok { background: var(--ws-accent); color: #fff; }
+.os-btn-ok:hover { filter: brightness(1.22); box-shadow: 0 4px 14px rgba(221, 111, 74, .6); }
+.os-btn-ok:active { filter: brightness(.82); box-shadow: none; }
+.os-cr {
+  text-align: center;
+  font-size: var(--ws-text-2xs);
+  color: var(--ws-text-muted);
+  letter-spacing: .5px;
+  white-space: nowrap;
+  padding-top: 6px;
+}
+
+/* === Lock button (per-channel, left col, anti-mistouch) === */
+.os-ch-lock {
+  /* 固定命中区：不随 --os-scale 缩小（曾缩到 8px 高，图标溢出部分点不中） */
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  align-self: center;   /* 与滑条行垂直居中 */
+  position: relative;
+  z-index: 10;
+  opacity: 0.3;
+  transition: opacity var(--ws-transition), color var(--ws-transition);
+  -webkit-font-smoothing: antialiased;
+}
+.os-ch-lock svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+.os-ch-lock:hover { opacity: 1; }
+.os-ch-lock.locked { opacity: 0.65; }
+.os-ch-lock.locked:hover { opacity: 1; }
+
+/* Tooltip for lock button */
+.os-ch-lock[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 5px;
+  border-radius: var(--ws-radius-sm);
+  background: rgba(0, 0, 0, .88);
+  color: var(--ws-text);
+  font-size: 8.5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 99999;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* Locked row: slider becomes visually inactive, non-interactive */
+.os-slider-row.ch-locked .os-track,
+.os-slider-row.ch-locked .os-fill-slot {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.os-slider-row.ch-locked .os-track-wrap {
+  box-shadow: none !important;
+}
+
+/* === Drag feedback === */
+.os-track-wrap:active { }
+.os-fill-rail:active {
+  filter: brightness(1.08);
+}
+.os-track-wrap.dragging {
+  box-shadow: 0 0 0 2px var(--os-active-color, var(--ws-accent)),
+              0 0 16px rgba(221, 111, 74, .25);
+  transition: box-shadow var(--ws-transition-slow);
+}
+
+/* === Accessibility: reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  .os-track-wrap,
+  .os-track-wrap:active,
+  .os-track-wrap.dragging,
+  .os-*-thumb {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === Touch device optimization === */
+@media (pointer: coarse) {
+  .os-track-wrap {
+    min-height: 36px;
+    padding: 8px 0;
+  }
+  .os-btn-col {
+    width: 28px;
+  }
+  .os-btn-col-right {
+    width: 28px;
+  }
+  .os-ctrl-btn {
+    width: 32px;
+    height: 30px;
+    font-size: 21px;
+  }
+  .os-ch-lock {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+  .os-fill-thumb-el {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* === 通道数弹窗（居中渐变滑条）=== */
+.os-ch-pop {
+  position: fixed;
+  z-index: 100003;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px 4px;
+  font-family: var(--ws-font-family);
+  user-select: none;
+  /* 透明容器：数字圆钮与彩色滑轨自带对比度，无需玻璃面板 */
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: var(--ws-text, #E4E4E7);
+}
+[data-theme="light"] .os-ch-pop,
+.os-ch-pop[data-theme="light"] {
+  color: var(--ws-text, #201914);
+}
+
+/* 悬浮提示（替代原标题：悬停弹窗时浮现于上方，零高度占用；上移避开数字气泡） */
+.os-ch-pop-tip {
+  position: absolute;
+  bottom: calc(100% + 34px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 9px;
+  font-size: 14px;
+  letter-spacing: .3px;
+  white-space: nowrap;
+  background: rgba(30,30,35,.78);
+  backdrop-filter: blur(20px) saturate(1.6);
+  -webkit-backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.12);
+  color: var(--ws-text, #E4E4E7);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .18s ease-out;
+}
+.os-ch-pop:hover .os-ch-pop-tip,
+.os-ch-pop.tip-show .os-ch-pop-tip { opacity: 1; }
+[data-theme="light"] .os-ch-pop-tip,
+.os-ch-pop[data-theme="light"] .os-ch-pop-tip {
+  background: rgba(255,255,255,.85);
+  border-color: rgba(0,0,0,.10);
+  color: var(--ws-text, #201914);
+}
+
+/* 轨道容器 */
+.os-ch-track-wrap {
+  width: 100%;
+  padding: 8px 0;
+  position: relative;
+  cursor: pointer;
+}
+
+/* 暗色轨道（温度滑条样式） */
+.os-ch-track {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #323232;   /* 与节点面板同色 */
+  overflow: visible;
+}
+[data-theme="light"] .os-ch-track,
+.os-ch-pop[data-theme="light"] .os-ch-track {
+  background: #D9D4CD;
+}
+
+/* 渐变填充：宽度随当前档位 */
+.os-ch-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: width .15s ease-out;
+}
+
+/* 单拇指：白圈 + 橙芯 */
+.os-ch-thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ws-accent, #DD6F4A);
+  border: 4px solid #fff;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  cursor: grab;
+  z-index: 5;
+  transition: left .15s ease-out, box-shadow .15s;
+}
+.os-ch-thumb:active {
+  cursor: grabbing;
+  box-shadow: 0 2px 14px rgba(221,111,74,.5);
+}
+
+/* 数字气泡：拖动时浮现于拇指上方，松手后淡出 */
+.os-ch-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 32px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: rgba(30,30,35,.88);
+  color: #fff;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s ease-out;
+}
+.os-ch-bubble.show { opacity: 1; }
+/* 数字切换时的弹跳放大动效 */
+@keyframes os-ch-bubble-pop {
+  0%   { transform: translateX(-50%) scale(1); }
+  50%  { transform: translateX(-50%) scale(1.35); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+.os-ch-bubble.pop { animation: os-ch-bubble-pop .25s ease-out; }
+[data-theme="light"] .os-ch-bubble,
+.os-ch-pop[data-theme="light"] .os-ch-bubble {
+  background: rgba(255,255,255,.92);
+  color: var(--ws-text, #201914);
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}

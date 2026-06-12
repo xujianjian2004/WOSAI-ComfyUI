@@ -1,0 +1,57 @@
+{
+    "WOSAI_OmniSlider": {
+        "display_name": "万能滑条 OmniSlider",
+        "description": "多通道滑条控制，支持浮点/整数/填充样式",
+        "inputs": {
+            "active_value": {
+                "display_name": "当前值",
+                "tooltip": "内部缓存键，自动同步滑条值"
+            }
+        },
+        "outputs": {
+            "滑条1": { "display_name": "滑条1" },
+            "滑条2": { "display_name": "滑条2" },
+            "滑条3": { "display_name": "滑条3" },
+            "滑条4": { "display_name": "滑条4" },
+            "滑条5": { "display_name": "滑条5" }
+        }
+    },
+    "WOSAI_SizeSelect": {
+        "display_name": "尺寸选择 SizeSelect",
+        "description": "预设/自定义双模式分辨率选择，自动8倍数对齐",
+        "inputs": {
+            "Manual_Mode": {
+                "display_name": "模式切换",
+                "tooltip": "off=预设模式 on=自定义模式"
+            },
+            "Resolution": {
+                "display_name": "分辨率",
+                "tooltip": "选择预设分辨率档位"
+            },
+            "Aspect_Ratio": {
+                "display_name": "宽高比",
+                "tooltip": "选择画面宽高比"
+            },
+            "Custom_Width": {
+                "display_name": "自定义宽度",
+                "tooltip": "自定义宽度（仅自定义模式）"
+            },
+            "Custom_Height": {
+                "display_name": "自定义高度",
+                "tooltip": "自定义高度（仅自定义模式）"
+            }
+        },
+        "outputs": {
+            "width": {
+                "display_name": "宽度"
+            },
+            "height": {
+                "display_name": "高度"
+            }
+        }
+    },
+    "WOSAI_CanvasNote": {
+        "display_name": "画布注释 CanvasNote",
+        "description": "可自由编辑的画布注释节点，支持Markdown/渐变/预设样式"
+    }
+}

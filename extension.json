@@ -1,0 +1,25 @@
+{
+  "name": "WOSAI-ComfyUI",
+  "version": "1.0",
+  "description": "WOSAI-ComfyUI：ComfyUI节点美化增强插件合集",
+  "author": "穿山阅海",
+  "license": "MIT",
+  "homepage": "https://github.com/xujianjian2004/WOSAI-ComfyUI",
+  "repository": "https://github.com/xujianjian2004/WOSAI-ComfyUI",
+  "js": [
+    "web/omni-slider.js",
+    "web/canvas-note.js",
+    "web/node-color.js",
+    "web/color-bar.js",
+    "web/size-select.js"
+  ],
+  "css": [
+    "web/css/wosai-variables.css",
+    "web/css/wosai-theme.css",
+    "web/css/os-slider.css",
+    "web/css/os-color.css",
+    "web/css/os-size.css"
+  ],
+  "tags": ["canvas", "annotation", "size-selection", "node-color", "omni-slider", "theme"],
+  "min_comfyui_version": "0.2.0"
+}

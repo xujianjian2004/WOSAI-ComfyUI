@@ -1,0 +1,247 @@
+/* ═══════════════════════════════════════════════════════════════════
+   wosai-variables.css — WOSAI 全局设计令牌（唯一来源）
+   所有 WOSAI 节点的颜色/尺寸/动效均引用此文件，禁止在 JS 中硬编码
+
+   维护原则：
+   - 深色主题在 :root 中定义（项目默认）
+   - 浅色主题在 [data-theme="light"] 中覆盖
+   - 所有面板组件统一通过 --ws-* 令牌获取颜色
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══ 深色主题 (默认) ═══ */
+:root,
+[data-theme="dark"] {
+  /* ── 品牌色 ── */
+  --ws-accent:            #DD6F4A;
+  --ws-accent-hover:      #E8815F;
+  --ws-accent-active:     #C86442;
+  --ws-accent-dim:        rgba(221, 111, 74, 0.15);
+
+  /* ── 背景层级 (由浅入深: bg > surface > s2 > s3) ── */
+  --ws-bg:                #17181B;
+  --ws-surface:           #262729;
+  --ws-surface-2:         #1c1d20;
+  --ws-surface-3:         #131417;
+  --ws-surface-2-rgb:     28, 29, 32;
+  /* 提亮层（按钮分层底色，比面板底逐层提亮） */
+  --ws-surface-raised:    #2c2c2e;
+  --ws-surface-raised-2:  #333336;
+
+  /* ── 边框 ── */
+  --ws-border:            #383B44;
+  --ws-border-muted:      #2A2A2A;
+  --ws-border-accent:     var(--ws-accent);
+  --ws-border-width:      1.5px;
+
+  /* ── 文字 ── */
+  --ws-text:              #E4E4E7;
+  --ws-text-secondary:    #A3A3A3;
+  --ws-text-muted:        #7A7A7A;
+  --ws-text-on-accent:    #FFFFFF;
+  --ws-text-placeholder:  #5A5A5A;
+
+  /* ── 语义色 ── */
+  --ws-success:           #43A047;
+  --ws-success-bg:        rgba(67, 160, 71, 0.12);
+  --ws-warning:           #F59E0B;
+  --ws-danger:            #EF4444;
+  --ws-danger-bg:         rgba(239, 68, 68, 0.12);
+
+  /* ── 圆角尺规 ── */
+  --ws-radius-sm:         4px;
+  --ws-radius:            6px;
+  --ws-radius-md:         8px;
+  --ws-radius-lg:         12px;
+  --ws-radius-xl:         16px;
+  --ws-radius-full:       50%;
+
+  /* ── 间距尺规 ── */
+  --ws-gap-xs:            4px;
+  --ws-gap-sm:            6px;
+  --ws-gap:               8px;
+  --ws-gap-md:            10px;
+  --ws-gap-lg:            12px;
+
+  /* ── 按钮高度 ── */
+  --ws-btn-h-xs:          26px;
+  --ws-btn-h-sm:          32px;
+  --ws-btn-h:             34px;
+
+  /* ── 字号尺规 ── */
+  --ws-text-3xs:          9px;
+  --ws-text-2xs:          10px;
+  --ws-text-xs:           10px;
+  --ws-text-sm:           11px;
+  --ws-text-base:         12px;
+  --ws-text-md:           13px;
+  --ws-text-lg:           14px;
+
+  /* ── 动效 ── */
+  --ws-transition-fast:   100ms ease-out;
+  --ws-transition:        150ms ease-out;
+  --ws-transition-slow:   200ms ease-out;
+
+  /* ── 阴影 ── */
+  --ws-shadow-panel:      0 16px 48px rgba(0, 0, 0, 0.80);
+
+  /* ── 滑块 ── */
+  --ws-slider-bg:         #383B44;
+  --ws-slider-thumb:      var(--ws-accent);
+
+  /* ── 面板 ── */
+  --ws-panel-padding:     14px;
+  --ws-panel-width-sm:    270px;
+  --ws-panel-width:       280px;
+  --ws-panel-radius:      14px;
+
+  /* ── 颜色选择器 ── */
+  --ws-cp-panel-w:        280px;
+  --ws-cp-sv-h:           140px;
+  --ws-cp-hue-track-h:    12px;
+  --ws-cp-hue-thumb-s:    22px;
+  --ws-cp-swatch-s:       36px;
+
+  /* ── 段控件 ── */
+  --ws-seg-bg:            var(--ws-surface-2);
+  --ws-seg-radius:        8px;
+  --ws-seg-pad:           3px;
+  --ws-seg-gap:           2px;
+
+  /* ── 焦点环 ── */
+  --ws-focus-ring:        0 0 0 2px var(--ws-accent);
+
+  /* ── 禁态 ── */
+  --ws-disabled-opacity:  0.4;
+
+  /* ── 输入框 ── */
+  --ws-input-bg:          var(--ws-surface-2);
+  --ws-input-border:      var(--ws-border);
+  --ws-input-text:        var(--ws-text);
+  --ws-input-focus-ring:  0 0 0 2px var(--ws-accent-dim);
+
+  /* ── 滚动条 ── */
+  --ws-scrollbar-w:       6px;
+  --ws-scrollbar-thumb:   #555;
+  --ws-scrollbar-track:   transparent;
+
+  /* ── 遮罩层 ── */
+  --ws-overlay-bg:        rgba(0, 0, 0, 0.45);
+
+  /* ── 通用过渡 ── */
+  --ws-ease-out:          cubic-bezier(0.16, 1, 0.3, 1);
+  --ws-ease-in-out:       cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+/* ═══ 浅色主题 ═══ */
+[data-theme="light"] {
+  /* ── 背景层级 ── */
+  --ws-bg:                #F5F3EE;
+  --ws-surface:           #FAF8F4;
+  --ws-surface-2:         #EBE5DF;
+  --ws-surface-3:         #D9D0C7;
+  --ws-surface-2-rgb:     235, 229, 223;
+  /* 提亮层（浅色主题：向白方向逐层提亮） */
+  --ws-surface-raised:    #F2EDE8;
+  --ws-surface-raised-2:  #F8F4F0;
+
+  /* ── 边框 ── */
+  --ws-border:            #C8BDB2;
+  --ws-border-muted:      #D5CDC4;
+
+  /* ── 文字 ── */
+  --ws-text:              #201914;
+  --ws-text-secondary:    #4A3A30;
+  --ws-text-muted:        #8A7A70;
+  --ws-text-placeholder:  #AAA098;
+
+  /* ── 语义色背景 ── */
+  --ws-success-bg:        rgba(67, 160, 71, 0.08);
+  --ws-danger-bg:         rgba(239, 68, 68, 0.08);
+
+  /* ── 阴影 ── */
+  --ws-shadow-panel:      0 12px 36px rgba(0, 0, 0, 0.08);
+
+  /* ── 滑块 ── */
+  --ws-slider-bg:         #DDD6CE;
+
+  /* ── 段控件 ── */
+  --ws-seg-bg:            var(--ws-surface-2);
+
+  /* ── 输入框 ── */
+  --ws-input-bg:          var(--ws-surface-2);
+
+  /* ── 焦点环调整 ── */
+  --ws-input-focus-ring:  0 0 0 2px rgba(221, 111, 74, 0.2);
+
+  /* ── 遮罩层 ── */
+  --ws-overlay-bg:        rgba(0, 0, 0, 0.25);
+
+  /* ── 滚动条 ── */
+  --ws-scrollbar-thumb:   #C0B8AE;
+}
+
+/* ═══ 可访问性: prefers-reduced-motion ═══ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ═══ 全局重置 (仅影响 WOSAI 面板内) ═══ */
+[data-wosai-panel],
+[data-wosai-theme] {
+  box-sizing: border-box;
+}
+
+[data-wosai-panel] *,
+[data-wosai-panel] *::before,
+[data-wosai-panel] *::after,
+[data-wosai-theme] *,
+[data-wosai-theme] *::before,
+[data-wosai-theme] *::after {
+  box-sizing: border-box;
+}
+
+/* ── 统一 focus-visible ── */
+[data-wosai-panel] :focus-visible,
+[data-wosai-theme] :focus-visible {
+  outline: none;
+  box-shadow: var(--ws-focus-ring);
+}
+
+[data-wosai-panel] button:focus:not(:focus-visible),
+[data-wosai-theme] button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ── 统一禁态 ── */
+.ws-disabled,
+[data-wosai-panel] [disabled],
+[data-wosai-theme] [disabled] {
+  opacity: var(--ws-disabled-opacity);
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* ── 自定义滚动条 ── */
+[data-wosai-panel] ::-webkit-scrollbar {
+  width: var(--ws-scrollbar-w);
+}
+
+[data-wosai-panel] ::-webkit-scrollbar-track {
+  background: var(--ws-scrollbar-track);
+}
+
+[data-wosai-panel] ::-webkit-scrollbar-thumb {
+  background: var(--ws-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+[data-wosai-panel] ::-webkit-scrollbar-thumb:hover {
+  background: var(--ws-accent);
+}
