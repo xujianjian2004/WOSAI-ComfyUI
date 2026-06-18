@@ -1647,6 +1647,16 @@ function _osBuildSliderRow(node, cfg, chIdx, chCount) {
         }
     }, { passive: false });
 
+    // ── 右键打开设置面板（直接绑定 dragEl，不依赖事件冒泡到 wrap，兼容 Nodes 2.0）──
+    dragEl.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (cfg.locked) return;
+        const activeTw = row.closest(".os-wrap")?.querySelector(".os-track-wrap.dragging");
+        if (activeTw) activeTw.classList.remove("dragging");
+        openSettingsPanel(node, chIdx, () => rebuildUI(node));
+    });
+
     // ── 键盘无障碍 ──
     if (cfg.style !== "fill") {
         const tw = row.querySelector(".os-track-wrap");
