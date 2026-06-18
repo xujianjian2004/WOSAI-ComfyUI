@@ -10,8 +10,8 @@ WOSAI 是专业的可视化 ComfyUI 节点美化与增强工具，好看更强�
 | --- | --- | --- |
 | **画布注释 CanvasNote** | 工具 | 画布注释节点，支持丰富样式、Markdown、内置/自定义预设 |
 | **尺寸选择 SizeSelect** | 图像 | 尺寸选择节点，四档分辨率 × 八种宽高比 + 自定义模式 |
-| **万能滑条 OmniSlider** | 工具 | 多通道独立滑条，全通道同时激活，浮点/整数/填充样式 |
-| **节点配色 NodeColor** | 工具 | 节点颜色扩展，纯色/双色/三色渐变 + 标题文字样式 + 拾色器，对任意节点有效 |
+| **万能滑条 OmniSlider** | 工具 | 多通道独立滑条，浮点/整数/双样式，滚轮调节 + 实时面板 + 极简模式(隐藏标题/角标/端口) |
+| **高级配色 NodeColor** | 工具 | 节点颜色扩展，纯色/双色/三色渐变 + 标题文字样式 + 拾色器，对任意节点有效 |
 | **WOSAI配色助手 ColorBar** | 工具 | 常驻悬浮球唤起的快捷上色工具条，预设色/拾色器/随机/按节点类型一键上色 |
 
 *更多节点开发中...*
@@ -116,46 +116,50 @@ WOSAI 是专业的可视化 ComfyUI 节点美化与增强工具，好看更强�
 
 ## 万能滑条 OmniSlider
 
-多通道独立滑条控制节点，支持浮点/整数双类型与多种视觉样式。
+多通道独立滑条控制节点，支持浮点/整数双类型、双视觉样式与实时设置面板。
 
 ### 核心特性
 
-- **1~6 独立通道**：+/- 按钮动态增减通道，每个通道独立输出各自的值，全通道同时激活
+- **多通道独立**：滑条总数上限可设（1~6），通过设置面板按钮任意增减；每个通道独立输出，全通道同时激活；增减时输出端口数同步匹配
 - **双输出类型**：每个通道可独立切换浮点数（FLOAT）或整数（INT）
-- **双视觉样式**：进度滑条（传统条形）+ 温度滑条（填充样式，左右色温对比）
-- **独立配色**：每个通道独立色环，温度滑条模式可分别设置左/右/按钮/数字颜色
-- **缩放比例**：统一调节所有滑条轨道高度
+- **双视觉样式**：一体式（传统条形）+ 圆点式（填充样式，左右色温对比）
+- **独立配色**：每个通道独立色环，圆点式可分别设置左/右/按钮/数字颜色
+- **端口自适应**：连到下游输入时自动识别端口名与类型，也可自定义滑条名
+- **滚轮调节**：滑条、面板缩放、配色色相条均支持滚轮上下快速增减
+- **防误触**：单条上锁（只读）+ 单击不跳值（仅拖动越过阈值才改值）
+- **极简模式**：可独立勾选隐藏「标题面板 / 角标 / 端口号」，经典 Canvas 与 Nodes 2.0（Vue DOM）双渲染均生效
+- **实时设置面板**：右键滑条打开；所有调整即时预览、关闭即生效（无确认按钮）
 
 ### 基本操作
 
 | 操作 | 效果 |
 | --- | --- |
-| 拖动滑条 | 调节当前通道的输出值 |
-| 双击滑条轨道 | 打开设置面板 |
-| 右键节点 → 菜单项 | 打开设置面板 |
-| 方向键 ↑ ↓ | 按步长微调值 |
-| Home / End | 跳转到最小值 / 最大值 |
+| 拖动滑条 | 调节当前通道的值（极简模式下单击不跳值，需拖动） |
+| 滚轮 | 按步长增 / 减当前滑条的值 |
+| 右键滑条 | 打开实时设置面板 |
+| 右键节点 → 🟠 万能滑条 OmniSlider | 打开设置面板（兜底入口） |
+| 点击锁图标 | 上锁 / 解锁，锁定后只读防误触 |
+| 方向键 ↑ ↓ / Home / End | 按步长微调 / 跳到最小 / 最大值 |
 
-### 设置面板
+### 设置面板（分组，关闭即生效）
 
-| 参数 | 说明 |
+| 分组 | 内容 |
 | --- | --- |
-| 显示名称 | 通道标签文字，显示于滑条前方与输出端口名 |
-| 输出类型 | 浮点数（FLOAT）或整数（INT） |
-| 最小值 / 最大值 | 滑条取值范围 |
-| 步长 | 方向键调节的最小粒度 |
-| 颜色 | 通道专属色环，温度滑条模式扩展为四色配置 |
+| 顶部 | 选择滑条总数（1~6 数字按钮）· 通道标签 C1…CN（带三角指针）· 修改滑条名称输入框 |
+| 滑条参数类型 | 浮点 / 整数（按钮点选）· 范围（最小值 ~ 最大值 · 步长） |
+| 样式 + 缩放 + 颜色 | 一体式 / 圆点式样式切换 · 缩放比例（滚轮可调）· 取色器与预设色点（圆点式扩展四色标签） |
+| 隐藏节点 | 标题面板 / 角标 / 端口号 三个独立多选按钮 |
 
 ### 输入/输出
 
 | 名称 | 类型 | 说明 |
 | --- | --- | --- |
 | active_value | FLOAT | 内部缓存键，自动同步滑条值（勿手动修改） |
-| **滑条1 ~ 滑条6** (出) | FLOAT | 各通道独立输出值，未启用通道输出 0.0 |
+| **C1 ~ CN** (出) | FLOAT / INT | 各通道独立输出，端口名随连接自动识别或自定义；INT 通道输出整数 |
 
 ---
 
-## 节点配色 NodeColor
+## 高级配色 NodeColor
 
 对任意 ComfyUI 节点生效的颜色扩展，支持纯色/多色渐变背景和标题文字样式。
 
@@ -175,8 +179,7 @@ WOSAI 是专业的可视化 ComfyUI 节点美化与增强工具，好看更强�
 
 | 操作 | 效果 |
 | --- | --- |
-| 右键节点 → 🟠 节点配色 | 打开配色面板 |
-| 快捷键 C | 选中节点后按 C 打开配色面板 |
+| 右键节点 → 🟠 高级配色 NodeColor | 打开配色面板 |
 | 单色/双色/三色按钮 | 纯色 ↔ 双色 ↔ 三色切换 |
 | 点击预设色块 | 一键应用预设配色 |
 | 按住 Shift | 纯色预设切换为灰度色卡 |
@@ -189,13 +192,11 @@ WOSAI 是专业的可视化 ComfyUI 节点美化与增强工具，好看更强�
 
 ### 核心特性
 
-- **悬浮球**：常驻画布的 🎨 圆球，可拖拽到任意位置（位置记忆），点击滑动展开/收起工具条
+- **悬浮球**：常驻画布的全彩渐变圆球，可拖拽到任意位置（位置记忆），点击滑动展开/收起工具条
 - **横版 / 竖版**：一键切换布局并记忆，工具条与配色菜单形态联动
-- **6 精选预设色**：亮（橙/金）、中（绿/蓝）、暗（紫/炭黑），点击即对选中节点/分组上色
-- **拾色器 + 取色历史**：屏幕任意位置取色自动应用，保留最近 3 条历史（悬停 × 可删除）
-- **按节点类型一键上色**：节点自动归入 12 个功能大类（输入/引导/采样/输出/解码/编码/模型/提示/图像/视频/音频/工具），12 组配色主题一键全图上色，支持撤销
-  - 纯色 Solid：柔和 / 鲜明 / 暗调 / 粉黛 / 森系 / 海雾
-  - 渐变 Gradient：流岚 / 幻彩 / 深邃 / 暮山 / 碧波 / 翠谷
+- **预设色（4 组 × 6 色）**：经典 / 浓郁 / 柔和 / 鲜亮 四组配色，点击「换一组预设」刷新图标循环切换（中心显示当前组号、记忆所选组），点击色点即对选中节点/分组上色
+- **拾色器 + 取色历史**：屏幕任意位置取色自动应用，保留最近 3 条历史（悬停可删除）
+- **按节点类型一键上色**：节点自动归入 12 个功能大类，12 组配色主题一键全图上色，可撤销
 - **随机 / 清除**：随机色（Alt = 多节点各配不同色）、一键清除颜色
 - **分组支持**：所有操作对选中的分组（Group）同样生效
 - **Hold 模式**（设置中开启）：按住 `` ` `` 显示工具条，悬停某项松开按键即应用，全程免点击
@@ -240,47 +241,53 @@ git clone https://github.com/xujianjian2004/WOSAI-ComfyUI.git
 ```
 WOSAI-ComfyUI/
 ├── __init__.py                  # 入口：V1 注册扫描 + V3 条件升级 + WEB_DIRECTORY
-├── extension.json               # ComfyUI 扩展清单（JS/CSS 路径）
-├── pyproject.toml               # 项目元数据
-├── Project_Notes.md             # 项目笔记（结构/约定/变更记录）
-├── LICENSE                      # MIT 开源协议
-├── README.md                    # 本文件
-├── requirements.txt             # 依赖声明
-├── .gitignore                   # Git 忽略规则
-├── workflows
-│   ├── WOSAI-ComfyUI_example.json # 演示工作流
-├── wosai_core/                  # 共享层（唯一包名，避免多插件冲突）
-│   ├── config.py                # 全局版本号、常量、共享默认值
-│   ├── registry.py              # 节点自动发现（热重载安全）
-│   └── color_presets.py         # NodeColor 预设持久化 API（/wosai/color_presets）
-├── presets/                     # 运行时生成：取色历史/自定义预设 JSON
-├── nodes/                       # 节点（V1 + V3 同文件共存）
-│   ├── canvas_note.py           # 画布注释 CanvasNote
-│   ├── size_select.py           # 尺寸选择 SizeSelect
-│   └── omni_slider.py           # 万能滑条 OmniSlider
-├── web/
-│   ├── canvas-note.js           # CanvasNote 前端扩展入口
-│   ├── node-color.js            # NodeColor 扩展（独立，对任意节点有效）
-│   ├── color-bar.js             # ColorBar 快捷上色条（悬浮球 + HUD）
-│   ├── omni-slider.js           # OmniSlider 前端扩展入口
-│   ├── size-select.js           # SizeSelect 前端扩展入口
-│   ├── lib/                     # 共享前端模块
-│   │   ├── shared-utils.js      # 字体/颜色工具函数
-│   │   ├── color-core.js        # 上色核心：颜色转换/预设/渐变算法/节点写入
-│   │   ├── color-store.js       # 取色历史持久化（localStorage + 服务端双层）
-│   │   ├── color-theme.js       # 配色主题：12 大类分类器 + 12 组主题 + 撤销
-│   │   ├── color-picker.js      # 颜色选择器共享模块
-│   │   └── note-renderer.js     # CanvasNote 文本渲染引擎
-│   ├── css/
-│   │   ├── wosai-variables.css  # CSS 设计令牌（深/浅色主题变量）
-│   │   ├── wosai-theme.css      # 全局主题样式覆盖
-│   │   ├── os-slider.css        # OmniSlider 样式
-│   │   ├── os-color.css         # NodeColor 样式
-│   │   └── os-size.css          # SizeSelect 样式
-│   └── icons/
-│       └── wosai-logo.svg
-└── locales/zh/                  # 中文翻译
-    └── nodeDefs.json
+	├── extension.json               # ComfyUI 扩展清单（JS/CSS 路径）
+	├── pyproject.toml               # 项目元数据
+	├── docs/                        # 开发文档
+	│   └── comfyui-node-hiding-best-practices.md  # 节点元素隐藏最佳实践（双渲染）
+	├── LICENSE                      # MIT 开源协议
+	├── README.md                    # 本文件
+	├── requirements.txt             # 依赖声明
+	├── .gitignore                   # Git 忽略规则
+	├── workflows/
+	│   ├── WOSAI-ComfyUI_example.json # 演示工作流
+	├── wosai_core/                  # 共享层（唯一包名，避免多插件冲突）
+	│   ├── config.py                # 全局版本号、常量、共享默认值
+	│   ├── registry.py              # 节点自动发现（热重载安全）
+	│   └── color_presets.py         # NodeColor 预设持久化 API（/wosai/color_presets）
+	├── presets/                     # 运行时生成：取色历史/自定义预设 JSON
+	├── nodes/                       # 节点（V1 + V3 同文件共存）
+	│   ├── canvas_note.py           # 画布注释 CanvasNote
+	│   ├── size_select.py           # 尺寸选择 SizeSelect
+	│   └── omni_slider.py           # 万能滑条 OmniSlider
+	├── web/
+	│   ├── canvas-note.js           # CanvasNote 前端扩展入口
+	│   ├── node-color.js            # NodeColor 扩展（独立，对任意节点有效）
+	│   ├── color-bar.js             # ColorBar 快捷上色条（悬浮球 + HUD）
+	│   ├── omni-slider.js           # OmniSlider 前端扩展入口
+	│   ├── size-select.js           # SizeSelect 前端扩展入口
+	│   ├── lib/                     # 共享前端模块
+	│   │   ├── shared-utils.js      # 字体/颜色工具函数 + 图标集
+	│   │   ├── color-core.js        # 上色核心：颜色转换/预设/渐变算法/节点写入
+	│   │   ├── color-store.js       # 取色历史持久化（localStorage + 服务端双层）
+	│   │   ├── color-theme.js       # 配色主题：12 大类分类器 + 12 组主题 + 撤销
+	│   │   ├── glass-theme.js       # 全插件玻璃主题（自动/浅/深三态，面板共享）
+	│   │   ├── note-renderer.js     # CanvasNote 文本渲染引擎
+	│   │   ├── tooltip.js           # 统一切换提示（ColorBar/OmniSlider/NodeColor/CanvasNote 共享）
+	│   │   └── omni-hide.js         # OmniSlider 隐藏模式逻辑（已从主文件提取）
+	│   ├── css/
+	│   │   ├── wosai-variables.css  # CSS 设计令牌（深/浅色主题变量）
+	│   │   ├── wosai-theme.css      # 全局主题样式覆盖
+	│   │   ├── os-slider.css        # OmniSlider 内核样式（滑条 + 交互）
+	│   │   ├── os-slider-panel.css  # OmniSlider 设置面板 + 通道数弹窗
+	│   │   ├── os-slider-hide.css   # OmniSlider 隐藏模式开关
+	│   │   ├── os-color.css         # NodeColor 样式
+	│   │   └── os-size.css          # SizeSelect 样式
+	│   └── icons/
+	│       └── wosai-logo.svg
+	└── locales/
+	    ├── zh/nodeDefs.json         # 中文翻译
+	    └── en/nodeDefs.json         # 英文翻译
 ```
 
 ---
@@ -289,11 +296,13 @@ WOSAI-ComfyUI/
 
 - 遵循 [ComfyUI 自定义节点规范](https://docs.comfy.org/zh-CN/custom-nodes/overview)
 - Node Note 纯前端渲染，Python 仅负责节点注册
+- 前端模块采用 ES module 架构，`lib/` 目录为共享模块，通过 `extension.json` 加载入口文件
 - Size Select 依赖 ComfyUI app.js 模块，需 ComfyUI 0.2.0+
 - NodeColor 渐变与标题样式同时支持经典 Canvas 与 Nodes 2.0（Vue DOM）双渲染路径
+- OmniSlider 隐藏模式通过 CSS 注入实现 Nodes 2.0 兼容（非 MutationObserver 反复打补丁）
 - 取色历史/自定义预设双层持久化：localStorage 即时读写 + 插件目录 `presets/color_presets.json`（服务端不可用时自动降级）
 - 屏幕拾色器使用原生 EyeDropper API，需 Chrome/Edge 95+（不支持时按钮自动禁用）
-- 其余自定义预设（注释样式等）存储于浏览器 localStorage
+- 统一 tooltip 机制：所有面板使用 `lib/tooltip.js` 共享实现，零延迟即时显示，视口自动钳制
 
 ---
 

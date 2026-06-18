@@ -1,4 +1,4 @@
-﻿from wosai_core.config import CATEGORY_PREFIX
+from wosai_core.config import CATEGORY_PREFIX
 
 
 class WOSAI_CanvasNote:

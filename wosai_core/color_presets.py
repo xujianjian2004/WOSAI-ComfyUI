@@ -1,4 +1,4 @@
-﻿# WOSAI NodeColor 预设持久化 API
+# WOSAI NodeColor 预设持久化 API
 # GET/POST /wosai/color_presets — 读写插件目录下 presets/color_presets.json
 # 仅在 PromptServer 可用时注册（import 本模块即生效）；失败由 __init__.py 捕获降级。
 

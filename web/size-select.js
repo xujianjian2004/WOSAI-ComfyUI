@@ -5,6 +5,9 @@ const MIN_DIMENSION  = 256;
 const DEFAULT_RES    = "FHD 1080P 全高清";
 const DEFAULT_RATIO  = "9:16 Mobile 手机竖屏";
 
+// ═══ 分辨率数据 ═══════════════════════════════════════════════════════════════════
+// ⚠ 与 nodes/size_select.py 的 RESOLUTION_DATA 必须保持同步（前端用于 UI 渲染与即时预览，
+//   后端是真正的计算源）。修改任一端时须同步另一端。
 const RESOLUTION_DATA = {
     "SD 480P 标清":  { "3:2":[768,512],  "2:3":[512,768],  "4:3":[512,384],  "3:4":[384,512],  "16:9":[640,360],  "9:16":[360,640],  "21:9":[768,328],  "1:1":[512,512]  },
     "HD 720P 高清":  { "3:2":[1152,768], "2:3":[768,1152], "4:3":[1024,768], "3:4":[768,1024], "16:9":[1280,720], "9:16":[720,1280], "21:9":[1280,544], "1:1":[768,768]  },
@@ -563,6 +566,7 @@ function buildUI(node) {
 app.registerExtension({
     name: "WOSAI_SizeSelect",
 
+    // 注入 CSS（extension.json 声明 + JS 手动双保险——其他 WOSAI 扩展同模式）
     setup() {
         if (!document.getElementById("wosai-os-size-css") && !document.querySelector('link[href*="os-size.css"]')) {
             const link = document.createElement("link");

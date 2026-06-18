@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from .wosai_core.registry import Registry
 
 WEB_DIRECTORY = "./web"

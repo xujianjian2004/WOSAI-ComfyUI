@@ -1,8 +1,11 @@
-﻿import math
+import math
 from typing import Optional
 
 from wosai_core.config import CATEGORY_PREFIX
 
+# ═══ 分辨率数据 ═══════════════════════════════════════════════════════════════════
+# ⚠ 与 web/size-select.js 的 RESOLUTION_DATA 必须保持同步（后端是真正的计算源）
+#   前端用于 UI 渲染与即时预览）。修改任一端时须同步另一端。
 RESOLUTION_DATA = {
     "SD 480P 标清": {
         "3:2": (768, 512),  "2:3": (512,  768),

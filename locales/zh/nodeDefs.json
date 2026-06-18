@@ -1,20 +1,7 @@
 {
     "WOSAI_OmniSlider": {
         "display_name": "万能滑条 OmniSlider",
-        "description": "多通道滑条控制，支持浮点/整数/填充样式",
-        "inputs": {
-            "active_value": {
-                "display_name": "当前值",
-                "tooltip": "内部缓存键，自动同步滑条值"
-            }
-        },
-        "outputs": {
-            "滑条1": { "display_name": "滑条1" },
-            "滑条2": { "display_name": "滑条2" },
-            "滑条3": { "display_name": "滑条3" },
-            "滑条4": { "display_name": "滑条4" },
-            "滑条5": { "display_name": "滑条5" }
-        }
+        "description": "多通道滑条控制，支持浮点/整数/填充样式"
     },
     "WOSAI_SizeSelect": {
         "display_name": "尺寸选择 SizeSelect",

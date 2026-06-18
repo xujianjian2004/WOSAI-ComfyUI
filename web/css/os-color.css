@@ -7,9 +7,9 @@
 .nc-p {
   position: fixed;
   width: 240px;
-  padding: var(--ws-panel-padding, 10px);
+  padding: var(--ws-panel-padding, 14px);
   background: var(--ws-surface);
-  border: var(--ws-border-width, 1px) solid var(--ws-border);
+  border: var(--ws-border-width, 1.5px) solid var(--ws-border);
   border-radius: var(--ws-panel-radius, 14px);
   box-shadow: var(--ws-shadow-panel);
   color: var(--ws-text);
@@ -383,6 +383,12 @@ html[data-theme="light"] .nc-dgi { border-color: rgba(0, 0, 0, .12); }
 }
 .nc-cfb:hover { background: var(--ws-accent); color: var(--ws-text-on-accent); border-color: var(--ws-accent); }
 .nc-cfb:active { filter: brightness(.85); transition: none; }
+/* 清除按钮：清除预览状态高亮 */
+.nc-cfb.nc-cleared {
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  border-color: var(--ws-accent);
+}
 
 /* ── Title style rows ── */
 .nc-ts-row {
@@ -474,14 +480,14 @@ html[data-theme="light"] .nc-dgi { border-color: rgba(0, 0, 0, .12); }
 .nc-sti-chip.on::after {
   content: '';
   position: absolute;
-  top: 100%;
+  top: calc(100% - 2px);   /* 上移 2px 嵌入按钮底边，与按钮无缝相连（同图1）*/
   left: 50%;
   transform: translateX(-50%);
   width: 0;
   height: 0;
-  border-left: 5px solid transparent;
-  border-right: 5px solid transparent;
-  border-top: 5px solid var(--ws-accent);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid var(--ws-accent);
 }
 .nc-sti-chip.on.nc-sti-no-tri::after { display: none; }
 .nc-sti-swatch { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }

@@ -73,6 +73,13 @@ function parseSpanStyle(str) {
     }
     return result;
 }
+// 颜色规范化：仅对「裸 16 进制(3/6 位)」补 #；命名色(blue)、rgb()/rgba()、已带 # 的原样保留。
+// 修复：早期统一 `'#'+c` 会把 "blue" 变成非法的 "#blue" → ctx.fillStyle 失败 → 退回白色。
+function normColor(c) {
+    c = (c || "").trim();
+    if (/^[0-9a-fA-F]{3}$/.test(c) || /^[0-9a-fA-F]{6}$/.test(c)) return "#" + c;
+    return c;
+}
 function extractAttr(attrStr, name) {
     const re = new RegExp('\\b' + name + '\\s*=\\s*([\\\'"])', 'i');
     const m = attrStr.match(re);
@@ -110,14 +117,14 @@ function applyTagAttrs(tagName, attrStr, baseAttrs) {
     if (sp['font-weight']) { a.bold = sp['font-weight'] === 'bold' || sp['font-weight'] === '700'; if (!a.bold) a._spanWeight = sp['font-weight']; }
     if (sp['font-size']) { const m = sp['font-size'].match(/^(\d+(?:\.\d+)?)/); if (m) a._spanSize = parseFloat(m[1]); }
     if (sp['font-family']) a._spanFamily = sp['font-family'];
-    if (sp['color']) { let c = sp['color'].trim(); if (!c.startsWith('#')) c = '#' + c; a._spanColor = c; }
+    if (sp['color']) a._spanColor = normColor(sp['color']);
     if (sp['text-align']) a.textAlign = sp['text-align'];
     if (sp['text-decoration'] === 'underline') a.underline = true;
     if (sp['text-decoration'] === 'line-through') a.strike = true;
     if (sp['font-style'] === 'italic') a.italic = true;
     if (sp['line-height']) { const l = parseFloat(sp['line-height']); if (l) a._lineHeight = l; }
     if (tagName === 'font') {
-        const fc = extractAttr(attrStr, 'color'); if (fc) { let c = fc.trim(); if (!c.startsWith('#')) c = '#' + c; a._spanColor = c; }
+        const fc = extractAttr(attrStr, 'color'); if (fc) a._spanColor = normColor(fc);
         const fs = extractAttr(attrStr, 'size'); if (fs) { const n = parseInt(fs); if (n) a._spanSize = n * 4 + 12; }
         const ff = extractAttr(attrStr, 'face'); if (ff) a._spanFamily = ff;
     }
@@ -263,7 +270,7 @@ function parseInline(raw, baseAttrs) {
                             if (styleProps['font-weight']) { spanAttrs.bold = styleProps['font-weight'] === 'bold' || styleProps['font-weight'] === '700'; if (!spanAttrs.bold) spanAttrs._spanWeight = styleProps['font-weight']; }
                             if (styleProps['font-size']) { const m = styleProps['font-size'].match(/^(\d+(?:\.\d+)?)/); if (m) spanAttrs._spanSize = parseFloat(m[1]); }
                             if (styleProps['font-family']) spanAttrs._spanFamily = styleProps['font-family'];
-                            if (styleProps['color']) { let c = styleProps['color'].trim(); if (!c.startsWith('#')) c = '#' + c; spanAttrs._spanColor = c; }
+                            if (styleProps['color']) spanAttrs._spanColor = normColor(styleProps['color']);
                             tokens.push(...parseInline(innerRaw, spanAttrs));
                             last = closeIdx + closeTag.length; i = last; matched = true;
                         }
@@ -573,16 +580,32 @@ export function drawNodeText(ctx, node, scrollbarW = 0) {
     const text = p.text.replace(/\\n/g,"\n").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
     const fontSize = p.fontSize || 24, uiFont = getUIFont();
     ctx.font = `${fontSize}px ${uiFont}`;
-    const blocks = parseTextBlocks(text), maxW = node.size[0] - 2 * p.padding - scrollbarW;
+    const maxW = node.size[0] - 2 * p.padding - scrollbarW;
+    // 排版缓存：解析(parseTextBlocks)+分词(buildTokenList)+换行(wrapChars) 很重，
+    //   拖动时每秒数十次全量重排会卡顿/闪烁。按 文本/字号/行距/宽度/字重/字体 缓存
+    //   blocks 与各块换行结果，内容/尺寸不变即复用，每帧只剩绘制(measure+fill)。
+    const ntKey = text + '|' + fontSize + '|' + (p.lineHeight||1.4) + '|' + p.padding + '|' + node.size[0] + '|' + (p.fontWeight||'') + '|' + scrollbarW + '|' + uiFont;
+    let _nt = node._ntCache;
+    if (!_nt || _nt.key !== ntKey) {
+        const bl = parseTextBlocks(text);
+        _nt = node._ntCache = { key: ntKey, blocks: bl, lines: bl.map(b => b.type === 'table' ? null : wrapChars(ctx, buildTokenList(b.text), maxW, fontSize, uiFont)) };
+    }
+    const blocks = _nt.blocks, blockLines = _nt.lines;
     const lineH = fontSize * (p.lineHeight || 1.4); ctx.textBaseline = "top";
     let curY = p.padding;
-    for (const block of blocks) {
+    // 视口裁剪：仅溢出滚动时(scrollbarW>0)启用。可视范围(内容坐标)=[_scrollY, _scrollY+h]，
+    //   留一行余量。屏幕外的纯文本行只累加高度、跳过 measure/fill/linkAreas；含图片的行
+    //   不裁剪，避免图片高度未知导致后续行垂直错位。大文档拖动时绘制量大幅下降。
+    const _cull = scrollbarW > 0, _vTop = (node._scrollY || 0) - lineH, _vBot = (node._scrollY || 0) + node.size[1] + lineH;
+    for (let _bi = 0; _bi < blocks.length; _bi++) {
+        const block = blocks[_bi];
         if (block.type === 'table') { curY += lineH * 0.3; curY = drawTable(ctx, block, p.padding, curY, maxW, fontSize, uiFont, p.fontColor); curY += lineH * 0.3; continue; }
-        const tokens = buildTokenList(block.text), lines = wrapChars(ctx, tokens, maxW, fontSize, uiFont);
+        const lines = blockLines[_bi];
         for (let li = 0; li < lines.length; li++) {
             const row = lines[li];
             if (!row.length) { const nextRow = lines[li + 1]; curY += nextRow && nextRow[0] && (nextRow[0].isList || nextRow[0].isOrderedList) ? lineH * 0.15 : lineH; continue; }
             const rh = getLineH(row, fontSize, p.lineHeight);
+            if (_cull && (curY + rh < _vTop || curY > _vBot) && !row.some(t => t.image)) { curY += rh; continue; }
             for (const tok of row) {
                 if (tok._gk === undefined) {
                     const font = tokFont(tok, fontSize, p.fontWeight, uiFont);

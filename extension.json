@@ -17,6 +17,8 @@
     "web/css/wosai-variables.css",
     "web/css/wosai-theme.css",
     "web/css/os-slider.css",
+    "web/css/os-slider-panel.css",
+    "web/css/os-slider-hide.css",
     "web/css/os-color.css",
     "web/css/os-size.css"
   ],

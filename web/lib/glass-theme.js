@@ -28,6 +28,8 @@ export const GLASS_TOKENS = {
         divider: 'rgba(255,255,255,.16)',
         chipRing: 'rgba(255,255,255,.25)',
         rowHover: 'rgba(221,111,74,.22)',
+        iconColor: '#AEBFD0',          // 工具栏图标静止态：软蓝灰（比纯灰耐看）
+        iconAccent: '#DD6F4A',         // 悬停点亮：品牌橙
     },
     light: {
         glass: 'rgba(255,255,255,0.55)',
@@ -40,6 +42,8 @@ export const GLASS_TOKENS = {
         divider: 'rgba(0,0,0,.14)',
         chipRing: 'rgba(0,0,0,.16)',
         rowHover: 'rgba(221,111,74,.18)',
+        iconColor: '#5E6B7A',          // 浅色主题：较深的软蓝灰，保证对比
+        iconAccent: '#DD6F4A',         // 品牌橙（深浅主题统一）
     },
 };
 

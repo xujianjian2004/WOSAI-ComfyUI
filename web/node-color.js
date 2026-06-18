@@ -8,6 +8,7 @@ import {
 import { store, initStore, persist, addRecent } from "./lib/color-store.js";
 import { WS_ICONS } from "./lib/shared-utils.js";
 import { getGlassTheme, getGlassMode, cycleGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./lib/glass-theme.js";
+import { showTip, hideTip } from "./lib/tooltip.js";
 
 // Shared gradient state - set by setup() for access from applyColor()
 let _refreshDOMGradients = null;
@@ -16,6 +17,9 @@ let _gradPollIntervalId = null;
 let _gradMORef = null;          // MutationObserver 引用（扩展卸载时断开）
 let _applyTitleAlignInline = null;
 let _onHexChFn = null;
+
+// 原型 hook 原函数引用（供 remove() 还原，防热重载 --watch 叠套）
+const _protoRefs = {};
 
 // ── 取色历史 & 自定义预设 ──
 // 数据与持久化迁至 lib/color-store.js（localStorage + 服务端 JSON 双层）
@@ -76,7 +80,12 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     // 清理旧面板（防止异常未 close 导致的 DOM/CSS 泄漏）
     // CSS 已通过 extension.json 加载 web/css/os-color.css
     const oldPanel = document.querySelector('.nc-p');
-    if (oldPanel) { oldPanel.remove(); }
+    if (oldPanel) {
+        // 先走 close 路径解绑 document 级监听器，再移除 DOM；
+        // 仅 remove() 会让旧面板的 _closeHandler/_pinOnMove 等监听器残留累积
+        if (typeof oldPanel._wosaiClose === 'function') oldPanel._wosaiClose();
+        oldPanel.remove();
+    }
 
     const canvas = app.canvas;
 
@@ -93,6 +102,8 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         // 标题文字样式（始终生效）
         titleStyle: { size: 14, color: '#ffffff', align: 'left', weight: 'normal' },
     };
+    // 清除状态标记已迁移至 _ncBuildFooter 内部 _isCleared
+
     // 从已有节点读取 titleStyle 初始值（多节点时取第一个）
     if (nodes[0]?._titleStyle) {
         S.titleStyle = { ...S.titleStyle, ...nodes[0]._titleStyle };
@@ -131,13 +142,20 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
 
     // ── 灰度色卡模式：按住 Shift 时纯色预设切换为 12 级灰度 ──
     let grayMode = false;
+    // 预设构建代理（闭包包装模块级 _ncBuildPresets）
+    const _callBuildPresets = () => _ncBuildPresets(document.getElementById('ncPa'), S, grayMode, {
+        showTip, hideTip, hsv2hex, hex2hsv, deriveMidStop,
+        SOLID_PRESETS, GRAD_PRESETS, GRAY_PRESETS,
+        onColorChange: () => { saveAndSync(); refresh(); },
+        onGradPick: () => { rebuildPins(); updateGradVisibility(); paintStopbar(); updatePins(); updateDirThumbs(); saveAndSync(); refresh(); },
+    });
     const _onGrayKeyDown = (e) => {
-        if (e.key === 'Shift' && !grayMode && S.stopCount === 1) { grayMode = true; buildPresets(); }
+        if (e.key === 'Shift' && !grayMode && S.stopCount === 1) { grayMode = true; _callBuildPresets(); }
     };
     const _onGrayKeyUp = (e) => {
-        if (e.key === 'Shift' && grayMode) { grayMode = false; buildPresets(); }
+        if (e.key === 'Shift' && grayMode) { grayMode = false; _callBuildPresets(); }
     };
-    const _onGrayBlur = () => { if (grayMode) { grayMode = false; buildPresets(); } };
+    const _onGrayBlur = () => { if (grayMode) { grayMode = false; _callBuildPresets(); } };
     document.addEventListener('keydown', _onGrayKeyDown);
     document.addEventListener('keyup', _onGrayKeyUp);
     window.addEventListener('blur', _onGrayBlur);
@@ -159,10 +177,13 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     function updatePins(){S.stops.forEach((s,i)=>{const el=document.getElementById('ncP'+i);if(el){el.style.left=(s.p*100)+'%';el.style.background=sHex(i);}});}
     function updateThumb(){const t=document.getElementById('ncSvt');t.style.left=S.s+'%';t.style.top=(100-S.v)+'%';t.style.background=curHex();}
     function updateDirThumbs(){document.querySelectorAll('#ncDg .nc-dgi').forEach(el=>{const d=parseInt(el.dataset.deg)||180;const dir=d+'deg';const s0=sHex(0),sLast=sHex(S.stops.length-1);if(S.stopCount===3){el.style.background=`linear-gradient(${dir}, ${s0} 0%, ${s0} 18%, ${sHex(1)} 42%, ${sHex(1)} 58%, ${sLast} 82%, ${sLast} 100%)`;}else{el.style.background=`linear-gradient(${dir}, ${s0} 0%, ${s0} 30%, ${sLast} 70%, ${sLast} 100%)`;}});}
+    const _callRenderStop = () => _ncRenderStopIndicators(S, {
+        hsv2hex, setStopCount: (cnt) => setStopCount(cnt), saveAndSync, refresh,
+    });
     function refresh(){
         paintSq(); updateThumb();
         if(S.stopCount>1){paintStopbar();updatePins();updateDirThumbs();}
-        renderStopIndicators();
+        _callRenderStop();
         // 标题样式控件实时刷新
         if (sizeRange) { sizeRange.value = S.titleStyle.size; }
         if (sizeNum) { sizeNum.value = S.titleStyle.size; }
@@ -195,6 +216,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
 
     // 上色核心已迁至 lib/color-core.js applyColorState —— 此处只做状态快照与刷新
     function applyToNodes(){
+        resetCleared();  // 任何主动上色操作取消清除状态
         applyColorState(nodes, {
             stopCount: S.stopCount,
             editTarget: S.editTarget,
@@ -260,110 +282,235 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         }
         rebuildPins();
         updateGradVisibility();
-        buildPresets();
+        _callBuildPresets();
         saveAndSync();
         refresh();
     }
 
-    // 动态重建取色针脚（清空 + 按 stops 数量重建）
-    let _pinOnMove = null, _pinOnUp = null;
-    function rebuildPins() {
-        const sbArea = document.querySelector('#ncSbw > div');
-        if (!sbArea) return;
-        // 移除旧针脚（保留 canvas）
-        sbArea.querySelectorAll('.nc-sp').forEach(el => el.remove());
-        // 移除旧的全局事件监听器，防止累积泄漏
-        if (_pinOnMove) document.removeEventListener('pointermove', _pinOnMove);
-        if (_pinOnUp) {
-            document.removeEventListener('pointerup', _pinOnUp);
-            document.removeEventListener('pointercancel', _pinOnUp);
-        }
-        const cvs = document.getElementById('ncSbc');
-        S.stops.forEach((st, i) => {
-            const pin = document.createElement('div');
-            pin.id = 'ncP' + i;
-            pin.className = 'nc-sp' + (i === S.aStop ? ' on' : '');
-            pin.style.left = (st.p * 100) + '%';
-            pin.style.background = sHex(i);
-            let drag = false;
-            pin.addEventListener('pointerdown', e => {
-                e.stopPropagation(); e.preventDefault(); drag = true; S.aStop = i;
-                sbArea.querySelectorAll('.nc-sp').forEach(p => p.classList.remove('on'));
-                pin.classList.add('on');
-                const st2 = S.stops[i];
-                S.h = st2.h; S.s = st2.s; S.v = st2.v;
-                document.getElementById('ncHs').value = st2.h;
-                refresh();
-            });
-        });
-        // 全局共享的移动/释放监听器（整个 picker 共用，rebuidPins 时替换）
-        _pinOnMove = e => {
-            const dragIdx = S.aStop;
-            if (dragIdx === undefined || dragIdx === null) return;
-            const r = sbArea.getBoundingClientRect();
-            if (!r.width) return;
-            S.stops[dragIdx].p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-            paintStopbar(); updatePins(); updateDirThumbs(); renderStopIndicators();
+    // 动态重建取色针脚（清空 + 按 stops 数量重建，已提取到 _ncRebuildPins）
+    const _pinRefs = { onMove: null, onUp: null };
+    const rebuildPins = () => _ncRebuildPins(S, _pinRefs, {
+        sHex, refresh, paintStopbar, updatePins, updateDirThumbs,
+        renderStop: _callRenderStop,
+    });
+// 工具按钮工厂（提取为模块级，供颜色选取工具行使用）
+function _ncMkToolBtn(iconSvg, tip, showTip, hideTip) {
+    const b = document.createElement('div');
+    b.innerHTML = iconSvg;
+    b.style.cssText = 'width:30px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--ws-surface-2);cursor:pointer;color:var(--ws-icon);user-select:none;flex-shrink:0;transition:color .12s,transform .12s';
+    b.onmousedown = e => e.preventDefault();
+    b._tip = tip;
+    b.onmouseenter = () => {
+        b.style.color = 'var(--ws-accent)'; b.style.transform = 'scale(1.12)';
+        if (b._tip) showTip(b, b._tip);
+    };
+    b.onmouseleave = () => { b.style.color = 'var(--ws-icon)'; b.style.transform = ''; hideTip(); };
+    return b;
+}
+
+// ── 页脚：清除/确认按钮 ──
+function _ncBuildFooter(panel, callbacks) {
+    const { refresh, close, canvas, app, refreshDOMGradients } = callbacks;
+    let _isCleared = false;
+    const fRow = document.createElement("div"); fRow.className = "nc-fb";
+    const resetBtn = document.createElement("button"); resetBtn.className = "nc-cfb"; resetBtn.textContent = "清除";
+    resetBtn.onclick = () => {
+        _isCleared = true;
+        callbacks.onClear();
+        canvas.setDirty(true, true); app.graph.setDirtyCanvas(true, true);
+        if (typeof refreshDOMGradients === "function") refreshDOMGradients();
+        refresh();
+        resetBtn.classList.add('nc-cleared');
+    };
+    const confirmBtn = document.createElement("button"); confirmBtn.className = "nc-cfb"; confirmBtn.textContent = "确认";
+    confirmBtn.onclick = () => {
+        if (!_isCleared) callbacks.onConfirm();
+        close();
+    };
+    fRow.appendChild(resetBtn); fRow.appendChild(confirmBtn);
+    panel.appendChild(fRow);
+    return { resetCleared: () => { _isCleared = false; resetBtn.classList.remove('nc-cleared'); } };
+}
+
+// ── 核心取色器 UI：SV 面板 + 色相辉 + HEX 输入 + 方向网格 ──
+function _ncBuildCorePickerUI(panel, S, presetArea, stiWrap, callbacks) {
+    const { onHue, showTip, hideTip, WS_ICONS, DIRS, DIR_TIPS, randomHSV, addRecentPick,
+            onHexCh, curHex, saveAndSync, refresh, nodes, applySolidHex, refreshAllNodeVisuals } = callbacks;
+    const mkToolBtn = (iconSvg, tip) => _ncMkToolBtn(iconSvg, tip, showTip, hideTip);
+    // SV square
+    const svSq = document.createElement("div"); svSq.id = "ncSv"; svSq.className = "nc-sv";
+    const svW = document.createElement("div"); svW.className = "nc-svw";
+    const svB = document.createElement("div"); svB.className = "nc-svb";
+    const svT = document.createElement("div"); svT.id = "ncSvt"; svT.className = "nc-svt";
+    svSq.appendChild(svW); svSq.appendChild(svB); svSq.appendChild(svT);
+    panel.appendChild(svSq);
+    // hue slider
+    const hw = document.createElement("div"); hw.className = "nc-hw";
+    const hs = document.createElement("input"); hs.id = "ncHs"; hs.className = "nc-hs";
+    hs.type = "range"; hs.min = 0; hs.max = 360; hs.value = 20;
+    hs.oninput = function () { onHue(+this.value); };
+    hs.addEventListener('wheel', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        let v = Math.max(0, Math.min(360, (+hs.value) + (e.deltaY < 0 ? 1 : -1)));
+        if (v !== +hs.value) { hs.value = v; onHue(v); }
+    }, { passive: false });
+    hw.appendChild(hs);
+    panel.appendChild(hw);
+    // 工具行
+    const toolRow = document.createElement('div');
+    toolRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 4px';
+    const hexInput = document.createElement('input');
+    hexInput.id = 'ncHex'; hexInput.type = 'text';
+    hexInput.spellcheck = false; hexInput.maxLength = 7;
+    hexInput.placeholder = '#RRGGBB';
+    hexInput.style.cssText = 'flex:1;min-width:0;height:26px;box-sizing:border-box;background:var(--ws-surface-2);border:1px solid transparent;border-radius:6px;color:var(--ws-text);font-size:12px;padding:0 8px;text-transform:uppercase;letter-spacing:.5px;outline:none;font-family:monospace';
+    const commitHex = () => {
+        let v = hexInput.value.trim();
+        if (!v) return;
+        if (v[0] !== '#') v = '#' + v;
+        if (/^#[0-9a-fA-F]{3}$/.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join('');
+        if (!/^#[0-9a-fA-F]{6}$/.test(v)) { hexInput.value = curHex().toUpperCase(); return; }
+        onHexCh(v.toLowerCase());
+    };
+    hexInput.onchange = commitHex;
+    hexInput.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { commitHex(); hexInput.blur(); } };
+    hexInput.onclick = () => hexInput.select();
+    const eyeBtn = mkToolBtn(WS_ICONS.pipette, '自定义取色');
+    if (window.EyeDropper) {
+        eyeBtn.onclick = async () => {
+            try { const r = await new window.EyeDropper().open(); const hex = r.sRGBHex.toLowerCase(); addRecentPick(hex); onHexCh(hex); }
+            catch (e) { }
         };
-        _pinOnUp = () => { /* drag 状态在各 pin 的 pointerdown 中管理 */ };
-        document.addEventListener('pointermove', _pinOnMove);
-        document.addEventListener('pointerup', _pinOnUp);
-        document.addEventListener('pointercancel', _pinOnUp);
-        renderStopIndicators();
+    } else {
+        eyeBtn.style.opacity = '.35'; eyeBtn.style.cursor = 'not-allowed';
+        eyeBtn._tip = '当前浏览器不支持屏幕取色（需 Chrome/Edge 95+）';
     }
-    // 渲染颜色站指示区域：模式按钮（单色/双色/三色）+ 上下文子芯片，各自独立背景
-    function renderStopIndicators() {
-        const sti = document.getElementById('ncSti');
-        if (!sti) return;
-        sti.innerHTML = '';
-
-        // ── 模式按钮行：单色 / 双色 / 三色（始终显示） ──
-        const modeRow = document.createElement('div');
-        modeRow.style.cssText = 'display:flex;gap:2px;width:100%;padding:4px;border-radius:8px;background:var(--ws-surface-2);border:1px solid transparent;box-sizing:border-box;overflow:visible;margin-bottom:4px';
-        const modes = ['单色', '双色', '三色'];
-        modes.forEach((label, i) => {
-            const cnt = i + 1;
-            const btn = document.createElement('div');
-            btn.className = 'nc-sti-chip' + (S.stopCount === cnt ? ' on' : '');
-            btn.textContent = label;
-            btn.onclick = () => {
-                if (S.stopCount === cnt) return;
-                setStopCount(cnt);
-            };
-            modeRow.appendChild(btn);
-        });
-        sti.appendChild(modeRow);
-
-        // ── 子芯片行：单色模式时显示编辑目标切换 ──
-        if (S.stopCount === 1) {
-            const subRow = document.createElement('div');
-            subRow.style.cssText = 'display:flex;gap:2px;width:100%;padding:4px 4px 8px 4px;border-radius:8px;background:var(--ws-surface-2);border:1px solid transparent;box-sizing:border-box;overflow:visible';
-            const targets = [
-                { key: 'bg',  label: '面板背景', hex: hsv2hex(S.bgH, S.bgS, S.bgV) },
-                { key: 'hdr', label: '标题背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV) },
-                { key: 'sync', label: '整体背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV), dual: true },
-            ];
-            targets.forEach(t => {
-                const chip = document.createElement('div');
-                chip.className = 'nc-sti-chip nc-sti-no-tri' + (S.editTarget === t.key ? ' on' : '');
-                chip.style.fontSize = '11px';
-                chip.style.whiteSpace = 'nowrap';
-                // icon removed, label only
-                const label = document.createElement('span');
-                label.textContent = t.label;
-                label.style.whiteSpace = 'nowrap';
-                chip.appendChild(label);
-                chip.onclick = () => {
-                    S.editTarget = t.key;
-                    document.getElementById('ncHs').value = S.h;
-                    saveAndSync();
-                    refresh();
-                };
-                subRow.appendChild(chip);
-            });
-            sti.appendChild(subRow);
+    const randBtn = mkToolBtn(WS_ICONS.dice, 'Alt + 点击：多节点 / 分组随机配色');
+    randBtn.onclick = (e) => {
+        if (e.altKey && nodes.length > 1) {
+            nodes.forEach(n => { const c = randomHSV(); applySolidHex([n], hsv2hex(c.h, c.s, c.v), { ...S.titleStyle }); });
+            refreshAllNodeVisuals(); return;
         }
+        const c = randomHSV();
+        S.h = c.h; S.s = c.s; S.v = c.v;
+        if (S.stopCount > 1) { const st = S.stops[S.aStop]; st.h = c.h; st.s = c.s; st.v = c.v; }
+        document.getElementById('ncHs').value = c.h;
+        saveAndSync(); refresh();
+    };
+    toolRow.appendChild(hexInput); toolRow.appendChild(eyeBtn); toolRow.appendChild(randBtn);
+    panel.appendChild(toolRow);
+    panel.appendChild(presetArea);
+    panel.appendChild(stiWrap);
+    // direction grid（保持与旧 CSS class.nc-dgt 一致）
+    const dirWrap = document.createElement("div"); dirWrap.id = "ncDg"; dirWrap.className = "nc-dg"; dirWrap.style.display = "none";
+    DIRS.forEach(d => {
+        const el = document.createElement("div");
+        el.className = 'nc-dgi' + (d.sym === S.dir ? ' on' : '');
+        el.dataset.deg = d.deg;
+        el.dataset.tip = DIR_TIPS[d.sym];
+        const sym = document.createElement("div"); sym.className = 'nc-dgs'; sym.textContent = d.sym;
+        el.appendChild(sym);
+        const tip = document.createElement("div"); tip.className = 'nc-dgt'; tip.textContent = DIR_TIPS[d.sym];
+        el.appendChild(tip);
+        el.onclick = () => {
+            document.querySelectorAll('#ncDg .nc-dgi').forEach(c => c.classList.remove('on'));
+            el.classList.add('on'); S.dir = d.sym;
+            saveAndSync(); refresh();
+        };
+        dirWrap.appendChild(el);
+    });
+    panel.appendChild(dirWrap);
+    return { hexInput, dirWrap };
+}
+
+function _ncRebuildPins(S, pinRefs, callbacks) {
+    const sbArea = document.querySelector('#ncSbw > div');
+    if (!sbArea) return;
+    sbArea.querySelectorAll('.nc-sp').forEach(el => el.remove());
+    if (pinRefs.onMove) document.removeEventListener('pointermove', pinRefs.onMove);
+    if (pinRefs.onUp) {
+        document.removeEventListener('pointerup', pinRefs.onUp);
+        document.removeEventListener('pointercancel', pinRefs.onUp);
     }
+    const { sHex, refresh, paintStopbar, updatePins, updateDirThumbs, renderStop } = callbacks;
+    S.stops.forEach((st, i) => {
+        const pin = document.createElement('div');
+        pin.id = 'ncP' + i;
+        pin.className = 'nc-sp' + (i === S.aStop ? ' on' : '');
+        pin.style.left = (st.p * 100) + '%';
+        pin.style.background = sHex(i);
+        let drag = false;
+        pin.addEventListener('pointerdown', e => {
+            e.stopPropagation(); e.preventDefault(); drag = true; S.aStop = i;
+            sbArea.querySelectorAll('.nc-sp').forEach(p => p.classList.remove('on'));
+            pin.classList.add('on');
+            const st2 = S.stops[i];
+            S.h = st2.h; S.s = st2.s; S.v = st2.v;
+            document.getElementById('ncHs').value = st2.h;
+            refresh();
+        });
+    });
+    pinRefs.onMove = e => {
+        const dragIdx = S.aStop;
+        if (dragIdx === undefined || dragIdx === null) return;
+        const r = sbArea.getBoundingClientRect();
+        if (!r.width) return;
+        S.stops[dragIdx].p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+        paintStopbar(); updatePins(); updateDirThumbs(); renderStop();
+    };
+    pinRefs.onUp = () => {};
+    document.addEventListener('pointermove', pinRefs.onMove);
+    document.addEventListener('pointerup', pinRefs.onUp);
+    document.addEventListener('pointercancel', pinRefs.onUp);
+    renderStop();
+}
+
+function _ncRenderStopIndicators(S, callbacks) {
+    const sti = document.getElementById('ncSti');
+    if (!sti) return;
+    sti.innerHTML = '';
+    const { hsv2hex, setStopCount, saveAndSync, refresh } = callbacks;
+
+    const modeRow = document.createElement('div');
+    modeRow.style.cssText = 'display:flex;gap:2px;width:100%;padding:4px;border-radius:8px;background:var(--ws-surface-2);border:1px solid transparent;box-sizing:border-box;overflow:visible;margin-bottom:4px';
+    ['单色', '双色', '三色'].forEach((label, i) => {
+        const cnt = i + 1;
+        const btn = document.createElement('div');
+        btn.className = 'nc-sti-chip' + (S.stopCount === cnt ? ' on' : '');
+        btn.textContent = label;
+        btn.onclick = () => { if (S.stopCount !== cnt) setStopCount(cnt); };
+        modeRow.appendChild(btn);
+    });
+    sti.appendChild(modeRow);
+
+    if (S.stopCount === 1) {
+        const subRow = document.createElement('div');
+        subRow.style.cssText = 'display:flex;gap:2px;width:100%;padding:4px 4px 8px 4px;border-radius:8px;background:var(--ws-surface-2);border:1px solid transparent;box-sizing:border-box;overflow:visible';
+        const targets = [
+            { key: 'bg',  label: '面板背景', hex: hsv2hex(S.bgH, S.bgS, S.bgV) },
+            { key: 'hdr', label: '标题背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV) },
+            { key: 'sync', label: '整体背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV), dual: true },
+        ];
+        targets.forEach(t => {
+            const chip = document.createElement('div');
+            chip.className = 'nc-sti-chip nc-sti-no-tri' + (S.editTarget === t.key ? ' on' : '');
+            chip.style.fontSize = '11px';
+            chip.style.whiteSpace = 'nowrap';
+            const label = document.createElement('span');
+            label.textContent = t.label;
+            label.style.whiteSpace = 'nowrap';
+            chip.appendChild(label);
+            chip.onclick = () => {
+                S.editTarget = t.key;
+                document.getElementById('ncHs').value = S.h;
+                saveAndSync();
+                refresh();
+            };
+            subRow.appendChild(chip);
+        });
+        sti.appendChild(subRow);
+    }
+}
     function onHue(v){S.h=v;if(S.stopCount>1)S.stops[S.aStop].h=v;saveAndSync();refresh();}
     function onHexCh(v){
         if(!/^#[0-9a-fA-F]{6}$/.test(v))return;
@@ -374,71 +521,69 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     }
     _onHexChFn = onHexCh;
 
-    function buildPresets(){
-        const area=document.getElementById('ncPa');
-        if(!area) return;  // 面板已关闭（store 异步合并回调场景）
-        area.innerHTML='';
-        if(S.stopCount===1){
-            // Shift 按住 → 灰度色卡（参考 NodeAlignPro 交互）
-            const pal = grayMode ? GRAY_PRESETS : SOLID_PRESETS;
-            for(let row=0;row<2;row++){
-                const g=document.createElement('div');g.className='nc-pg';
-                for(let col=0;col<6;col++){
-                    const p=pal[row*6+col];
-                    const el=document.createElement('div');
-                    el.className='nc-ps';el.style.background=p.h;
-                    el.onmouseenter=(e)=>{const r=el.getBoundingClientRect();ncT.textContent=p.n+' '+p.e;ncT.style.display='block';ncT.style.left=(r.left+r.width/2)+'px';ncT.style.top=(r.top-8)+'px';};
-                    el.onmouseleave=()=>{ncT.style.display='none';};
-                    el.onclick=()=>{
-                        area.querySelectorAll('.nc-ps').forEach(x=>x.classList.remove('on'));
-                        el.classList.add('on');
-                        const hv=hex2hsv(S.editTarget==='bg' ? p.b : p.h);S.h=hv.h;S.s=hv.s;S.v=hv.v;
-                        document.getElementById('ncHs').value=hv.h;
-                        saveAndSync();refresh();
-                    };
-                    g.appendChild(el);
-                }
-                area.appendChild(g);
+function _ncBuildPresets(area, S, grayMode, callbacks) {
+    if (!area) return;
+    area.innerHTML = '';
+    const { showTip, hideTip, hsv2hex, hex2hsv, deriveMidStop, SOLID_PRESETS, GRAD_PRESETS, GRAY_PRESETS } = callbacks;
+    if (S.stopCount === 1) {
+        const pal = grayMode ? GRAY_PRESETS : SOLID_PRESETS;
+        for (let row = 0; row < 2; row++) {
+            const g = document.createElement('div'); g.className = 'nc-pg';
+            for (let col = 0; col < 6; col++) {
+                const p = pal[row * 6 + col];
+                const el = document.createElement('div');
+                el.className = 'nc-ps'; el.style.background = p.h;
+                el.onmouseenter = () => showTip(el, p.n + ' ' + p.e);
+                el.onmouseleave = hideTip;
+                el.onclick = () => {
+                    area.querySelectorAll('.nc-ps').forEach(x => x.classList.remove('on'));
+                    el.classList.add('on');
+                    const hv = hex2hsv(S.editTarget === 'bg' ? p.b : p.h);
+                    S.h = hv.h; S.s = hv.s; S.v = hv.v;
+                    document.getElementById('ncHs').value = hv.h;
+                    callbacks.onColorChange();
+                };
+                g.appendChild(el);
             }
-        } else {
-            for(let row=0;row<2;row++){
-                const g=document.createElement('div');g.className='nc-pg';
-                for(let col=0;col<6;col++){
-                    const p=GRAD_PRESETS[row*6+col];
-                    const el=document.createElement('div');
-                    el.className='nc-ps';
-                    if(S.stopCount===3){
-                        const m0=p.s[0],m1=p.s[1];
-                        const mid=deriveMidStop(m0,m1);
-                        el.style.background=`linear-gradient(135deg,${hsv2hex(m0.h,m0.s,m0.v)},${hsv2hex(mid.h,mid.s,mid.v)},${hsv2hex(m1.h,m1.s,m1.v)})`;
+            area.appendChild(g);
+        }
+    } else {
+        for (let row = 0; row < 2; row++) {
+            const g = document.createElement('div'); g.className = 'nc-pg';
+            for (let col = 0; col < 6; col++) {
+                const p = GRAD_PRESETS[row * 6 + col];
+                const el = document.createElement('div');
+                el.className = 'nc-ps';
+                if (S.stopCount === 3) {
+                    const m0 = p.s[0], m1 = p.s[1];
+                    const mid = deriveMidStop(m0, m1);
+                    el.style.background = `linear-gradient(135deg,${hsv2hex(m0.h, m0.s, m0.v)},${hsv2hex(mid.h, mid.s, mid.v)},${hsv2hex(m1.h, m1.s, m1.v)})`;
+                } else {
+                    el.style.background = `linear-gradient(135deg,${hsv2hex(p.s[0].h, p.s[0].s, p.s[0].v)},${hsv2hex(p.s[1].h, p.s[1].s, p.s[1].v)})`;
+                }
+                el.onmouseenter = () => showTip(el, p.n + ' ' + p.e);
+                el.onmouseleave = hideTip;
+                el.onclick = () => {
+                    area.querySelectorAll('.nc-ps').forEach(x => x.classList.remove('on'));
+                    el.classList.add('on');
+                    const s0 = { h: p.s[0].h, s: p.s[0].s, v: p.s[0].v }, s1 = { h: p.s[1].h, s: p.s[1].s, v: p.s[1].v };
+                    if (S.stopCount === 3) {
+                        const mid = deriveMidStop(s0, s1);
+                        S.stops = [{ p: 0, ...s0 }, { p: 0.5, h: mid.h, s: mid.s, v: mid.v }, { p: 1, ...s1 }];
                     } else {
-                        el.style.background=`linear-gradient(135deg,${hsv2hex(p.s[0].h,p.s[0].s,p.s[0].v)},${hsv2hex(p.s[1].h,p.s[1].s,p.s[1].v)})`;
+                        S.stops = [{ p: 0, ...s0 }, { p: 1, ...s1 }];
+                        S.stopCount = 2;
                     }
-                    el.onmouseenter=(e)=>{const r=el.getBoundingClientRect();ncT.textContent=p.n+' '+p.e;ncT.style.display='block';ncT.style.left=(r.left+r.width/2)+'px';ncT.style.top=(r.top-8)+'px';};
-                    el.onmouseleave=()=>{ncT.style.display='none';};
-                    el.onclick=()=>{
-                        area.querySelectorAll('.nc-ps').forEach(x=>x.classList.remove('on'));
-                        el.classList.add('on');
-                        const s0={h:p.s[0].h,s:p.s[0].s,v:p.s[0].v},s1={h:p.s[1].h,s:p.s[1].s,v:p.s[1].v};
-                        if(S.stopCount===3) {
-                            const mid=deriveMidStop(s0,s1);
-                            S.stops=[{p:0,...s0},{p:0.5,h:mid.h,s:mid.s,v:mid.v},{p:1,...s1}];
-                        } else {
-                            S.stops=[{p:0,...s0},{p:1,...s1}];
-                            S.stopCount=2;
-                        }
-                        S.aStop=0;S.h=p.s[0].h;S.s=p.s[0].s;S.v=p.s[0].v;
-                        document.getElementById('ncHs').value=p.s[0].h;
-                        rebuildPins();updateGradVisibility();
-                        paintStopbar();updatePins();updateDirThumbs();
-                        saveAndSync();refresh();
-                    };
-                    g.appendChild(el);
-                }
-                area.appendChild(g);
+                    S.aStop = 0; S.h = p.s[0].h; S.s = p.s[0].s; S.v = p.s[0].v;
+                    document.getElementById('ncHs').value = p.s[0].h;
+                    callbacks.onGradPick();
+                };
+                g.appendChild(el);
             }
+            area.appendChild(g);
         }
     }
+}
 
     const panel = document.createElement("div");
     panel.className="nc-p";
@@ -448,14 +593,11 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     const _closeHandler=e=>{if(!panel.contains(e.target))close();};
     document.addEventListener("pointerdown",_closeHandler,{capture:true});
 
-    const ncT=document.createElement("div");
-    ncT.style.cssText="position:fixed;padding:4px 10px;background:var(--ws-bg);color:var(--ws-text);font-size:12px;border-radius:4px;pointer-events:none;z-index:100001;white-space:nowrap;display:none;transform:translateX(-50%) translateY(-100%);";
-
     // 标题行：标题 + 主题切换按钮同一行
     const titleRow = document.createElement("div");
     titleRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:10px";
     const titleEl = document.createElement("div");
-    titleEl.textContent = "节点配色 Node Color";
+    titleEl.textContent = "高级配色 NodeColor";
     titleEl.style.cssText = "font-size:14px;color:var(--ws-text);letter-spacing:.5px;flex:1;text-align:center";
     titleRow.appendChild(titleEl);
 
@@ -478,8 +620,6 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     // presets
     const presetArea=document.createElement("div");presetArea.id="ncPa";
 
-
-
     // stopbar (pins built dynamically by rebuildPins)
     const sbWrap=document.createElement("div");sbWrap.id="ncSbw";sbWrap.className="nc-sbw";sbWrap.style.display="none";
     const sbArea=document.createElement("div");sbArea.style.cssText="position:relative;height:22px";
@@ -493,135 +633,23 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     stiWrap.id = "ncSti";
     stiWrap.className = "nc-sti";
 
-    // SV square
-    const svSq=document.createElement("div");svSq.id="ncSv";svSq.className="nc-sv";
-    const svW=document.createElement("div");svW.className="nc-svw";
-    const svB=document.createElement("div");svB.className="nc-svb";
-    const svT=document.createElement("div");svT.id="ncSvt";svT.className="nc-svt";
-    svSq.appendChild(svW);svSq.appendChild(svB);svSq.appendChild(svT);
-    panel.appendChild(svSq);
-
-    // hue slider
-    const hw=document.createElement("div");hw.className="nc-hw";
-    const hs=document.createElement("input");hs.id="ncHs";hs.className="nc-hs";hs.type="range";hs.min=0;hs.max=360;hs.value=20;
-    hs.oninput=function(){onHue(+this.value);};
-    hw.appendChild(hs);
-    panel.appendChild(hw);
-
-    // ── 工具行：HEX 输入 + 屏幕吸管 + 随机色 ──
-    const toolRow = document.createElement('div');
-    toolRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 4px';
-    const mkToolBtn = (iconSvg, tip) => {
-        const b = document.createElement('div');
-        b.innerHTML = iconSvg; b.title = tip;
-        b.style.cssText = 'width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--ws-surface-2);cursor:pointer;color:var(--ws-text);user-select:none;flex-shrink:0';
-        b.onmousedown = e => e.preventDefault();
-        return b;
-    };
-    const hexInput = document.createElement('input');
-    hexInput.id = 'ncHex'; hexInput.type = 'text';
-    hexInput.spellcheck = false; hexInput.maxLength = 7;
-    hexInput.placeholder = '#RRGGBB';
-    hexInput.style.cssText = 'flex:1;min-width:0;height:26px;box-sizing:border-box;background:var(--ws-surface-2);border:1px solid transparent;border-radius:6px;color:var(--ws-text);font-size:12px;padding:0 8px;text-transform:uppercase;letter-spacing:.5px;outline:none;font-family:monospace';
-    const commitHex = () => {
-        let v = hexInput.value.trim();
-        if (!v) return;
-        if (v[0] !== '#') v = '#' + v;
-        if (/^#[0-9a-fA-F]{3}$/.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join('');
-        if (!/^#[0-9a-fA-F]{6}$/.test(v)) { hexInput.value = curHex().toUpperCase(); return; }
-        onHexCh(v.toLowerCase());
-    };
-    hexInput.onchange = commitHex;
-    hexInput.onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter') { commitHex(); hexInput.blur(); } };
-    hexInput.onclick = () => hexInput.select();  // 单击全选便于复制
-
-    // 屏幕吸管（原生 EyeDropper API，Chrome/Edge 95+）
-    const eyeBtn = mkToolBtn(WS_ICONS.pipette, '屏幕取色（吸管）');
-    if (window.EyeDropper) {
-        eyeBtn.onclick = async () => {
-            try {
-                const r = await new window.EyeDropper().open();
-                const hex = r.sRGBHex.toLowerCase();
-                addRecentPick(hex);
-                onHexCh(hex);
-            } catch (e) { /* 用户按 Esc 取消 */ }
-        };
-    } else {
-        eyeBtn.style.opacity = '.35';
-        eyeBtn.style.cursor = 'not-allowed';
-        eyeBtn.title = '当前浏览器不支持屏幕取色（需 Chrome/Edge 95+）';
-    }
-
-    // 随机色；Alt+点击 = 超级随机（多选节点各配不同随机色）
-    const randBtn = mkToolBtn(WS_ICONS.dice, 'Alt+点击：多节点随机配色');
-    randBtn.onclick = (e) => {
-        if (e.altKey && nodes.length > 1) {
-            // 超级随机：绕过面板状态，逐节点独立上色
-            nodes.forEach(n => {
-                const c = randomHSV();
-                applySolidHex([n], hsv2hex(c.h, c.s, c.v), { ...S.titleStyle });
-            });
-            refreshAllNodeVisuals();
-            return;
-        }
-        const c = randomHSV();
-        S.h = c.h; S.s = c.s; S.v = c.v;
-        if (S.stopCount > 1) { const st = S.stops[S.aStop]; st.h = c.h; st.s = c.s; st.v = c.v; }
-        document.getElementById('ncHs').value = c.h;
-        saveAndSync(); refresh();
-    };
-
-    toolRow.appendChild(hexInput);
-    toolRow.appendChild(eyeBtn);
-    toolRow.appendChild(randBtn);
-    panel.appendChild(toolRow);
-
-    // 12 颜色预设（色相条下方）
-    panel.appendChild(presetArea);
-
-    // 颜色站模式按钮
-    panel.appendChild(stiWrap);
-
-    // direction grid
-    const dirWrap=document.createElement("div");dirWrap.id="ncDg";dirWrap.className="nc-dg";dirWrap.style.display="none";
-    DIRS.forEach(d=>{
-        const el=document.createElement("div");
-        el.className='nc-dgi'+(d.sym===S.dir?' on':'');
-        el.dataset.deg=d.deg;  // 直接用数值存储角度，避免 Unicode dataset 字符比对问题
-        el.dataset.tip=DIR_TIPS[d.sym];
-        const sym=document.createElement("div");sym.className='nc-dgs';sym.textContent=d.sym;
-        el.appendChild(sym);
-        const tip=document.createElement("div");tip.className='nc-dgt';tip.textContent=DIR_TIPS[d.sym];
-        el.appendChild(tip);
-        el.onclick=()=>{
-            document.querySelectorAll('#ncDg .nc-dgi').forEach(c=>c.classList.remove('on'));
-            el.classList.add('on');S.dir=d.sym;
-            saveAndSync();refresh();
-        };
-        dirWrap.appendChild(el);
+    // ── 核心取色器 UI（已提取到 _ncBuildCorePickerUI）──
+    const { hexInput, dirWrap } = _ncBuildCorePickerUI(panel, S, presetArea, stiWrap, {
+        onHue, showTip, hideTip, WS_ICONS, DIRS, DIR_TIPS,
+        randomHSV, addRecentPick, onHexCh, curHex, saveAndSync, refresh,
+        nodes, applySolidHex, refreshAllNodeVisuals,
     });
-    panel.appendChild(dirWrap);
 
-    // ── 标题文字样式控件（始终显示） ──
+function _ncBuildTitleStylePanel(panel, S, callbacks) {
+    const { saveAndSync, canvas, app } = callbacks;
     const tsWrap = document.createElement('div');
     tsWrap.id = 'ncTsWrap';
     tsWrap.style.display = 'block';
-
-    // ── 标题样式：字号/字重/对齐共用背景容器 ──────────────────────
     const tsGroup = document.createElement('div');
     tsGroup.className = 'nc-ts-row';
-    tsGroup.style.flexDirection = 'column';
-    tsGroup.style.gap = '8px';
-    tsGroup.style.padding = '6px 8px';
-    tsGroup.style.overflow = 'visible';
-    tsGroup.style.alignItems = 'stretch';
-
-    // ── 第1行：字号（标签 + 滑条 + 数字框） ──
+    tsGroup.style.cssText = 'flex-direction:column;gap:8px;padding:6px 8px;overflow:visible;align-items:stretch';
     const sizeRow = document.createElement('div');
-    sizeRow.style.display = 'flex';
-    sizeRow.style.alignItems = 'center';
-    sizeRow.style.gap = 'var(--ws-gap-xs)';
-    sizeRow.style.width = '100%';
+    sizeRow.style.cssText = 'display:flex;align-items:center;gap:var(--ws-gap-xs);width:100%';
     const sizeLbl = document.createElement('label');
     sizeLbl.textContent = '字号';
     const sizeRange = document.createElement('input');
@@ -632,33 +660,21 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     sizeNum.type = 'number'; sizeNum.className = 'nc-ts-num';
     sizeNum.min = 14; sizeNum.max = 24; sizeNum.step = 1;
     sizeNum.value = S.titleStyle.size;
-    sizeRange.oninput = () => {
-        const v = +sizeRange.value;
-        S.titleStyle.size = v; sizeNum.value = v;
+    const onSizeChange = () => {
         saveAndSync(); canvas.setDirty(true, true); app.graph.setDirtyCanvas(true, true);
     };
-    sizeNum.oninput = () => {
-        const v = Math.max(14, Math.min(24, +sizeNum.value || 14));
-        S.titleStyle.size = v; sizeRange.value = v;
-        saveAndSync(); canvas.setDirty(true, true); app.graph.setDirtyCanvas(true, true);
-    };
+    sizeRange.oninput = () => { const v = +sizeRange.value; S.titleStyle.size = v; sizeNum.value = v; onSizeChange(); };
+    sizeNum.oninput = () => { const v = Math.max(14, Math.min(24, +sizeNum.value || 14)); S.titleStyle.size = v; sizeRange.value = v; onSizeChange(); };
     sizeRow.appendChild(sizeLbl); sizeRow.appendChild(sizeRange); sizeRow.appendChild(sizeNum);
     tsGroup.appendChild(sizeRow);
 
-    // ── 第2行：字重（左）+ 对齐（右） ──
     const styleRow = document.createElement('div');
-    styleRow.style.display = 'flex';
-    styleRow.style.justifyContent = 'space-between';
-    styleRow.style.alignItems = 'center';
-    styleRow.style.width = '100%';
-
-    // 左侧：字重（L/R/B）
+    styleRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%';
     const weightLbl = document.createElement('label');
     weightLbl.textContent = '字重';
     const weightSeg = document.createElement('div');
     weightSeg.className = 'nc-ts-seg';
-    weightSeg.style.marginLeft = '6px';
-    weightSeg.style.marginRight = '6px';
+    weightSeg.style.cssText = 'margin-left:6px;margin-right:6px';
     const weightDefs = [
         { key: 'lighter', label: '细', title: '细体' },
         { key: 'normal',  label: '中', title: '正常' },
@@ -673,8 +689,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         btn.onclick = () => {
             S.titleStyle.weight = key;
             weightDefs.forEach(d => weightBtns[d.key]?.classList.toggle('on', d.key === key));
-            saveAndSync();
-            canvas.setDirty(true, true); app.graph.setDirtyCanvas(true, true);
+            onSizeChange();
         };
         weightBtns[key] = btn;
         weightSeg.appendChild(btn);
@@ -682,11 +697,8 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     styleRow.appendChild(weightLbl);
     styleRow.appendChild(weightSeg);
 
-    // 右侧：对齐
     const alignWrap = document.createElement('div');
-    alignWrap.style.display = 'flex';
-    alignWrap.style.alignItems = 'center';
-    alignWrap.style.gap = '4px';
+    alignWrap.style.cssText = 'display:flex;align-items:center;gap:4px';
     const alignLbl = document.createElement('label');
     alignLbl.textContent = '对齐';
     const alignSeg = document.createElement('div');
@@ -710,7 +722,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         btn.onclick = () => {
             S.titleStyle.align = key;
             alignDefs.forEach(d => alignBtns[d.key]?.classList.toggle('on', d.key === key));
-            saveAndSync(); canvas.setDirty(true, true); app.graph.setDirtyCanvas(true, true);
+            onSizeChange();
         };
         alignBtns[key] = btn;
         alignSeg.appendChild(btn);
@@ -719,49 +731,44 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     alignWrap.appendChild(alignSeg);
     styleRow.appendChild(alignWrap);
     tsGroup.appendChild(styleRow);
-
     tsWrap.appendChild(tsGroup);
-
     panel.appendChild(tsWrap);
+    return { sizeRange, sizeNum, weightBtns, weightDefs, alignBtns, alignDefs };
+}
 
+    // ── 标题文字样式控件（已提取到 _ncBuildTitleStylePanel）──
+    const { sizeRange, sizeNum, weightBtns, weightDefs, alignBtns, alignDefs } =
+        _ncBuildTitleStylePanel(panel, S, { saveAndSync, canvas, app });
 
-
-    // footer
-    const fRow=document.createElement("div");fRow.className="nc-fb";
-    const resetBtn=document.createElement("button");resetBtn.className="nc-cfb";resetBtn.textContent="清除";
-    resetBtn.onclick=()=>{
-        nodes.forEach(n=>{
-            if(typeof n.setColorOption==="function")n.setColorOption(null);
-            else{n.color=void 0;n.bgcolor=void 0;}
-            delete n.constructor.title_text_color;delete n._gradient;delete n._titleStyle;
-        });
-        // 联动分组框同步清除
-        linkedGroups.forEach(g => { g.color = void 0; });
-        // 重置面板状态到初始化，但保留当前模式（单色/双色/三色）
-        const cnt = S.stopCount;
-        S.direction = '↓';
-        S.h = 20; S.s = 82; S.v = 83;
-        S.stops = [{p:0,h:20,s:82,v:83},{p:1,h:20,s:60,v:30}];
-        S.editTarget = 'hdr';
-        S.titleH = 20; S.titleS = 82; S.titleV = 83;
-        S.bgH = 20; S.bgS = 90; S.bgV = 35;
-        S.titleStyle = { size: 14, color: '#ffffff', align: 'left', weight: 'normal' };
-        S.stopCount = cnt;
-        canvas.setDirty(true,true);app.graph.setDirtyCanvas(true,true);
-        if(typeof _refreshDOMGradients==="function")_refreshDOMGradients();
-        refresh();
-    };
-    const confirmBtn=document.createElement("button");confirmBtn.className="nc-cfb";confirmBtn.textContent="确认";
-    confirmBtn.onclick=()=>{applyToNodes();close();};
-    fRow.appendChild(resetBtn);fRow.appendChild(confirmBtn);
-    panel.appendChild(fRow);
+    // ── 页脚（已提取到 _ncBuildFooter）──
+    const { resetCleared } = _ncBuildFooter(panel, {
+        refresh, close, canvas, app,
+        refreshDOMGradients: _refreshDOMGradients,
+        onClear: () => {
+            nodes.forEach(n => {
+                if (typeof n.setColorOption === "function") n.setColorOption(null);
+                else { n.color = void 0; n.bgcolor = void 0; }
+                delete n.constructor.title_text_color; delete n._gradient; delete n._titleStyle;
+            });
+            linkedGroups.forEach(g => { g.color = void 0; });
+            const cnt = S.stopCount;
+            S.dir = '↓';
+            S.h = 20; S.s = 82; S.v = 83;
+            S.stops = [{ p: 0, h: 20, s: 82, v: 83 }, { p: 1, h: 20, s: 60, v: 30 }];
+            S.editTarget = 'hdr';
+            S.titleH = 20; S.titleS = 82; S.titleV = 83;
+            S.bgH = 20; S.bgS = 90; S.bgV = 35;
+            S.titleStyle = { size: 14, color: '#ffffff', align: 'left', weight: 'normal' };
+            S.stopCount = cnt;
+        },
+        onConfirm: () => { applyToNodes(); },
+    });
 
     const cr=document.createElement("div");cr.style.cssText="padding:12px 0 0;flex-shrink:0;text-align:center";
     cr.innerHTML='<span style="color:var(--ws-text-muted);font-size:10px;letter-spacing:0.5px;white-space:nowrap">COPYRIGHT © WOSAI STUDIO | 穿山阅海</span>';
     panel.appendChild(cr);
 
     document.body.appendChild(panel);
-    document.body.appendChild(ncT);
     const gap = 12;
     if (anchorRect) {
         // 从 color bar 打开：横版在 bar 下方水平居中；竖版在 bar 左/右侧垂直居中
@@ -844,7 +851,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     }
 
     function close(){
-        _onHexChFn=null;ncT.remove();panel.remove();
+        _onHexChFn=null;hideTip();panel.remove();
         _offGlass();   // 退订玻璃主题广播
         document.removeEventListener("pointerdown",_closeHandler,{capture:true});
         document.removeEventListener('keydown',_onGrayKeyDown);
@@ -853,7 +860,15 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         document.removeEventListener('pointermove',_svMove);
         document.removeEventListener('pointerup',_svUp);
         document.removeEventListener('pointercancel',_svUp);
+        // 补移除 rebuildPins 注册的 document 级监听器（防面板关闭后残留累积）
+        if (_pinRefs.onMove) document.removeEventListener('pointermove', _pinRefs.onMove);
+        if (_pinRefs.onUp) {
+            document.removeEventListener('pointerup', _pinRefs.onUp);
+            document.removeEventListener('pointercancel', _pinRefs.onUp);
+        }
     }
+    // 暴露 close 路径：旧面板清理(L78-82)可通过 _wosaiClose() 正确解绑监听
+    panel._wosaiClose = close;
 }
 
 app.registerExtension({
@@ -883,6 +898,7 @@ app.registerExtension({
 
         // Find the DOM element that visually represents a node's background
         const _bgElCache = new Map();  // key: node.id:bgColor → element|null
+        const _appliedGrad = new Set();  // 已应用 inline 渐变的 node.id（用于精确清理，避免每次刷新遍历全部节点 querySelector → 卡顿）
 
         function findNodeBgElement(node) {
             const bgColor = node.bgcolor;
@@ -1041,6 +1057,7 @@ app.registerExtension({
             for (const node of graph.nodes) {
                 const g = node._gradient;
                 if (!g) continue;
+                if (node._osHideTitle) continue;   // 被 OmniSlider 精简隐藏的节点不生成渐变规则，让隐藏生效
                 const dir = cssGradientDir(g.dir);
                 let gradCSS;
                 if (g.stops) {
@@ -1060,23 +1077,32 @@ app.registerExtension({
             if (styleEl) styleEl.textContent = css;
 
             // ── 即时应用 inline style（Nodes 2.0 + Classic 双路径） ──
+            //   被 OmniSlider 精简隐藏(_osHideTitle)的节点：清除渐变(inline)而非应用，
+            //   否则 node-color 的 inline !important 渐变会盖过 omni 的隐藏 → 隐藏失效。
+            //   性能：只对「有渐变且未隐藏」的节点应用 inline；只对「之前应用过、现在不再符合」
+            //   的节点清理（依 _appliedGrad 记录），跳过从未上色的节点 → 避免 O(全部节点) querySelector。
             for (const node of graph.nodes) {
-                if (node._gradient) {
+                if (node._gradient && !node._osHideTitle) {
                     applyGradientToNode(node);
-                } else {
-                    clearGradientFromNode(node);
+                    _appliedGrad.add(node.id);
+                } else if (_appliedGrad.has(node.id)) {
+                    clearGradientFromNode(node);   // 渐变被清除 / 节点被隐藏 → 清掉残留 inline
+                    _appliedGrad.delete(node.id);
                 }
             }
 
             // 兜底：Vue 异步渲染后可能替换 DOM，RAF 后重试
             requestAnimationFrame(() => {
                 for (const node of graph.nodes) {
-                    if (node._gradient) applyGradientToNode(node, 2);
+                    if (node._gradient && !node._osHideTitle) applyGradientToNode(node, 2);
                 }
             });
         }
         _refreshDOMGradients = refreshDOMGradients;
         _refreshDOMTitleStyles = refreshDOMTitleStyles;
+        // 暴露给 OmniSlider：隐藏/显示切换后调用，使 node-color 重新评估渐变
+        //   （隐藏时清渐变让隐藏生效，显示时恢复渐变）。
+        try { window.__wosaiColorRefresh = refreshDOMGradients; } catch (_) {}
 
         // ── 模式检测：Nodes 2.0 (Vue DOM) vs Classic (Canvas) ──
         // Nodes 2.0 特征：[data-node-id] 属性存在于外层容器
@@ -1325,15 +1351,51 @@ app.registerExtension({
             ctx.textAlign = align;
             ctx.textBaseline = 'middle';
             // 自适应阴影，确保在亮色背景（金黄、沙橙等）上文字也清晰
-            const cc2 = color.startsWith('#') ? color : '#ffffff';
-            const cr2=parseInt(cc2.slice(1,3),16),cg2=parseInt(cc2.slice(3,5),16),cb2=parseInt(cc2.slice(5,7),16);
-            const clum2=0.299*cr2+0.587*cg2+0.114*cb2;
-            ctx.shadowColor = clum2 > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
-            ctx.shadowBlur = 3;
+            _applyTitleShadow(ctx, color);
             ctx.fillText(title, x, -th / 2);
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             ctx.restore();
+        }
+
+        // ── 公共：OmniSlider 精简模式画布层隐藏（drawNodeShape/drawNode 共用）──
+        //   还原上一帧清空的角标 → 按需清空 badges → 隐藏标题时设透明色。
+        //   返回 true 表示调用方应跳过原生绘制（return）。
+        function _applyOmniHide(node) {
+            if (!node || node.type !== "WOSAI_OmniSlider") return false;
+            // 每帧先还原上一帧清空的角标，再按需清空 → 关闭开关后角标自动恢复
+            if (node._osOrigBadges !== undefined) {
+                node.badges = node._osOrigBadges;
+                node._osOrigBadges = undefined;
+            }
+            if (node._osHideBadge && Array.isArray(node.badges) && node.badges.length) {
+                node._osOrigBadges = node.badges;
+                node.badges = [];   // 本帧清空，后续就画不出 WOSAI 角标
+            }
+            if (node._osHideTitle) {
+                node.bgcolor = "transparent";
+                node.color = "#fff0";
+                return true;   // 调用方跳过标题栏+节点体背景；端口由父级 drawNode 后续绘制
+            }
+            return false;
+        }
+
+        // ── 公共：8 方向线性渐变端点（drawNodeShape/drawNode 共用，消除 pts 字典重复）──
+        function _gradPts(w, h, th) {
+            return {
+                '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
+                '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
+                '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
+            };
+        }
+
+        // ── 公共：按标题色亮度设置自适应阴影（亮色→黑影，暗色→白影），确保任意背景可读 ──
+        function _applyTitleShadow(ctx, color) {
+            const cc = (typeof color === 'string' && color.startsWith('#')) ? color : '#ffffff';
+            const cr = parseInt(cc.slice(1, 3), 16), cg = parseInt(cc.slice(3, 5), 16), cb = parseInt(cc.slice(5, 7), 16);
+            const clum = 0.299 * cr + 0.587 * cg + 0.114 * cb;
+            ctx.shadowColor = clum > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
+            ctx.shadowBlur = 3;
         }
 
         // ── drawNodeShape wrapper（经典模式渐变，CYBERPUNK 同款技术）──
@@ -1341,6 +1403,9 @@ app.registerExtension({
         // 因此 globalAlpha=0 trick 可安全地让原始 drawNodeShape 绘制透明，不影响 slots/widgets
         function makeDrawShapeWrapper(origFn) {
             return function(node, ctx, size, fgcolor, bgcolor, selected, mouseOver) {
+                // ── WOSAI OmniSlider 精简模式：隐藏标题 / 画布角标 ────────────────
+                //   统一在此唯一的 drawNodeShape wrapper 处理，避免与 omni 双钩子冲突。
+                if (_applyOmniHide(node)) return;
                 // ── 无渐变：正常绘制纯色背景，如有自定义标题样式则事后重绘文字 ──
                 if (!node._gradient) {
                     origFn.call(this, node, ctx, size, fgcolor, bgcolor, selected, mouseOver);
@@ -1355,11 +1420,7 @@ app.registerExtension({
                 const w = size[0], h = size[1];
                 const r = node.borderRadius || LG?.NODE_CORNER_RADIUS || 8;
                 const cfg = node._gradient;
-                const pts = {
-                    '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
-                    '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
-                    '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
-                };
+                const pts = _gradPts(w, h, th);
                 const [x1, y1, x2, y2] = pts[cfg.dir] || pts['↓'];
                 ctx.save();
                 try {
@@ -1390,11 +1451,7 @@ app.registerExtension({
                         ctx.font = `${ts?.weight || "bold"} ${fontSize}px Arial, sans-serif`;
                         ctx.fillStyle = color;
                         // 标题横跨渐变亮暗区，加阴影确保任何背景下都可见
-                        const cc = color.startsWith('#') ? color : '#ffffff';
-                        const cr=parseInt(cc.slice(1,3),16),cg=parseInt(cc.slice(3,5),16),cb=parseInt(cc.slice(5,7),16);
-                        const clum=0.299*cr+0.587*cg+0.114*cb;
-                        // 用中等透明度缓解亮色渐变上的文字可读性问题（沙漠、黎明等）
-                        ctx.shadowColor = clum > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
+                        _applyTitleShadow(ctx, color);
                         ctx.shadowBlur = 3;
                         ctx.textAlign = align === 'center' ? 'center' : (align === 'right' ? 'right' : 'left');
                         ctx.textBaseline = 'middle';
@@ -1418,6 +1475,11 @@ app.registerExtension({
         // drawNode wrapper（兜底：drawNodeShape 不存在时使用）
         function makeDrawNodeWrapper(origDrawNode) {
             return function(node, ctx) {
+                // WOSAI OmniSlider 精简模式兜底（旧版无 drawNodeShape）：复用公共隐藏逻辑
+                if (node && node.type === "WOSAI_OmniSlider" && _applyOmniHide(node)) {
+                    try { node.onDrawBackground?.(ctx); } catch (_) {}
+                    return;
+                }
                 if (node._wgradDrawing) return origDrawNode.call(this, node, ctx);
                 node._wgradDrawing = true;
                 const origColor = node.color, origBg = node.bgcolor;
@@ -1429,11 +1491,7 @@ app.registerExtension({
                         const w = node.size[0], h = node.size[1];
                         const LG = typeof LiteGraph !== 'undefined' ? LiteGraph : null;
                         const th = LG?.NODE_TITLE_HEIGHT || 30;
-                        const pts = {
-                            '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
-                            '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
-                            '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
-                        };
+                        const pts = _gradPts(w, h, th);
                         const [x1, y1, x2, y2] = pts[cfg.dir] || pts['↓'];
                         const r = LG?.NODE_CORNER_RADIUS ?? 8;
                         ctx.save();
@@ -1564,37 +1622,51 @@ app.registerExtension({
             // - 可能替换/更新节点 DOM 子树（childList 事件）→ 需要重新打标记
             // - 可能更新元素 style/class 属性 → 可能覆盖我们的注入样式 → 需要刷新
             let _moTimer = null;
-            const _gradMO = new MutationObserver(() => {
-                // 防抖：16ms 内只触发一次，避免频繁刷新
+            // 监听目标 + 选项提取出来，便于刷新时断开/重连
+            const graphContainer = document.getElementById('graph-canvas-container')
+                || document.getElementById('graph-canvas')
+                || document.querySelector('.graph-canvas-container, .graph-canvas, .litegraph, #litegraph');
+            const _moTarget = graphContainer || document.body;   // 兜底监听 body（稍重但可靠）
+            // ⚠ 绝不监听 'style'：refreshDOMGradients 给每个渐变节点写 inline style，
+            //   监听 style 会被自身写入(及 Vue 对其的异步反应)反复触发 → 16ms 死循环 → 右键假死。
+            //   只监听 childList(Vue 重建节点子树需重新注入) + class；其余情况由 500ms 轮询兜底。
+            const _moOpts = { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] };
+            // 判断 DOM 节点是否属于本插件自身 UI（面板/提示），用于过滤无关变更
+            const _SELF_SEL = '[data-wosai-panel],.ws-tip,.os-panel,#wosai-panel';
+            const _isSelfUI = (n) => n && n.nodeType === 1 &&
+                ((n.matches && n.matches(_SELF_SEL)) || (n.closest && n.closest(_SELF_SEL)));
+            const _gradMO = new MutationObserver((muts) => {
+                // 防抖 120ms：开面板/画布重渲会在多帧内持续产生 childList 变更，
+                //   小窗口(16ms)会触发多次全量刷新→卡顿；加大窗口把整段突发合并成一次刷新。
+                //   期间渐变由 <style> 规则维持显示，inline 延迟重注入无副作用。
                 if (_moTimer) return;
+                // 过滤：仅由本插件面板/提示引发的变更(右键开面板、悬浮提示等)直接忽略，避免无谓刷新→卡顿
+                const relevant = muts.some(m => {
+                    if (_isSelfUI(m.target)) return false;
+                    const ns = [...(m.addedNodes || []), ...(m.removedNodes || [])];
+                    if (ns.length && ns.every(_isSelfUI)) return false;
+                    return true;
+                });
+                if (!relevant) return;
                 _moTimer = setTimeout(() => {
                     _moTimer = null;
                     const hasGrad = app.graph?.nodes?.some(n => n._gradient);
                     const hasTitleStyle = app.graph?.nodes?.some(n => n._titleStyle);
-                    if (hasGrad) refreshDOMGradients();
-                    if (hasTitleStyle) { refreshDOMTitleStyles(); applyTitleAlignInline(); }
-                }, 16);
+                    if (!hasGrad && !hasTitleStyle) return;
+                    // ⚠ 关键防死循环：refreshDOMGradients 会写节点 style(background-image)，
+                    //   而本观察器正监听 style/class → 自身写入会再次触发回调，形成永不停的 16ms 循环
+                    //   （CPU 持续占用 → 右键弹窗迟迟不出现；画布旁 DOM 不停变 → 输入法悬浮栏闪烁抖动）。
+                    //   故刷新期间先断开，刷新后再重连（disconnect 清空待处理队列，自身写入不入队）。
+                    _gradMO.disconnect();
+                    try {
+                        if (hasGrad) refreshDOMGradients();
+                        if (hasTitleStyle) { refreshDOMTitleStyles(); applyTitleAlignInline(); }
+                    } finally {
+                        _gradMO.observe(_moTarget, _moOpts);   // 重连
+                    }
+                }, 120);
             });
-            // 监听节点容器内的属性 + 子节点变更
-            const graphContainer = document.getElementById('graph-canvas-container')
-                || document.getElementById('graph-canvas')
-                || document.querySelector('.graph-canvas-container, .graph-canvas, .litegraph, #litegraph');
-            if (graphContainer) {
-                _gradMO.observe(graphContainer, {
-                    subtree: true,
-                    childList: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-            } else {
-                // 兜底：监听 body（稍重但可靠）
-                _gradMO.observe(document.body, {
-                    subtree: true,
-                    childList: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-            }
+            _gradMO.observe(_moTarget, _moOpts);
 
             // 轮询兜底：处理节点增删、工作流加载等场景
             let prevNodeCount = app.graph?.nodes?.length || 0;
@@ -1623,46 +1695,60 @@ app.registerExtension({
         }
         setupGradientSupport();
 
+        // ── 原型 hook 幂等安装：防热重载/重复 setup 叠套 ──
+        //   若当前方法已是本插件包装(_wosaiWrapped)，直接复用已保存的原函数；
+        //   否则首次记录真实原函数到 _protoRefs，供 remove() 还原。
+        function hookProto(obj, name, makeWrapper) {
+            const cur = obj[name];
+            if (cur && cur._wosaiWrapped) { _protoRefs[name] = cur._wosaiOrig; return; }
+            const w = makeWrapper(cur);
+            w._wosaiWrapped = true; w._wosaiOrig = cur;
+            obj[name] = w;
+            _protoRefs[name] = cur;
+        }
+
         // Serialize _gradient so it survives workflow save/load
-        const origSerialize = LGraphNode.prototype.serialize;
-        LGraphNode.prototype.serialize = function() {
+        hookProto(LGraphNode.prototype, 'serialize', (origSerialize) => function() {
             const data = origSerialize ? origSerialize.call(this) : {};
             if (this._gradient) data._gradient = JSON.parse(JSON.stringify(this._gradient));
             if (this._titleStyle) data._titleStyle = JSON.parse(JSON.stringify(this._titleStyle));
             return data;
-        };
-        const origConfigure = LGraphNode.prototype.configure;
-        LGraphNode.prototype.configure = function(data) {
+        });
+        hookProto(LGraphNode.prototype, 'configure', (origConfigure) => function(data) {
             if (origConfigure) origConfigure.call(this, data);
             if (data && data._gradient) this._gradient = JSON.parse(JSON.stringify(data._gradient));
             else delete this._gradient;
             if (data && data._titleStyle) this._titleStyle = JSON.parse(JSON.stringify(data._titleStyle));
             else delete this._titleStyle;
-        };
-        // Also hook onAdded so newly created nodes have a clean state
-        const origOnAdded = LGraphNode.prototype.onAdded;
-        LGraphNode.prototype.onAdded = function(graph) {
+        });
+        hookProto(LGraphNode.prototype, 'onAdded', (origOnAdded) => function(graph) {
             if (origOnAdded) origOnAdded.call(this, graph);
             if (!this._gradient) delete this._gradient;
-        };
+        });
 
         // 分组右键菜单 — 复用 openNodeColorPicker 完整面板
-        const origGroupOpts = LGraphGroup.prototype.getMenuOptions;
-        LGraphGroup.prototype.getMenuOptions = function (gc) {
+        hookProto(LGraphGroup.prototype, 'getMenuOptions', (origGroupOpts) => function (gc) {
             const opts = origGroupOpts?.apply(this, arguments) || [];
             const group = this;
             opts.push(null);
             opts.push({
-                content: "🟠WOSAI 配色助手（快捷键 C ）",
+                content: "🟠 高级配色 NodeColor",
                 callback: () => openNodeColorPicker([group]),
             });
             return opts;
-        };
+        });
     },
 
     remove() {
         if (_gradPollIntervalId) { clearInterval(_gradPollIntervalId); _gradPollIntervalId = null; }
         if (_gradMORef) { _gradMORef.disconnect(); _gradMORef = null; }
+        // 还原原型 hook（防热重载后残留包装）
+        for (const [name, orig] of Object.entries(_protoRefs)) {
+            if (orig !== undefined) {
+                if (LGraphNode.prototype[name] && LGraphNode.prototype[name]._wosaiWrapped) LGraphNode.prototype[name] = orig;
+                if (LGraphGroup.prototype[name] && LGraphGroup.prototype[name]._wosaiWrapped) LGraphGroup.prototype[name] = orig;
+            }
+        }
     },
 
     getNodeMenuItems(node) {
@@ -1678,7 +1764,7 @@ app.registerExtension({
         return [
             null,
             {
-                content: nodes.length > 1 ? `🟠WOSAI 配色助手 (${nodes.length})（快捷键 C ）` : "🟠WOSAI 配色助手（快捷键 C ）",
+                content: nodes.length > 1 ? `🟠 高级配色 NodeColor (${nodes.length})` : "🟠 高级配色 NodeColor",
                 callback: () => openNodeColorPicker(nodes),
             },
         ];
@@ -1686,7 +1772,7 @@ app.registerExtension({
 
     commands: [{
         id: "wosai-node-color",
-        label: "🟠WOSAI 配色助手",
+        label: "🟠 高级配色 NodeColor",
         function: () => {
             const canvas = app.canvas;
             const graph = app.graph;
@@ -1701,11 +1787,6 @@ app.registerExtension({
             const selGroups = (graph._groups || []).filter(g => g._selected || g.selected);
             if (selGroups.length) openPickerForGroups(selGroups);
         },
-    }],
-
-    keybindings: [{
-        combo: { key: "C" },
-        commandId: "wosai-node-color",
     }],
 });
 
