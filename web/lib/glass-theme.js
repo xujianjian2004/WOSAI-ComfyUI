@@ -32,7 +32,7 @@ export const GLASS_TOKENS = {
         // 文字/图标（镜像 --ws-*，保持与 wosai-variables.css 同步）
         text: '#E4E4E7',             // --ws-text
         textMuted: '#7A7A7A',         // --ws-text-muted
-        btnBg: '#2C2C2E',             // --ws-surface-raised (玻璃内按钮底色)
+        btnBg: 'rgba(255,255,255,0.08)',  // 玻璃内按钮底色：微透白，与玻璃背景形成层次
         iconColor: '#AEBFD0',         // --ws-icon
         iconAccent: '#DD6F4A',        // --ws-accent
     },
@@ -48,7 +48,7 @@ export const GLASS_TOKENS = {
         // 文字/图标（镜像 --ws-*，保持与 wosai-variables.css 同步）
         text: '#201914',              // --ws-text
         textMuted: '#8A7A70',         // --ws-text-muted
-        btnBg: '#F2EDE8',             // --ws-surface-raised (玻璃内按钮底色)
+        btnBg: 'rgba(0,0,0,0.06)',       // 玻璃内按钮底色：微透黑，与玻璃背景形成层次
         iconColor: '#5E6B7A',         // --ws-icon
         iconAccent: '#DD6F4A',        // --ws-accent
     },

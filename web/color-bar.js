@@ -165,31 +165,39 @@ function mkItem(visualEl, label, tip) {
     wrap.onmousedown = e => e.preventDefault();
     // 悬停提示用自定义 tooltip（条目上方居中），不用原生 title；_tip 可被外部更新
     wrap._tip = tip || '';
-    // 图标类条目(含 svg)：悬停点亮品牌橙(方案 A)，文字同步变橙；色块(chip)保持原 brightness 效果
+    // 图标类条目(含 svg)：悬停时背景提亮 + 图标变品牌橙，文字同步变橙；色块(chip)保持原 brightness 效果
     const _isIcon = () => !!visualEl.querySelector && !!visualEl.querySelector('svg');
     wrap.onmouseenter = () => {
         visualEl.style.transform = 'scale(1.1)';
         if (_isIcon()) {
-            visualEl.dataset.baseColor = visualEl.style.color; visualEl.style.color = barT().iconAccent;
-            if (lblEl) lblEl.style.color = barT().iconAccent;
+            // 半透明背景悬停提亮：深色模式增加白色透明度，浅色模式增加黑色透明度
+            const T = barT();
+            visualEl.style.background = T.btnBg === 'rgba(255,255,255,0.08)' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)';
+            visualEl.dataset.baseColor = visualEl.style.color; visualEl.style.color = T.iconAccent;
+            if (lblEl) lblEl.style.color = T.iconAccent;
         }
         else visualEl.style.filter = 'brightness(1.4)';
         _hoverItem = wrap; if (wrap._tip) showTip(wrap, wrap._tip);
     };
     wrap.onmouseleave = () => {
         visualEl.style.transform = ''; visualEl.style.filter = '';
-        if (_isIcon()) { visualEl.style.color = visualEl.dataset.baseColor || barT().iconColor; if (lblEl) lblEl.style.color = barT().text; }
+        if (_isIcon()) {
+            const T = barT();
+            visualEl.style.background = T.btnBg;
+            visualEl.style.color = visualEl.dataset.baseColor || T.iconColor; if (lblEl) lblEl.style.color = T.text;
+        }
         if (_hoverItem === wrap) _hoverItem = null; hideTip();
     };
     return wrap;
 }
 
-// 功能按钮（深色圆底 + 多彩线性 SVG 图标 + 下方中文标签）
+// 功能按钮（半透明圆底 + 线性 SVG 图标 + 下方中文标签）
+// 背景使用 glass-theme.js 中 btnBg（深色模式 rgba(255,255,255,0.08) / 浅色模式 rgba(0,0,0,0.06)）
 function mkBtn(iconSvg, tip, label) {
     const T = barT();
     const b = document.createElement('div');
     b.innerHTML = iconSvg;
-    b.style.cssText = `width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${T.btnBg};color:${T.iconColor};transition:color .15s,filter .15s,transform .12s;pointer-events:none`;
+    b.style.cssText = `width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${T.btnBg};color:${T.iconColor};transition:color .15s,background .15s,filter .15s,transform .12s;pointer-events:none`;
     return mkItem(b, label, tip);
 }
 
@@ -526,7 +534,7 @@ function openBar() {
             const del = document.createElement('span');
             del.textContent = '×';
             del.title = '删除此取色记录';
-            del.style.cssText = `position:absolute;top:-7px;right:-7px;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:${getBarTheme()==='light'?'#E8E8EC':'#2a2a2e'};color:${T.text};font-size:11px;cursor:pointer;display:none;border:1px solid ${T.divider};box-sizing:border-box;z-index:1`;
+            del.style.cssText = `position:absolute;top:-7px;right:-7px;width:15px;height:15px;line-height:13px;text-align:center;border-radius:50%;background:${T.btnBg};color:${T.text};font-size:11px;cursor:pointer;display:none;border:1px solid ${T.divider};box-sizing:border-box;z-index:1`;
             del.onclick = (e) => {
                 e.stopPropagation();
                 store.recent.splice(idx, 1);
