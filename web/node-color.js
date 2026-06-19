@@ -352,9 +352,9 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
             const subRow = document.createElement('div');
             subRow.style.cssText = 'display:flex;gap:2px;width:100%;padding:4px 4px 8px 4px;border-radius:8px;background:var(--ws-surface-2);border:1px solid transparent;box-sizing:border-box;overflow:visible';
             const targets = [
-                { key: 'bg',  label: '面板背景', hex: hsv2hex(S.bgH, S.bgS, S.bgV) },
-                { key: 'hdr', label: '标题背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV) },
-                { key: 'sync', label: '整体背景', hex: hsv2hex(S.titleH, S.titleS, S.titleV), dual: true },
+                { key: 'bg',  label: '面板上色', hex: hsv2hex(S.bgH, S.bgS, S.bgV) },
+                { key: 'hdr', label: '标题上色', hex: hsv2hex(S.titleH, S.titleS, S.titleV) },
+                { key: 'sync', label: '整体上色', hex: hsv2hex(S.titleH, S.titleS, S.titleV), dual: true },
             ];
             targets.forEach(t => {
                 const chip = document.createElement('div');
@@ -375,6 +375,32 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
                 subRow.appendChild(chip);
             });
             sti.appendChild(subRow);
+        } else {
+            // ── 多色模式：每个色标一块常显色块（同时可见，点击即选中编辑），借鉴 CYBERPUNK「每色一行」──
+            //   复用现有 aStop/HSV 编辑链；refresh() 会重建本区，故色块/高亮自动随编辑同步。
+            const colorsRow = document.createElement('div');
+            // 横向 0 内边距 + 满宽 + 标准 gap → 左右边与预设圆点/方向格对齐；行距由 .nc-sti 的 gap/margin 统一
+            colorsRow.style.cssText = 'display:flex;gap:var(--ws-gap);width:100%;box-sizing:border-box';
+            S.stops.forEach((st, i) => {
+                const hex = sHex(i);
+                // 块内编号对比色：按色块亮度取深/浅，保证数字在任意颜色上可见
+                const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+                const numColor = (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#1A1A1A' : '#FFFFFF';
+                const cell = document.createElement('div');
+                cell.style.cssText = `flex:1;height:22px;display:flex;align-items:center;justify-content:center;border-radius:5px;background:${hex};cursor:pointer;box-sizing:border-box;font-size:11px;font-weight:500;color:${numColor};border:1.5px solid ${i === S.aStop ? 'var(--ws-accent)' : 'var(--ws-border)'};transition:border-color .12s`;
+                cell.textContent = String(i + 1);
+                cell.onclick = () => {
+                    S.aStop = i;
+                    const st2 = S.stops[i];
+                    S.h = st2.h; S.s = st2.s; S.v = st2.v;
+                    const hs = document.getElementById('ncHs');
+                    if (hs) hs.value = st2.h;
+                    document.querySelectorAll('#ncSbw .nc-sp').forEach((p, j) => p.classList.toggle('on', j === i));
+                    refresh();
+                };
+                colorsRow.appendChild(cell);
+            });
+            sti.appendChild(colorsRow);
         }
     }
     function onHue(v){S.h=v;if(S.stopCount>1)S.stops[S.aStop].h=v;saveAndSync();refresh();}

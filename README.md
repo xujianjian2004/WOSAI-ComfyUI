@@ -297,16 +297,14 @@ WOSAI-ComfyUI/
 	│   │   ├── note-renderer.js     # CanvasNote 文本渲染引擎
 	│   │   ├── tooltip.js           # 统一切换提示（ColorBar/OmniSlider/NodeColor/CanvasNote 共享）
 	│   │   └── omni-hide.js         # OmniSlider 隐藏模式逻辑（已从主文件提取）
-	│   ├── css/
-	│   │   ├── wosai-variables.css  # CSS 设计令牌（深/浅色主题变量）
-	│   │   ├── wosai-theme.css      # 全局主题样式覆盖
-	│   │   ├── os-slider.css        # OmniSlider 内核样式（滑条 + 交互）
-	│   │   ├── os-slider-panel.css  # OmniSlider 设置面板 + 通道数弹窗
-	│   │   ├── os-slider-hide.css   # OmniSlider 隐藏模式开关
-	│   │   ├── os-color.css         # NodeColor 样式
-	│   │   └── os-size.css          # SizeSelect 样式
-	│   └── icons/
-	│       └── wosai-logo.svg
+	│   └── css/
+	│       ├── wosai-variables.css  # CSS 设计令牌（深/浅色主题变量）
+	│       ├── wosai-theme.css      # 全局主题样式覆盖
+	│       ├── os-slider.css        # OmniSlider 内核样式（滑条 + 交互）
+	│       ├── os-slider-panel.css  # OmniSlider 设置面板 + 通道数弹窗
+	│       ├── os-slider-hide.css   # OmniSlider 隐藏模式开关
+	│       ├── os-color.css         # NodeColor 样式
+	│       └── os-size.css          # SizeSelect 样式
 	└── locales/
 	    ├── zh/nodeDefs.json         # 中文翻译
 	    └── en/nodeDefs.json         # 英文翻译

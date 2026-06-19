@@ -138,13 +138,13 @@
 /* ── Direction grid (8 个方向：2行×4列) ──── */
 .nc-dg {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--ws-gap);
+  grid-template-columns: repeat(8, 1fr);   /* 8 个方向一行排列 */
+  gap: var(--ws-gap-sm);
   margin-bottom: var(--ws-gap-md);
 }
 .nc-dgi {
-  height: 28px;
-  border-radius: var(--ws-radius-md);
+  aspect-ratio: 1;                         /* 圆形按钮：宽高相等 */
+  border-radius: 50%;
   border: 1px solid var(--ws-border);
   cursor: pointer;
   transition: transform .12s, border-color .12s, background .12s;
@@ -157,37 +157,21 @@
 .nc-dgi:hover { border-color: var(--ws-accent); }
 .nc-dgi:active { transition: none; }
 .nc-dgi.on { border-color: var(--ws-accent); background: var(--ws-accent); }
-.nc-dgi.on .nc-dgs { opacity: 0; }
-.nc-dgi.on .nc-dgt { opacity: 1; }
+/* 始终显示方向箭头（不再悬停/激活切换为中文文字） */
 .nc-dgs {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 12px;
   color: var(--ws-text-on-accent);
   font-weight: 600;
   pointer-events: none;
   text-shadow: 0 0 3px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .3);
-  transition: opacity .12s;
 }
-.nc-dgi:hover .nc-dgs { opacity: 0; }
-.nc-dgt {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--ws-text-xs);
-  color: var(--ws-text-on-accent);
-  font-weight: 400;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .12s;
-  text-shadow: 0 0 3px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .3);
-}
-.nc-dgi:hover .nc-dgt { opacity: 1; }
+/* 中文方向文字标签：不再显示，仅保留方向符号 */
+.nc-dgt { display: none; }
 html[data-theme="light"] .nc-dgi::after {
   content: '';
   position: absolute;
