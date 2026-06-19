@@ -8,14 +8,17 @@ import {
 import { store, initStore, persist, addRecent } from "./lib/color-store.js";
 import { WS_ICONS } from "./lib/shared-utils.js";
 import { getGlassTheme, getGlassMode, cycleGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./lib/glass-theme.js";
+import { showTip, hideTip } from "./lib/tooltip.js";
 
 // Shared gradient state - set by setup() for access from applyColor()
 let _refreshDOMGradients = null;
 let _refreshDOMTitleStyles = null;
-let _gradPollIntervalId = null;
 let _gradMORef = null;          // MutationObserver 引用（扩展卸载时断开）
 let _applyTitleAlignInline = null;
 let _onHexChFn = null;
+
+// 原型 hook 原函数引用（供 remove() 还原，防热重载 --watch 叠套）
+const _protoRefs = {};
 
 // ── 取色历史 & 自定义预设 ──
 // 数据与持久化迁至 lib/color-store.js（localStorage + 服务端 JSON 双层）
@@ -76,7 +79,12 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     // 清理旧面板（防止异常未 close 导致的 DOM/CSS 泄漏）
     // CSS 已通过 extension.json 加载 web/css/os-color.css
     const oldPanel = document.querySelector('.nc-p');
-    if (oldPanel) { oldPanel.remove(); }
+    if (oldPanel) {
+        // 先走 close 路径解绑 document 级监听器，再移除 DOM；
+        // 仅 remove() 会让旧面板的 _closeHandler/_pinOnMove 等监听器残留累积
+        if (typeof oldPanel._wosaiClose === 'function') oldPanel._wosaiClose();
+        oldPanel.remove();
+    }
 
     const canvas = app.canvas;
 
@@ -93,6 +101,9 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         // 标题文字样式（始终生效）
         titleStyle: { size: 14, color: '#ffffff', align: 'left', weight: 'normal' },
     };
+    // 清除状态标记：清除按钮预览时设为 true，确认时跳过上色；其他操作恢复 false
+    let _isCleared = false;
+
     // 从已有节点读取 titleStyle 初始值（多节点时取第一个）
     if (nodes[0]?._titleStyle) {
         S.titleStyle = { ...S.titleStyle, ...nodes[0]._titleStyle };
@@ -195,6 +206,8 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
 
     // 上色核心已迁至 lib/color-core.js applyColorState —— 此处只做状态快照与刷新
     function applyToNodes(){
+        _isCleared = false;  // 任何主动上色操作取消清除状态
+        resetBtn.classList.remove('nc-cleared');
         applyColorState(nodes, {
             stopCount: S.stopCount,
             editTarget: S.editTarget,
@@ -387,8 +400,8 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
                     const p=pal[row*6+col];
                     const el=document.createElement('div');
                     el.className='nc-ps';el.style.background=p.h;
-                    el.onmouseenter=(e)=>{const r=el.getBoundingClientRect();ncT.textContent=p.n+' '+p.e;ncT.style.display='block';ncT.style.left=(r.left+r.width/2)+'px';ncT.style.top=(r.top-8)+'px';};
-                    el.onmouseleave=()=>{ncT.style.display='none';};
+                    el.onmouseenter=()=>showTip(el,p.n+' '+p.e);
+                    el.onmouseleave=hideTip;
                     el.onclick=()=>{
                         area.querySelectorAll('.nc-ps').forEach(x=>x.classList.remove('on'));
                         el.classList.add('on');
@@ -414,8 +427,8 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
                     } else {
                         el.style.background=`linear-gradient(135deg,${hsv2hex(p.s[0].h,p.s[0].s,p.s[0].v)},${hsv2hex(p.s[1].h,p.s[1].s,p.s[1].v)})`;
                     }
-                    el.onmouseenter=(e)=>{const r=el.getBoundingClientRect();ncT.textContent=p.n+' '+p.e;ncT.style.display='block';ncT.style.left=(r.left+r.width/2)+'px';ncT.style.top=(r.top-8)+'px';};
-                    el.onmouseleave=()=>{ncT.style.display='none';};
+                    el.onmouseenter=()=>showTip(el,p.n+' '+p.e);
+                    el.onmouseleave=hideTip;
                     el.onclick=()=>{
                         area.querySelectorAll('.nc-ps').forEach(x=>x.classList.remove('on'));
                         el.classList.add('on');
@@ -448,14 +461,11 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     const _closeHandler=e=>{if(!panel.contains(e.target))close();};
     document.addEventListener("pointerdown",_closeHandler,{capture:true});
 
-    const ncT=document.createElement("div");
-    ncT.style.cssText="position:fixed;padding:4px 10px;background:var(--ws-bg);color:var(--ws-text);font-size:12px;border-radius:4px;pointer-events:none;z-index:100001;white-space:nowrap;display:none;transform:translateX(-50%) translateY(-100%);";
-
     // 标题行：标题 + 主题切换按钮同一行
     const titleRow = document.createElement("div");
     titleRow.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:10px";
     const titleEl = document.createElement("div");
-    titleEl.textContent = "节点配色 Node Color";
+    titleEl.textContent = "高级配色 NodeColor";
     titleEl.style.cssText = "font-size:14px;color:var(--ws-text);letter-spacing:.5px;flex:1;text-align:center";
     titleRow.appendChild(titleEl);
 
@@ -505,6 +515,12 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     const hw=document.createElement("div");hw.className="nc-hw";
     const hs=document.createElement("input");hs.id="ncHs";hs.className="nc-hs";hs.type="range";hs.min=0;hs.max=360;hs.value=20;
     hs.oninput=function(){onHue(+this.value);};
+    // 滚轮调节色相（上滚 +1 / 下滚 -1）
+    hs.addEventListener('wheel',(e)=>{
+        e.preventDefault();e.stopPropagation();
+        let v=Math.max(0,Math.min(360,(+hs.value)+(e.deltaY<0?1:-1)));
+        if(v!==+hs.value){hs.value=v;onHue(v);}
+    },{passive:false});
     hw.appendChild(hs);
     panel.appendChild(hw);
 
@@ -513,9 +529,17 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     toolRow.style.cssText = 'display:flex;align-items:center;gap:6px;margin:8px 0 4px';
     const mkToolBtn = (iconSvg, tip) => {
         const b = document.createElement('div');
-        b.innerHTML = iconSvg; b.title = tip;
-        b.style.cssText = 'width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--ws-surface-2);cursor:pointer;color:var(--ws-text);user-select:none;flex-shrink:0';
+        b.innerHTML = iconSvg;
+        // A+B：静止软蓝灰(--ws-icon)，悬停点亮品牌橙(--ws-accent) + 放大
+        b.style.cssText = 'width:30px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:var(--ws-surface-2);cursor:pointer;color:var(--ws-icon);user-select:none;flex-shrink:0;transition:color .12s,transform .12s';
         b.onmousedown = e => e.preventDefault();
+        b._tip = tip;
+        // 共享即时提示(mouseenter 立刻显示，无原生 title 的 ~0.5s 延迟)
+        b.onmouseenter = () => {
+            b.style.color = 'var(--ws-accent)'; b.style.transform = 'scale(1.12)';
+            if (b._tip) showTip(b, b._tip);
+        };
+        b.onmouseleave = () => { b.style.color = 'var(--ws-icon)'; b.style.transform = ''; hideTip(); };
         return b;
     };
     const hexInput = document.createElement('input');
@@ -536,7 +560,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     hexInput.onclick = () => hexInput.select();  // 单击全选便于复制
 
     // 屏幕吸管（原生 EyeDropper API，Chrome/Edge 95+）
-    const eyeBtn = mkToolBtn(WS_ICONS.pipette, '屏幕取色（吸管）');
+    const eyeBtn = mkToolBtn(WS_ICONS.pipette, '自定义取色');
     if (window.EyeDropper) {
         eyeBtn.onclick = async () => {
             try {
@@ -549,11 +573,11 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     } else {
         eyeBtn.style.opacity = '.35';
         eyeBtn.style.cursor = 'not-allowed';
-        eyeBtn.title = '当前浏览器不支持屏幕取色（需 Chrome/Edge 95+）';
+        eyeBtn._tip = '当前浏览器不支持屏幕取色（需 Chrome/Edge 95+）';
     }
 
     // 随机色；Alt+点击 = 超级随机（多选节点各配不同随机色）
-    const randBtn = mkToolBtn(WS_ICONS.dice, 'Alt+点击：多节点随机配色');
+    const randBtn = mkToolBtn(WS_ICONS.dice, 'Alt + 点击：多节点 / 分组随机配色');
     randBtn.onclick = (e) => {
         if (e.altKey && nodes.length > 1) {
             // 超级随机：绕过面板状态，逐节点独立上色
@@ -730,6 +754,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     const fRow=document.createElement("div");fRow.className="nc-fb";
     const resetBtn=document.createElement("button");resetBtn.className="nc-cfb";resetBtn.textContent="清除";
     resetBtn.onclick=()=>{
+        _isCleared = true;  // 标记为清除预览状态
         nodes.forEach(n=>{
             if(typeof n.setColorOption==="function")n.setColorOption(null);
             else{n.color=void 0;n.bgcolor=void 0;}
@@ -739,7 +764,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         linkedGroups.forEach(g => { g.color = void 0; });
         // 重置面板状态到初始化，但保留当前模式（单色/双色/三色）
         const cnt = S.stopCount;
-        S.direction = '↓';
+        S.dir = '↓';   // 字段名与初始化(L86)/读取(L108)一致；原误写为 S.direction 导致方向归零失效
         S.h = 20; S.s = 82; S.v = 83;
         S.stops = [{p:0,h:20,s:82,v:83},{p:1,h:20,s:60,v:30}];
         S.editTarget = 'hdr';
@@ -750,9 +775,17 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         canvas.setDirty(true,true);app.graph.setDirtyCanvas(true,true);
         if(typeof _refreshDOMGradients==="function")_refreshDOMGradients();
         refresh();
+        resetBtn.classList.add('nc-cleared');  // 清除按钮高亮
     };
     const confirmBtn=document.createElement("button");confirmBtn.className="nc-cfb";confirmBtn.textContent="确认";
-    confirmBtn.onclick=()=>{applyToNodes();close();};
+    confirmBtn.onclick=()=>{
+        if (_isCleared) {
+            // 清除状态：保持已清除效果，直接关闭（不再重新上色）
+        } else {
+            applyToNodes();
+        }
+        close();
+    };
     fRow.appendChild(resetBtn);fRow.appendChild(confirmBtn);
     panel.appendChild(fRow);
 
@@ -761,7 +794,6 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     panel.appendChild(cr);
 
     document.body.appendChild(panel);
-    document.body.appendChild(ncT);
     const gap = 12;
     if (anchorRect) {
         // 从 color bar 打开：横版在 bar 下方水平居中；竖版在 bar 左/右侧垂直居中
@@ -844,7 +876,7 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
     }
 
     function close(){
-        _onHexChFn=null;ncT.remove();panel.remove();
+        _onHexChFn=null;hideTip();panel.remove();
         _offGlass();   // 退订玻璃主题广播
         document.removeEventListener("pointerdown",_closeHandler,{capture:true});
         document.removeEventListener('keydown',_onGrayKeyDown);
@@ -853,7 +885,15 @@ function openNodeColorPicker(nodes, anchorRect, groups) {
         document.removeEventListener('pointermove',_svMove);
         document.removeEventListener('pointerup',_svUp);
         document.removeEventListener('pointercancel',_svUp);
+        // 补移除 rebuildPins 注册的 document 级监听器（防面板关闭后残留累积）
+        if (_pinOnMove) document.removeEventListener('pointermove', _pinOnMove);
+        if (_pinOnUp) {
+            document.removeEventListener('pointerup', _pinOnUp);
+            document.removeEventListener('pointercancel', _pinOnUp);
+        }
     }
+    // 暴露 close 路径：旧面板清理(L78-82)可通过 _wosaiClose() 正确解绑监听
+    panel._wosaiClose = close;
 }
 
 app.registerExtension({
@@ -883,6 +923,7 @@ app.registerExtension({
 
         // Find the DOM element that visually represents a node's background
         const _bgElCache = new Map();  // key: node.id:bgColor → element|null
+        const _appliedGrad = new Set();  // 已应用 inline 渐变的 node.id（用于精确清理，避免每次刷新遍历全部节点 querySelector → 卡顿）
 
         function findNodeBgElement(node) {
             const bgColor = node.bgcolor;
@@ -937,59 +978,88 @@ app.registerExtension({
             return null;
         }
 
-        // 在节点 DOM 元素上应用渐变背景（CSS 规则 + inline style 双保险）
-        // Nodes 2.0 (Vue): 节点 DOM 结构
-        //   [data-node-id] 外层容器
-        //     └── [data-testid="node-inner-wrapper"] ← 包裹 header+body 的共同父容器
-        //           backgroundColor: node.color (标题栏色)
-        //           --component-node-background: node.bgcolor (面板 CSS 变量)
-        //           ├── div (header container)
-        //           │   └── [data-testid="node-header-X"] 标题栏
-        //           └── [data-testid="node-body-X"] 面板 (bg-component-node-background)
-        // 统一渐变：渐变设在 node-inner-wrapper（覆盖 header+body），
-        // 同时将 node-body 透明化，让渐变穿透面板
-        // Classic (Canvas DOM): 使用 data-wgrad 标记 + CSS 规则 + findNodeBgElement 匹配
+        // 在节点 DOM 元素上应用渐变背景（一次性 inline style 写入，不使用 MutationObserver ）
+        // 参考单色模式的机制：
+        //   Vue 把颜色写入节点 DOM（通过 CSS 变量 --component-node-background / --component-node-header）
+        //   渐变模式：在 inner-wrapper / header / body 上用 background: linear-gradient(...) !important 覆盖
+        function _applyGradientInline(node) {
+            const g = node._gradient;
+            if (!g) return;
+            const isSplit = g.mode === 'split' && g.title && g.body;
+
+            const container = document.querySelector(`[data-node-id="${node.id}"]`);
+            if (!container) return;
+
+            const inner = container.querySelector('[data-testid="node-inner-wrapper"]');
+            const header = container.querySelector(`[data-testid="node-header-${node.id}"]`);
+            const body = container.querySelector(`[data-testid="node-body-${node.id}"]`);
+
+            // 清除旧值（先清，再设），避免不同属性互相干扰
+            const _clearBg = (el) => {
+                if (!el) return;
+                el.style.removeProperty('background');
+                el.style.removeProperty('background-image');
+                el.style.removeProperty('background-color');
+                el.style.removeProperty('--component-node-background');
+                el.style.removeProperty('--component-node-header');
+            };
+            _clearBg(inner); _clearBg(header); _clearBg(body);
+
+            if (isSplit) {
+                // 分区域渐变：inner 透明，header 独立渐变，body 独立渐变
+                const titleGrad = sharpGradientCSS(cssGradientDir(g.title.dir), g.title.stops);
+                const bodyGrad  = sharpGradientCSS(cssGradientDir(g.body.dir), g.body.stops);
+
+                if (inner) {
+                    inner.style.setProperty('background', 'transparent', 'important');
+                    inner.style.setProperty('--component-node-background', 'transparent', 'important');
+                    inner.style.setProperty('--component-node-header',     'transparent', 'important');
+                }
+                if (header) {
+                    header.style.setProperty('background', titleGrad, 'important');
+                    header.style.setProperty('--component-node-header', 'transparent', 'important');
+                }
+                if (body) {
+                    body.style.setProperty('background', bodyGrad, 'important');
+                    body.style.setProperty('--component-node-background', 'transparent', 'important');
+                } else if (inner) {
+                    inner.style.setProperty('background', bodyGrad, 'important');
+                    if (header) header.style.setProperty('background', titleGrad, 'important');
+                }
+            } else {
+                // 整体渐变（sync 模式）：渐变设在 inner-wrapper 上，覆盖 header+body 整个区域
+                let gradCSS;
+                if (g.stops) gradCSS = sharpGradientCSS(cssGradientDir(g.dir), g.stops);
+                else         gradCSS = `linear-gradient(${cssGradientDir(g.dir)}, ${g.from} 0%, ${g.from} 30%, ${g.to} 70%, ${g.to} 100%)`;
+                const target = inner || container;
+                target.style.setProperty('background', gradCSS, 'important');
+                if (body) body.style.setProperty('background-color', 'transparent', 'important');
+                if (inner) {
+                    inner.style.setProperty('--component-node-background', 'transparent', 'important');
+                    inner.style.setProperty('--component-node-header',     'transparent', 'important');
+                }
+            }
+        }
+
         function applyGradientToNode(node, retries = 5) {
             const g = node._gradient;
             if (!g) return;
 
-            const markerId = `wgrad-${node.id}`;
-            // Build CSS gradient string from stops array (new format) or from/to (legacy)
-            let gradCSS;
-            if (g.stops) {
-                gradCSS = sharpGradientCSS(cssGradientDir(g.dir), g.stops);
-            } else {
-                gradCSS = `linear-gradient(${cssGradientDir(g.dir)}, ${g.from} 0%, ${g.from} 30%, ${g.to} 70%, ${g.to} 100%)`;
-            }
-
-            // ── Nodes 2.0 路径：渐变设在 node-inner-wrapper（包裹整个节点内容） ──
+            // Nodes 2.0 (Vue DOM)：一次性写入 inline style
             const container2 = document.querySelector(`[data-node-id="${node.id}"]`);
-            if (container2) {
-                // node-inner-wrapper 是 header+body 的共同父容器
-                const inner = container2.querySelector('[data-testid="node-inner-wrapper"]');
-                const target = inner || container2;
-                target.style.setProperty('background-image', gradCSS, 'important');
+            if (container2) { _applyGradientInline(node); return; }
 
-                // 将 node-body 面板透明化，让渐变穿透（body 的 bg-component-node-background 会盖住渐变）
-                const body = container2.querySelector(`[data-testid="node-body-${node.id}"]`);
-                if (body) {
-                    body.style.setProperty('background-color', 'transparent', 'important');
-                }
-                return;
-            }
-
-            // ── Classic 模式路径：使用 data-wgrad 标记 ──
+            // Classic 模式：data-wgrad 标记（降级使用标题 / 整体渐变）
+            const markerId = `wgrad-${node.id}`;
             let el = document.querySelector(`[data-wgrad="${markerId}"]`);
-            if (!el) {
-                el = findNodeBgElement(node);
-            }
-            if (!el) {
-                if (retries > 0) {
-                    setTimeout(() => applyGradientToNode(node, retries - 1), 80);
-                }
-                return;
-            }
+            if (!el) el = findNodeBgElement(node);
+            if (!el) { if (retries > 0) setTimeout(() => applyGradientToNode(node, retries - 1), 80); return; }
             el.setAttribute('data-wgrad', markerId);
+            const isSplit = g.mode === 'split' && g.title && g.body;
+            let gradCSS;
+            if (isSplit) gradCSS = sharpGradientCSS(cssGradientDir(g.title.dir), g.title.stops);
+            else if (g.stops) gradCSS = sharpGradientCSS(cssGradientDir(g.dir), g.stops);
+            else gradCSS = `linear-gradient(${cssGradientDir(g.dir)}, ${g.from} 0%, ${g.from} 30%, ${g.to} 70%, ${g.to} 100%)`;
             el.style.setProperty('background', gradCSS, 'important');
         }
 
@@ -997,24 +1067,26 @@ app.registerExtension({
         function clearGradientFromNode(node) {
             const container2 = document.querySelector(`[data-node-id="${node.id}"]`);
             if (container2) {
-                // 清除 node-inner-wrapper 上的渐变
                 const inner = container2.querySelector('[data-testid="node-inner-wrapper"]');
-                if (inner) {
-                    inner.style.removeProperty('background-image');
-                }
+                const header = container2.querySelector(`[data-testid="node-header-${node.id}"]`);
+                const body = container2.querySelector(`[data-testid="node-body-${node.id}"]`);
+                const _clearBg = (el) => {
+                    if (!el) return;
+                    el.style.removeProperty('background');
+                    el.style.removeProperty('background-image');
+                    el.style.removeProperty('background-color');
+                    el.style.removeProperty('--component-node-background');
+                    el.style.removeProperty('--component-node-header');
+                };
+                _clearBg(inner); _clearBg(header); _clearBg(body);
                 container2.style.removeProperty('background-image');
                 container2.style.removeProperty('background');
-                // 恢复 node-body 面板原始背景
-                const body = container2.querySelector(`[data-testid="node-body-${node.id}"]`);
-                if (body) {
-                    body.style.removeProperty('background-color');
-                }
             }
-            // 清除 data-wgrad 标记
             const markerId = `wgrad-${node.id}`;
             document.querySelectorAll(`[data-wgrad="${markerId}"]`).forEach(el => {
                 el.removeAttribute('data-wgrad');
                 el.style.removeProperty('background');
+                el.style.removeProperty('background-image');
             });
         }
 
@@ -1029,54 +1101,73 @@ app.registerExtension({
                 graph.nodes.filter(n => n._gradient).map(n => `wgrad-${n.id}`)
             );
             document.querySelectorAll('[data-wgrad]').forEach(el => {
-                if (!markerIds.has(el.getAttribute('data-wgrad'))) {
-                    el.removeAttribute('data-wgrad');
-                }
+                if (!markerIds.has(el.getAttribute('data-wgrad'))) el.removeAttribute('data-wgrad');
             });
 
-            // ── 重建 CSS 规则（三种选择器并存） ──
-            //   1) [data-wgrad="..."]                              — Classic DOM 标记匹配
-            //   2) [data-testid="node-inner-wrapper"] 父 + [data-testid="node-body-X"] 子   — Nodes 2.0 统一渐变
+            // ── 重建 CSS 规则（background !important 覆盖 Vue 颜色） ──
+            //   CSS 规则优先级：带 !important 的属性 > 元素内联 style 中对应属性
+            //   所以 [data-node-id="N"] [data-testid="..."] { background: linear-gradient(...) !important }
+            //   会覆盖 Vue 在该元素内联设置的 background-color / --component-node-background。
+            //   注：CSS 变量(--component-node-*) 不受 !important 影响，主要靠 background 简写的 !important 覆盖视觉。
             let css = '';
             for (const node of graph.nodes) {
                 const g = node._gradient;
                 if (!g) continue;
-                const dir = cssGradientDir(g.dir);
-                let gradCSS;
-                if (g.stops) {
-                    gradCSS = sharpGradientCSS(dir, g.stops);
-                } else {
-                    gradCSS = `linear-gradient(${dir}, ${g.from} 0%, ${g.from} 30%, ${g.to} 70%, ${g.to} 100%)`;
-                }
-                const markerId = `wgrad-${node.id}`;
+                if (node._osHideTitle) continue;   // 被 OmniSlider 隐藏的节点不生成渐变规则，让隐藏生效
+                const isSplit = g.mode === 'split' && g.title && g.body;
 
-                // Classic: data-wgrad 标记
-                css += `[data-wgrad="${markerId}"] { background: ${gradCSS} !important; }\n`;
-                // Nodes 2.0: node-inner-wrapper 渐变 + node-body 透明化
-                css += `[data-node-id="${node.id}"] [data-testid="node-inner-wrapper"] { background-image: ${gradCSS} !important; }\n`;
-                css += `[data-node-id="${node.id}"] [data-testid="node-body-${node.id}"] { background-color: transparent !important; }\n`;
+                let titleGrad, bodyGrad, unifiedGrad;
+                if (isSplit) {
+                    titleGrad = sharpGradientCSS(cssGradientDir(g.title.dir), g.title.stops);
+                    bodyGrad  = sharpGradientCSS(cssGradientDir(g.body.dir),  g.body.stops);
+                } else {
+                    const dir = cssGradientDir(g.dir);
+                    if (g.stops) unifiedGrad = sharpGradientCSS(dir, g.stops);
+                    else         unifiedGrad = `linear-gradient(${dir}, ${g.from} 0%, ${g.from} 30%, ${g.to} 70%, ${g.to} 100%)`;
+                }
+
+                const markerId = `wgrad-${node.id}`;
+                const sel = `[data-node-id="${node.id}"]`;
+                // Classic 模式：data-wgrad 标记（降级使用标题 / 整体渐变）
+                css += `[data-wgrad="${markerId}"] { background: ${isSplit ? titleGrad : unifiedGrad} !important; }\n`;
+
+                if (isSplit) {
+                    // 分区域渐变：inner 透明，header / body 各自独立渐变
+                    css += `${sel} [data-testid="node-inner-wrapper"]    { background: transparent !important; }\n`;
+                    css += `${sel} [data-testid="node-header-${node.id}"] { background: ${titleGrad} !important; }\n`;
+                    css += `${sel} [data-testid="node-body-${node.id}"]   { background: ${bodyGrad} !important; }\n`;
+                } else {
+                    // 整体渐变：渐变设在 inner-wrapper，body 不透明色块清除
+                    css += `${sel} [data-testid="node-inner-wrapper"]    { background: ${unifiedGrad} !important; }\n`;
+                    css += `${sel} [data-testid="node-body-${node.id}"]   { background-color: transparent !important; }\n`;
+                }
             }
             const styleEl = document.getElementById('wosai-gradient-styles');
             if (styleEl) styleEl.textContent = css;
 
-            // ── 即时应用 inline style（Nodes 2.0 + Classic 双路径） ──
+            // 一次性 inline style 写入（辅助覆盖 Vue 内联 style，尤其对启动时已渲染的节点立即生效）
             for (const node of graph.nodes) {
-                if (node._gradient) {
+                if (node._gradient && !node._osHideTitle) {
                     applyGradientToNode(node);
-                } else {
+                    _appliedGrad.add(node.id);
+                } else if (_appliedGrad.has(node.id)) {
                     clearGradientFromNode(node);
+                    _appliedGrad.delete(node.id);
                 }
             }
 
             // 兜底：Vue 异步渲染后可能替换 DOM，RAF 后重试
             requestAnimationFrame(() => {
                 for (const node of graph.nodes) {
-                    if (node._gradient) applyGradientToNode(node, 2);
+                    if (node._gradient && !node._osHideTitle) applyGradientToNode(node, 2);
                 }
             });
         }
         _refreshDOMGradients = refreshDOMGradients;
         _refreshDOMTitleStyles = refreshDOMTitleStyles;
+        // 暴露给 OmniSlider：隐藏/显示切换后调用，使 node-color 重新评估渐变
+        //   （隐藏时清渐变让隐藏生效，显示时恢复渐变）。
+        try { window.__wosaiColorRefresh = refreshDOMGradients; } catch (_) {}
 
         // ── 模式检测：Nodes 2.0 (Vue DOM) vs Classic (Canvas) ──
         // Nodes 2.0 特征：[data-node-id] 属性存在于外层容器
@@ -1325,15 +1416,51 @@ app.registerExtension({
             ctx.textAlign = align;
             ctx.textBaseline = 'middle';
             // 自适应阴影，确保在亮色背景（金黄、沙橙等）上文字也清晰
-            const cc2 = color.startsWith('#') ? color : '#ffffff';
-            const cr2=parseInt(cc2.slice(1,3),16),cg2=parseInt(cc2.slice(3,5),16),cb2=parseInt(cc2.slice(5,7),16);
-            const clum2=0.299*cr2+0.587*cg2+0.114*cb2;
-            ctx.shadowColor = clum2 > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
-            ctx.shadowBlur = 3;
+            _applyTitleShadow(ctx, color);
             ctx.fillText(title, x, -th / 2);
             ctx.shadowColor = 'transparent';
             ctx.shadowBlur = 0;
             ctx.restore();
+        }
+
+        // ── 公共：OmniSlider 精简模式画布层隐藏（drawNodeShape/drawNode 共用）──
+        //   还原上一帧清空的角标 → 按需清空 badges → 隐藏标题时设透明色。
+        //   返回 true 表示调用方应跳过原生绘制（return）。
+        function _applyOmniHide(node) {
+            if (!node || node.type !== "WOSAI_OmniSlider") return false;
+            // 每帧先还原上一帧清空的角标，再按需清空 → 关闭开关后角标自动恢复
+            if (node._osOrigBadges !== undefined) {
+                node.badges = node._osOrigBadges;
+                node._osOrigBadges = undefined;
+            }
+            if (node._osHideBadge && Array.isArray(node.badges) && node.badges.length) {
+                node._osOrigBadges = node.badges;
+                node.badges = [];   // 本帧清空，后续就画不出 WOSAI 角标
+            }
+            if (node._osHideTitle) {
+                node.bgcolor = "transparent";
+                node.color = "#fff0";
+                return true;   // 调用方跳过标题栏+节点体背景；端口由父级 drawNode 后续绘制
+            }
+            return false;
+        }
+
+        // ── 公共：8 方向线性渐变端点（drawNodeShape/drawNode 共用，消除 pts 字典重复）──
+        function _gradPts(w, h, th) {
+            return {
+                '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
+                '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
+                '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
+            };
+        }
+
+        // ── 公共：按标题色亮度设置自适应阴影（亮色→黑影，暗色→白影），确保任意背景可读 ──
+        function _applyTitleShadow(ctx, color) {
+            const cc = (typeof color === 'string' && color.startsWith('#')) ? color : '#ffffff';
+            const cr = parseInt(cc.slice(1, 3), 16), cg = parseInt(cc.slice(3, 5), 16), cb = parseInt(cc.slice(5, 7), 16);
+            const clum = 0.299 * cr + 0.587 * cg + 0.114 * cb;
+            ctx.shadowColor = clum > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
+            ctx.shadowBlur = 3;
         }
 
         // ── drawNodeShape wrapper（经典模式渐变，CYBERPUNK 同款技术）──
@@ -1341,6 +1468,9 @@ app.registerExtension({
         // 因此 globalAlpha=0 trick 可安全地让原始 drawNodeShape 绘制透明，不影响 slots/widgets
         function makeDrawShapeWrapper(origFn) {
             return function(node, ctx, size, fgcolor, bgcolor, selected, mouseOver) {
+                // ── WOSAI OmniSlider 精简模式：隐藏标题 / 画布角标 ────────────────
+                //   统一在此唯一的 drawNodeShape wrapper 处理，避免与 omni 双钩子冲突。
+                if (_applyOmniHide(node)) return;
                 // ── 无渐变：正常绘制纯色背景，如有自定义标题样式则事后重绘文字 ──
                 if (!node._gradient) {
                     origFn.call(this, node, ctx, size, fgcolor, bgcolor, selected, mouseOver);
@@ -1355,11 +1485,7 @@ app.registerExtension({
                 const w = size[0], h = size[1];
                 const r = node.borderRadius || LG?.NODE_CORNER_RADIUS || 8;
                 const cfg = node._gradient;
-                const pts = {
-                    '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
-                    '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
-                    '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
-                };
+                const pts = _gradPts(w, h, th);
                 const [x1, y1, x2, y2] = pts[cfg.dir] || pts['↓'];
                 ctx.save();
                 try {
@@ -1390,11 +1516,7 @@ app.registerExtension({
                         ctx.font = `${ts?.weight || "bold"} ${fontSize}px Arial, sans-serif`;
                         ctx.fillStyle = color;
                         // 标题横跨渐变亮暗区，加阴影确保任何背景下都可见
-                        const cc = color.startsWith('#') ? color : '#ffffff';
-                        const cr=parseInt(cc.slice(1,3),16),cg=parseInt(cc.slice(3,5),16),cb=parseInt(cc.slice(5,7),16);
-                        const clum=0.299*cr+0.587*cg+0.114*cb;
-                        // 用中等透明度缓解亮色渐变上的文字可读性问题（沙漠、黎明等）
-                        ctx.shadowColor = clum > 128 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)';
+                        _applyTitleShadow(ctx, color);
                         ctx.shadowBlur = 3;
                         ctx.textAlign = align === 'center' ? 'center' : (align === 'right' ? 'right' : 'left');
                         ctx.textBaseline = 'middle';
@@ -1418,6 +1540,11 @@ app.registerExtension({
         // drawNode wrapper（兜底：drawNodeShape 不存在时使用）
         function makeDrawNodeWrapper(origDrawNode) {
             return function(node, ctx) {
+                // WOSAI OmniSlider 精简模式兜底（旧版无 drawNodeShape）：复用公共隐藏逻辑
+                if (node && node.type === "WOSAI_OmniSlider" && _applyOmniHide(node)) {
+                    try { node.onDrawBackground?.(ctx); } catch (_) {}
+                    return;
+                }
                 if (node._wgradDrawing) return origDrawNode.call(this, node, ctx);
                 node._wgradDrawing = true;
                 const origColor = node.color, origBg = node.bgcolor;
@@ -1429,11 +1556,7 @@ app.registerExtension({
                         const w = node.size[0], h = node.size[1];
                         const LG = typeof LiteGraph !== 'undefined' ? LiteGraph : null;
                         const th = LG?.NODE_TITLE_HEIGHT || 30;
-                        const pts = {
-                            '↖': [w, h, 0, -th], '↑': [0, h, 0, -th], '↗': [0, h, w, -th],
-                            '←': [w, 0, 0,  0],  '→': [0, 0, w,  0],
-                            '↙': [w, -th, 0, h], '↓': [0, -th, 0, h], '↘': [0, -th, w, h],
-                        };
+                        const pts = _gradPts(w, h, th);
                         const [x1, y1, x2, y2] = pts[cfg.dir] || pts['↓'];
                         const r = LG?.NODE_CORNER_RADIUS ?? 8;
                         ctx.save();
@@ -1564,51 +1687,62 @@ app.registerExtension({
             // - 可能替换/更新节点 DOM 子树（childList 事件）→ 需要重新打标记
             // - 可能更新元素 style/class 属性 → 可能覆盖我们的注入样式 → 需要刷新
             let _moTimer = null;
-            const _gradMO = new MutationObserver(() => {
-                // 防抖：16ms 内只触发一次，避免频繁刷新
+            // 监听目标 + 选项提取出来，便于刷新时断开/重连
+            const graphContainer = document.getElementById('graph-canvas-container')
+                || document.getElementById('graph-canvas')
+                || document.querySelector('.graph-canvas-container, .graph-canvas, .litegraph, #litegraph');
+            const _moTarget = graphContainer || document.body;   // 兜底监听 body（稍重但可靠）
+            // ⚠ 绝不监听 'style'：refreshDOMGradients 给每个渐变节点写 inline style，
+            //   监听 style 会被自身写入(及 Vue 对其的异步反应)反复触发 → 16ms 死循环 → 右键假死。
+            //   只监听 childList(Vue 重建节点子树需重新注入) + class；其余情况由 500ms 轮询兜底。
+            const _moOpts = { subtree: true, childList: true, attributes: true, attributeFilter: ['class'] };
+            // 判断 DOM 节点是否属于本插件自身 UI（面板/提示），用于过滤无关变更
+            const _SELF_SEL = '[data-wosai-panel],.ws-tip,.os-panel,#wosai-panel';
+            const _isSelfUI = (n) => n && n.nodeType === 1 &&
+                ((n.matches && n.matches(_SELF_SEL)) || (n.closest && n.closest(_SELF_SEL)));
+            const _gradMO = new MutationObserver((muts) => {
+                // 防抖 120ms：开面板/画布重渲会在多帧内持续产生 childList 变更，
+                //   小窗口(16ms)会触发多次全量刷新→卡顿；加大窗口把整段突发合并成一次刷新。
+                //   期间渐变由 <style> 规则维持显示，inline 延迟重注入无副作用。
                 if (_moTimer) return;
+                // 过滤：仅由本插件面板/提示引发的变更(右键开面板、悬浮提示等)直接忽略，避免无谓刷新→卡顿
+                const relevant = muts.some(m => {
+                    if (_isSelfUI(m.target)) return false;
+                    const ns = [...(m.addedNodes || []), ...(m.removedNodes || [])];
+                    if (ns.length && ns.every(_isSelfUI)) return false;
+                    return true;
+                });
+                if (!relevant) return;
                 _moTimer = setTimeout(() => {
                     _moTimer = null;
                     const hasGrad = app.graph?.nodes?.some(n => n._gradient);
                     const hasTitleStyle = app.graph?.nodes?.some(n => n._titleStyle);
-                    if (hasGrad) refreshDOMGradients();
-                    if (hasTitleStyle) { refreshDOMTitleStyles(); applyTitleAlignInline(); }
-                }, 16);
+                    if (!hasGrad && !hasTitleStyle) return;
+                    // ⚠ 关键防死循环：refreshDOMGradients 会写节点 style(background-image)，
+                    //   而本观察器正监听 style/class → 自身写入会再次触发回调，形成永不停的 16ms 循环
+                    //   （CPU 持续占用 → 右键弹窗迟迟不出现；画布旁 DOM 不停变 → 输入法悬浮栏闪烁抖动）。
+                    //   故刷新期间先断开，刷新后再重连（disconnect 清空待处理队列，自身写入不入队）。
+                    _gradMO.disconnect();
+                    try {
+                        if (hasGrad) refreshDOMGradients();
+                        if (hasTitleStyle) { refreshDOMTitleStyles(); applyTitleAlignInline(); }
+                    } finally {
+                        _gradMO.observe(_moTarget, _moOpts);   // 重连
+                    }
+                }, 120);
             });
-            // 监听节点容器内的属性 + 子节点变更
-            const graphContainer = document.getElementById('graph-canvas-container')
-                || document.getElementById('graph-canvas')
-                || document.querySelector('.graph-canvas-container, .graph-canvas, .litegraph, #litegraph');
-            if (graphContainer) {
-                _gradMO.observe(graphContainer, {
-                    subtree: true,
-                    childList: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-            } else {
-                // 兜底：监听 body（稍重但可靠）
-                _gradMO.observe(document.body, {
-                    subtree: true,
-                    childList: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-            }
+            _gradMO.observe(_moTarget, _moOpts);
 
-            // 轮询兜底：处理节点增删、工作流加载等场景
-            let prevNodeCount = app.graph?.nodes?.length || 0;
-            let prevGradCount = 0;
-            let prevTitleStyleCount = 0;
-            const _pollIntervalId = setInterval(() => {
-                if (document.hidden) return; // 页面不可见时跳过，降低后台开销
-                const curr = app.graph?.nodes?.length || 0;
-                const gradCount = app.graph?.nodes?.filter(n => n._gradient)?.length || 0;
-                const tsCount = app.graph?.nodes?.filter(n => n._titleStyle)?.length || 0;
-                if (curr !== prevNodeCount || gradCount !== prevGradCount || tsCount !== prevTitleStyleCount) {
-                    prevNodeCount = curr;
-                    prevGradCount = gradCount;
-                    prevTitleStyleCount = tsCount;
+            // 事件驱动兜底：使用 graph.onNodeAdded/onNodeRemoved 替代 setInterval 轮询
+            // 处理节点增删、工作流加载等 MO 无法捕获的场景
+            let _prevNodeCount = app.graph?.nodes?.length || 0;
+            const _refreshIfChanged = () => {
+                if (!app.graph) return;
+                const curr = app.graph.nodes?.length || 0;
+                const gradCount = app.graph.nodes?.filter(n => n._gradient)?.length || 0;
+                const tsCount = app.graph.nodes?.filter(n => n._titleStyle)?.length || 0;
+                if (curr !== _prevNodeCount || gradCount > 0 || tsCount > 0) {
+                    _prevNodeCount = curr;
                     refreshDOMGradients();
                     refreshDOMTitleStyles();
                     applyTitleAlignInline();
@@ -1617,52 +1751,83 @@ app.registerExtension({
                         app.graph.setDirtyCanvas(true, true);
                     }
                 }
-            }, 500);
-            _gradPollIntervalId = _pollIntervalId;
+            };
+            const _origOnNodeAdded = app.graph.onNodeAdded;
+            const _origOnNodeRemoved = app.graph.onNodeRemoved;
+            const _wrappedOnNodeAdded = (n) => { _origOnNodeAdded?.(n); _refreshIfChanged(); };
+            const _wrappedOnNodeRemoved = (n) => { _origOnNodeRemoved?.(n); _refreshIfChanged(); };
+            _wrappedOnNodeAdded._wosaiWrapped = true;
+            _wrappedOnNodeAdded._wosaiOrig = _origOnNodeAdded;
+            _wrappedOnNodeRemoved._wosaiWrapped = true;
+            _wrappedOnNodeRemoved._wosaiOrig = _origOnNodeRemoved;
+            app.graph.onNodeAdded = _wrappedOnNodeAdded;
+            app.graph.onNodeRemoved = _wrappedOnNodeRemoved;
+
             _gradMORef = _gradMO;
         }
         setupGradientSupport();
 
+        // ── 原型 hook 幂等安装：防热重载/重复 setup 叠套 ──
+        //   若当前方法已是本插件包装(_wosaiWrapped)，直接复用已保存的原函数；
+        //   否则首次记录真实原函数到 _protoRefs，供 remove() 还原。
+        function hookProto(obj, name, makeWrapper) {
+            const cur = obj[name];
+            if (cur && cur._wosaiWrapped) { _protoRefs[name] = cur._wosaiOrig; return; }
+            const w = makeWrapper(cur);
+            w._wosaiWrapped = true; w._wosaiOrig = cur;
+            obj[name] = w;
+            _protoRefs[name] = cur;
+        }
+
         // Serialize _gradient so it survives workflow save/load
-        const origSerialize = LGraphNode.prototype.serialize;
-        LGraphNode.prototype.serialize = function() {
+        hookProto(LGraphNode.prototype, 'serialize', (origSerialize) => function() {
             const data = origSerialize ? origSerialize.call(this) : {};
             if (this._gradient) data._gradient = JSON.parse(JSON.stringify(this._gradient));
             if (this._titleStyle) data._titleStyle = JSON.parse(JSON.stringify(this._titleStyle));
             return data;
-        };
-        const origConfigure = LGraphNode.prototype.configure;
-        LGraphNode.prototype.configure = function(data) {
+        });
+        hookProto(LGraphNode.prototype, 'configure', (origConfigure) => function(data) {
             if (origConfigure) origConfigure.call(this, data);
             if (data && data._gradient) this._gradient = JSON.parse(JSON.stringify(data._gradient));
             else delete this._gradient;
             if (data && data._titleStyle) this._titleStyle = JSON.parse(JSON.stringify(data._titleStyle));
             else delete this._titleStyle;
-        };
-        // Also hook onAdded so newly created nodes have a clean state
-        const origOnAdded = LGraphNode.prototype.onAdded;
-        LGraphNode.prototype.onAdded = function(graph) {
+        });
+        hookProto(LGraphNode.prototype, 'onAdded', (origOnAdded) => function(graph) {
             if (origOnAdded) origOnAdded.call(this, graph);
             if (!this._gradient) delete this._gradient;
-        };
+        });
 
         // 分组右键菜单 — 复用 openNodeColorPicker 完整面板
-        const origGroupOpts = LGraphGroup.prototype.getMenuOptions;
-        LGraphGroup.prototype.getMenuOptions = function (gc) {
+        hookProto(LGraphGroup.prototype, 'getMenuOptions', (origGroupOpts) => function (gc) {
             const opts = origGroupOpts?.apply(this, arguments) || [];
             const group = this;
             opts.push(null);
             opts.push({
-                content: "🟠WOSAI 配色助手（快捷键 C ）",
+                content: "🟠 高级配色 NodeColor",
                 callback: () => openNodeColorPicker([group]),
             });
             return opts;
-        };
+        });
     },
 
     remove() {
-        if (_gradPollIntervalId) { clearInterval(_gradPollIntervalId); _gradPollIntervalId = null; }
         if (_gradMORef) { _gradMORef.disconnect(); _gradMORef = null; }
+        // 恢复 graph 的原始 onNodeAdded/onNodeRemoved 回调
+        if (app.graph) {
+            const _curAdd = app.graph.onNodeAdded;
+            const _curRem = app.graph.onNodeRemoved;
+            // 简单判断：如果当前回调是包装后的，恢复原始
+            if (_curAdd && _curAdd._wosaiWrapped) app.graph.onNodeAdded = _curAdd._wosaiOrig;
+            if (_curRem && _curRem._wosaiWrapped) app.graph.onNodeRemoved = _curRem._wosaiOrig;
+        }
+        // 还原原型 hook（防热重载后残留包装）
+        for (const [name, orig] of Object.entries(_protoRefs)) {
+            if (orig !== undefined) {
+                if (LGraphNode.prototype[name] && LGraphNode.prototype[name]._wosaiWrapped) LGraphNode.prototype[name] = orig;
+                if (LGraphGroup.prototype[name] && LGraphGroup.prototype[name]._wosaiWrapped) LGraphGroup.prototype[name] = orig;
+            }
+        }
     },
 
     getNodeMenuItems(node) {
@@ -1678,7 +1843,7 @@ app.registerExtension({
         return [
             null,
             {
-                content: nodes.length > 1 ? `🟠WOSAI 配色助手 (${nodes.length})（快捷键 C ）` : "🟠WOSAI 配色助手（快捷键 C ）",
+                content: nodes.length > 1 ? `🟠 高级配色 NodeColor (${nodes.length})` : "🟠 高级配色 NodeColor",
                 callback: () => openNodeColorPicker(nodes),
             },
         ];
@@ -1686,7 +1851,7 @@ app.registerExtension({
 
     commands: [{
         id: "wosai-node-color",
-        label: "🟠WOSAI 配色助手",
+        label: "🟠 高级配色 NodeColor",
         function: () => {
             const canvas = app.canvas;
             const graph = app.graph;
@@ -1701,11 +1866,6 @@ app.registerExtension({
             const selGroups = (graph._groups || []).filter(g => g._selected || g.selected);
             if (selGroups.length) openPickerForGroups(selGroups);
         },
-    }],
-
-    keybindings: [{
-        combo: { key: "C" },
-        commandId: "wosai-node-color",
     }],
 });
 

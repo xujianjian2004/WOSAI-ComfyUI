@@ -1,0 +1,146 @@
+/* ══════════════════════════════════════════════════════════════════════
+   os-slider-hide.css — OmniSlider 隐藏模式开关（面板/角标/端口）
+   从 os-slider.css 拆分，设计令牌见 wosai-variables.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* === Node display toggles (隐藏标题 / 隐藏角标) === */
+.os-display-section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 4px 0 2px;
+  background: var(--ws-surface-2);
+  border-radius: var(--ws-radius-md);
+}
+.os-display-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ws-gap-sm);
+  padding: 5px 10px;
+  border-radius: var(--ws-radius-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+.os-display-row-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--ws-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+.os-display-row-label svg {
+  width: 14px;
+  height: 14px;
+  color: var(--ws-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Settings group container */
+.os-group {
+  background: var(--ws-surface-2);
+  border-radius: var(--ws-radius-md);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+.os-panel > .os-group { margin-bottom: 2px; }
+.os-panel .os-group .os-display-row,
+.os-panel .os-group .os-scale-row {
+  background: transparent;
+  border-radius: 0;
+  padding: 3px 4px;
+}
+.os-group .os-num-group {
+  background: transparent;
+  border: none;
+  border-radius: var(--ws-radius-md);
+  padding: 6px 2px 8px;
+}
+.os-group .os-row-label { margin: 2px 0 0; padding-left: 4px; }
+.os-group-top .os-seg { background: transparent; padding: 0; }
+.os-group-top .os-maxch-section { border: none; }
+
+/* Channel tabs: circular buttons with pointer at bottom */
+.os-group-top .os-seg.os-seg-tabs {
+  display: flex;
+  justify-content: flex-start;
+  gap: 11px;
+  margin-bottom: 10px;
+  background: transparent;
+  padding: 0;
+}
+.os-group-top .os-seg-tabs .os-seg-btn {
+  position: relative;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+}
+.os-group-top .os-seg-tabs .os-seg-btn.on::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--ws-accent);
+}
+
+/* Segmented control compact variant */
+.os-panel .os-seg.os-seg-compact { flex: 0 0 auto; width: auto; gap: 10px; }
+.os-panel .os-seg.os-seg-compact .os-seg-btn {
+  flex: 0 0 auto;
+  padding: 3px 14px;
+  font-size: 11px;
+}
+.os-panel .os-seg.os-seg-hide { gap: 8px; }
+.os-panel .os-seg.os-seg-hide .os-seg-btn { padding: 3px 9px; font-size: 11px; }
+
+/* iOS-style toggle switch */
+.os-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--ws-surface-3);
+  border: 1px solid var(--ws-border);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--ws-transition), border-color var(--ws-transition);
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.os-toggle:focus-visible { box-shadow: 0 0 0 2px var(--ws-accent); }
+.os-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ws-text-secondary);
+  transition: transform var(--ws-transition), background var(--ws-transition);
+  pointer-events: none;
+}
+.os-toggle.on { background: var(--ws-accent); border-color: var(--ws-accent); }
+.os-toggle.on::after { transform: translateX(16px); background: var(--ws-text-on-accent); }
+.os-toggle:hover:not(.on) { background: var(--ws-border); }
+.os-toggle.on:hover { filter: brightness(1.1); }
+.os-toggle:active::after { transform: scale(0.92); }
+.os-toggle.on:active::after { transform: translateX(16px) scale(0.92); }

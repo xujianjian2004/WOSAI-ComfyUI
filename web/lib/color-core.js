@@ -57,19 +57,27 @@ export function randomHSV(opts = {}) {
     };
 }
 
-// ── 渐变方向 ──────────────────────────────────────────────
+// ── 渐变方向（8 个方向：上/下/左/右 + 四个对角线，2行×4列排列）───────────────
 export const DIRS = [
-    { sym: '↑', deg: 0 }, { sym: '←', deg: 270 }, { sym: '↖', deg: 315 }, { sym: '↙', deg: 225 },
-    { sym: '↓', deg: 180 }, { sym: '→', deg: 90 }, { sym: '↗', deg: 45 }, { sym: '↘', deg: 135 },
+    { sym: '↑', deg: 0 }, { sym: '←', deg: 270 }, { sym: '↖', deg: 315 }, { sym: '↗', deg: 45 },
+    { sym: '↓', deg: 180 }, { sym: '→', deg: 90 }, { sym: '↙', deg: 225 }, { sym: '↘', deg: 135 },
 ];
-export const DIR_TIPS = { '↑': '向上渐暗', '↓': '向下渐暗', '←': '向左渐暗', '→': '向右渐暗', '↖': '左上渐暗', '↗': '右上渐暗', '↙': '左下渐暗', '↘': '右下渐暗' };
+export const DIR_TIPS = {
+    '↖': '左上渐暗', '↑': '向上渐暗', '↗': '右上渐暗',
+    '←': '向左渐暗',                  '→': '向右渐暗',
+    '↙': '左下渐暗', '↓': '向下渐暗', '↘': '右下渐暗',
+};
 
-const DEG_MAP = { '↖': '315deg', '↑': '0deg', '↗': '45deg', '→': '90deg', '←': '270deg', '↙': '225deg', '↓': '180deg', '↘': '135deg' };
+const DEG_MAP = {
+    '↖': '315deg', '↑': '0deg', '↗': '45deg',
+    '←': '270deg',              '→': '90deg',
+    '↙': '225deg', '↓': '180deg', '↘': '135deg',
+};
 export function degOf(dir) { return DEG_MAP[dir] || '180deg'; }
 
 const CSS_DIR_MAP = {
     '↖': 'to top left', '↑': 'to top', '↗': 'to top right',
-    '←': 'to left', '→': 'to right',
+    '←': 'to left',                     '→': 'to right',
     '↙': 'to bottom left', '↓': 'to bottom', '↘': 'to bottom right',
 };
 export function cssGradientDir(dir) { return CSS_DIR_MAP[dir] || 'to bottom'; }
@@ -124,47 +132,68 @@ export const GRAD_PRESETS = [
 // state 为纯数据快照：
 // {
 //   stopCount: 1|2|3,
-//   editTarget: 'hdr'|'bg'|'sync',          // stopCount===1 时有效
-//   title: {h,s,v}, bg: {h,s,v},            // 单色模式两个目标
-//   dir: '↓', stops: [{p,h,s,v}, ...],      // 渐变模式
-//   titleStyle: {size,color,align,weight},  // 始终写入
+//   editTarget: 'hdr'|'bg'|'sync',              // 始终有效：单色 = 两区域各自纯色；渐变 = 整体渐变
+//   title: {h,s,v}, bg: {h,s,v},                // 单色模式两个目标（标题色 / 面板色）
+//   dir: '↓', stops: [{p,h,s,v}, ...],          // 整体渐变（标题与面板共用同渐变）
+//   titleStyle: {size,color,align,weight},      // 始终写入
 // }
 // 不触发任何刷新；调用方负责 canvas.setDirty / DOM 渐变刷新。
 export function applyColorState(nodes, state) {
     if (!nodes?.length || !state) return;
     const S = state;
     nodes.forEach(n => {
-        const opt = {};
+        // 颜色（标题色）：单色 = 标题目标；渐变 = 取 stops 首端色
+        let titleHex, bgHex;
         if (S.stopCount === 1) {
+            // 单色模式：title / bg 各自独立，sync 时两端保持一致（标题色 = 面板色 ）
             if (S.editTarget === 'sync') {
-                opt.color = hsv2hex(S.title.h, S.title.s, S.title.v);
-                opt.bgcolor = hsv2hex(S.bg.h, S.bg.s, S.bg.v);
+                titleHex = hsv2hex(S.title.h, S.title.s, S.title.v);
+                bgHex = hsv2hex(S.bg.h, S.bg.s, S.bg.v);
             } else if (S.editTarget === 'hdr') {
-                opt.color = hsv2hex(S.title.h, S.title.s, S.title.v);
+                titleHex = hsv2hex(S.title.h, S.title.s, S.title.v);
+                bgHex = n.bgcolor || deriveDarkBgHex(S.title.h, S.title.s, S.title.v);
             } else {
-                opt.bgcolor = hsv2hex(S.bg.h, S.bg.s, S.bg.v);
+                bgHex = hsv2hex(S.bg.h, S.bg.s, S.bg.v);
+                titleHex = n.color || deriveLightBgHex(S.bg.h, S.bg.s, S.bg.v);
             }
         } else {
+            // 渐变模式：取 stops 首端色作为标题色，面板色自动衍暗版
             const s0 = S.stops[0];
-            opt.color = hsv2hex(s0.h, s0.s, s0.v);
+            titleHex = hsv2hex(s0.h, s0.s, s0.v);
             const d = deriveDarkBg(s0.h, s0.s, s0.v);
-            opt.bgcolor = hsv2hex(d.h, d.s, d.v);
+            bgHex = hsv2hex(d.h, d.s, d.v);
         }
-        if (Object.keys(opt).length) {
-            if (opt.color !== undefined) n.color = opt.color;
-            if (opt.bgcolor !== undefined) n.bgcolor = opt.bgcolor;
-            if (typeof n.setColorOption === "function") n.setColorOption(opt);
-            // 根据标题栏亮度自动选择文字颜色
-            const tcHex = opt.color || n.color || '#333';
-            n.constructor.title_text_color = autoTitleTextColor(tcHex);
-        }
-        if (S.titleStyle) n._titleStyle = { ...S.titleStyle };
-        if (S.stopCount > 1) {
-            n._gradient = { dir: S.dir, stops: S.stops.map(s => ({ p: s.p, hex: hsv2hex(s.h, s.s, s.v) })) };
-        } else {
+
+        n.color = titleHex;
+        n.bgcolor = bgHex;
+        if (typeof n.setColorOption === "function") n.setColorOption({ color: titleHex, bgcolor: bgHex });
+        n.constructor.title_text_color = autoTitleTextColor(titleHex);
+
+        // ── 渐变写入 ──
+        // 节点数据结构：
+        //   n._gradient = null                              // 无渐变
+        //   n._gradient = { mode: 'sync', dir, stops }      // 整体渐变
+        if (S.stopCount === 1) {
             delete n._gradient;
+        } else {
+            n._gradient = {
+                mode: 'sync',
+                dir: S.dir,
+                stops: S.stops.map(s => ({ p: s.p, hex: hsv2hex(s.h, s.s, s.v) })),
+            };
         }
+
+        if (S.titleStyle) n._titleStyle = { ...S.titleStyle };
     });
+}
+
+// 派生浅色背景（面板色反向使用）
+function deriveLightBgHex(h, s, v) {
+    return hsv2hex(h, Math.min(100, Math.round(s * 0.9)), Math.min(100, Math.round(v * 0.95)));
+}
+function deriveDarkBgHex(h, s, v) {
+    const d = deriveDarkBg(h, s, v);
+    return hsv2hex(d.h, d.s, d.v);
 }
 
 // 便捷封装：以单一 hex 为节点上色（标题色 + 自动衍生暗版面板）
@@ -176,11 +205,28 @@ export function applySolidHex(nodes, hex, titleStyle) {
     const b = deriveDarkBg(t.h, t.s, t.v);
     const bgHex = hsv2hex(b.h, b.s, b.v);
     nodes.forEach(n => {
+        const oldColor = n.color;
+        const oldBg = n.bgcolor;
         n.color = hex;
         n.bgcolor = bgHex;
         if (typeof n.setColorOption === "function") n.setColorOption({ color: hex, bgcolor: bgHex });
         n.constructor.title_text_color = autoTitleTextColor(hex);
         if (titleStyle) n._titleStyle = { ...titleStyle };
         delete n._gradient;
+        // v10 Nodes 2.0 Vue 兼容：触发 property changed 事件通知 Vue 响应式更新
+        if (n.graph?.trigger) {
+            n.graph.trigger('node:property:changed', {
+                nodeId: n.id,
+                property: 'color',
+                oldValue: oldColor,
+                newValue: hex
+            });
+            n.graph.trigger('node:property:changed', {
+                nodeId: n.id,
+                property: 'bgcolor',
+                oldValue: oldBg,
+                newValue: bgHex
+            });
+        }
     });
 }

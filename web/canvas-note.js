@@ -2,18 +2,36 @@ import { app } from "../../../scripts/app.js";
 import { getUIFont, resetFontCache, hexToRGBA, WS_ICONS } from "./lib/shared-utils.js";
 import { getGlassTheme, getGlassMode, cycleGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./lib/glass-theme.js";
 import { drawNodeText, drawResizeHandle, parseTextBlocks, buildTokenList, wrapChars, measureTable } from "./lib/note-renderer.js";
+import { bindTip } from "./lib/tooltip.js";
+
+// ========== 兼容性 polyfill ==========
+// ctx.roundRect 需 Chrome 99+ / Safari 16+；旧环境补齐，避免绘制时抛错（本文件与 note-renderer 共用）
+if (typeof CanvasRenderingContext2D !== "undefined" && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h, r) {
+        let rr = typeof r === "number" ? [r, r, r, r] : (Array.isArray(r) ? r : [0, 0, 0, 0]);
+        if (rr.length === 1) rr = [rr[0], rr[0], rr[0], rr[0]];
+        else if (rr.length === 2) rr = [rr[0], rr[1], rr[0], rr[1]];
+        const lim = Math.min(Math.abs(w) / 2, Math.abs(h) / 2);
+        const [tl, tr, br, bl] = rr.map(v => Math.min(v, lim));
+        this.moveTo(x + tl, y);
+        this.lineTo(x + w - tr, y); this.arcTo(x + w, y, x + w, y + tr, tr);
+        this.lineTo(x + w, y + h - br); this.arcTo(x + w, y + h, x + w - br, y + h, br);
+        this.lineTo(x + bl, y + h); this.arcTo(x, y + h, x, y + h - bl, bl);
+        this.lineTo(x, y + tl); this.arcTo(x, y, x + tl, y, tl);
+        this.closePath();
+        return this;
+    };
+}
 
 // ========== CONSTANTS ==========
 const NODE_TYPE  = "WOSAI_CanvasNote";
 const NODE_TITLE = "Canvas Note";
-const VERSION    = "1.0";
 const PRESET_KEY   = "wosai-custom-presets";
 const PANEL_WIDTH  = 360;
 const PANEL_OFFSET = 12;
 const SWATCH_SIZE  = 22;
 const BADGE_DELAYS = [500, 1500, 3000];
 const DOM_PREFIX   = "wosai";
-const FONT_TTL     = 3000;
 function getThemeState() {
     // 返回 var() 引用而非解析值：面板带 data-theme 属性时，CSS 引擎按
     // wosai-variables.css 的深/浅作用域实时取值（接入全插件玻璃主题标准）
@@ -45,23 +63,6 @@ function getThemeState() {
 }
 // 主题判定统一走全插件玻璃主题标准（lib/glass-theme.js：auto 跟随画布亮度 / 手动锁定）
 function isDarkTheme() { return getGlassTheme() === 'dark'; }
-function toggleTheme() {
-    const isDark = isDarkTheme(), html = document.documentElement;
-    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-    if (isDark) {
-        html.style.setProperty('--bg-color','#f5f5f5'); html.style.setProperty('--fg-color','#000000');
-        try { localStorage.setItem('comfy-splash-bg','#f5f5f5'); localStorage.setItem('comfy-splash-fg','#000000'); } catch(e) {}
-        const w = document.querySelector('#vue-app > div');
-        if (w) { w.classList.remove('dark-theme','bg-neutral-900','text-neutral-300'); w.classList.add('bg-neutral-300','text-neutral-900'); }
-    } else {
-        html.style.setProperty('--bg-color','#202020'); html.style.setProperty('--fg-color','#ffffff');
-        try { localStorage.setItem('comfy-splash-bg','#202020'); localStorage.setItem('comfy-splash-fg','#ffffff'); } catch(e) {}
-        const w = document.querySelector('#vue-app > div');
-        if (w) { w.classList.remove('bg-neutral-300','text-neutral-900'); w.classList.add('dark-theme','bg-neutral-900','text-neutral-300'); }
-    }
-    document.getElementById(`${DOM_PREFIX}-slider-css`)?.remove();
-    ensureSliderCSS();
-}
 const VUE_BODY_SELS = ".node-body,.litegraph-node-body,[class*='node-body'],[class*='node_body']";
 const _refs = {};
 
@@ -69,17 +70,35 @@ const _refs = {};
 const DEFAULT_PROPS = {
     text:"📍双击输入内容", fontSize:52, fontWeight:"bold", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#000000", backgroundAlpha:0, lineHeight:1.4, padding:20, borderRadius:0, borderEnabled:false, borderColor:"#2a2d36", borderWidth:0, shadowColor:"#000000", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0
 };
-const BUILTIN_PRESETS = {
-    "注释": { dark:{ text:"📍双击输入内容", fontSize:52, fontWeight:"bold", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#000000", backgroundAlpha:0, lineHeight:1.4, padding:20, borderRadius:0, borderEnabled:false, borderColor:"#2a2d36", borderWidth:0, shadowColor:"#000000", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 }, light:{ text:"📍双击输入内容", fontSize:52, fontWeight:"bold", textAlign:"left", fontColor:"#555555", backgroundColor:"#000000", backgroundAlpha:0, lineHeight:1.4, padding:20, borderRadius:0, borderEnabled:false, borderColor:"#2a2d36", borderWidth:0, shadowColor:"#000000", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 } },
-    "标题": { dark:{ text:"🔥工作流标题", fontSize:72, fontWeight:"bold", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#1d4ed8", backgroundAlpha:0.92, lineHeight:0.8, padding:20, borderRadius:50, borderEnabled:false, borderColor:"#3b82f6", borderWidth:0, shadowColor:"#3b82f6", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 }, light:{ text:"🔥工作流标题", fontSize:72, fontWeight:"bold", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#1d4ed8", backgroundAlpha:0.92, lineHeight:0.8, padding:20, borderRadius:50, borderEnabled:false, borderColor:"#3b82f6", borderWidth:0, shadowColor:"#3b82f6", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 } },
-    "正文": { dark:{ text:"📚正文 ✦", fontSize:24, fontWeight:"normal", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#065f46", backgroundAlpha:0.88, lineHeight:1.4, padding:20, borderRadius:8, borderEnabled:true, borderColor:"#10b981", borderWidth:2, shadowColor:"#10b981", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 }, light:{ text:"📚正文 ✦", fontSize:24, fontWeight:"normal", textAlign:"left", fontColor:"#ffffff", backgroundColor:"#065f46", backgroundAlpha:0.88, lineHeight:1.4, padding:20, borderRadius:8, borderEnabled:true, borderColor:"#10b981", borderWidth:2, shadowColor:"#10b981", shadowBlur:0, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 } },
-    "便签": { dark:{ text:"🏷️便签 ✦", fontSize:24, fontWeight:"normal", textAlign:"left", fontColor:"#3E1600", backgroundColor:"#FFFFCC", backgroundAlpha:1, lineHeight:1.4, padding:20, borderRadius:16, borderEnabled:true, borderColor:"#d4a843", borderWidth:1, shadowColor:"#d4a843", shadowBlur:12, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 }, light:{ text:"🏷️便签 ✦", fontSize:24, fontWeight:"normal", textAlign:"left", fontColor:"#3E1600", backgroundColor:"#FFFFCC", backgroundAlpha:1, lineHeight:1.4, padding:20, borderRadius:16, borderEnabled:true, borderColor:"#d4a843", borderWidth:1, shadowColor:"#d4a843", shadowBlur:12, width:600, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 } },
-    "序号": { dark:{ text:"1", fontSize:60, fontWeight:"bold", textAlign:"center", fontColor:"#ffffff", backgroundColor:"#452626", backgroundAlpha:0.88, lineHeight:0.8, padding:20, borderRadius:50, borderEnabled:true, borderColor:"#643c3c", borderWidth:2, shadowColor:"#643c3c", shadowBlur:0, width:100, height:100, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 }, light:{ text:"1", fontSize:60, fontWeight:"bold", textAlign:"center", fontColor:"#ffffff", backgroundColor:"#452626", backgroundAlpha:0.88, lineHeight:0.8, padding:20, borderRadius:50, borderEnabled:true, borderColor:"#643c3c", borderWidth:2, shadowColor:"#643c3c", shadowBlur:0, width:100, height:100, gradientEnabled:false, gradientColor:"#000000", gradientDirection:0 } },
+// 预设去重：每项只写「与 DEFAULT_PROPS 的差异」；绝大多数 dark===light，仅"注释"浅色文字不同。
+// 末尾构建回原 { dark, light } 结构，消费代码（isDark?pr.dark:pr.light）不变，行为完全等价。
+const _PRESET_BASE = {
+    "注释": { ...DEFAULT_PROPS },
+    "标题": { ...DEFAULT_PROPS, text:"🔥工作流标题", fontSize:72, backgroundColor:"#1d4ed8", backgroundAlpha:0.92, lineHeight:0.8, borderRadius:50, borderColor:"#3b82f6", shadowColor:"#3b82f6" },
+    "正文": { ...DEFAULT_PROPS, text:"📚正文 ✦", fontSize:24, fontWeight:"normal", backgroundColor:"#065f46", backgroundAlpha:0.88, borderRadius:8, borderEnabled:true, borderColor:"#10b981", borderWidth:2, shadowColor:"#10b981" },
+    "便签": { ...DEFAULT_PROPS, text:"🏷️便签 ✦", fontSize:24, fontWeight:"normal", fontColor:"#3E1600", backgroundColor:"#FFFFCC", backgroundAlpha:1, borderRadius:16, borderEnabled:true, borderColor:"#d4a843", borderWidth:1, shadowColor:"#d4a843", shadowBlur:12 },
+    "序号": { ...DEFAULT_PROPS, text:"1", fontSize:60, textAlign:"center", backgroundColor:"#452626", backgroundAlpha:0.88, lineHeight:0.8, borderRadius:50, borderEnabled:true, borderColor:"#643c3c", borderWidth:2, shadowColor:"#643c3c", width:100, height:100 },
 };
+// 所有预设都不再随主题变文字色（原"注释"浅色 #555555 依赖 canvasIsLight()，
+// 但 Nodes 2.0 画布背景常透明→误判浅色→深色画布下注释变灰字。改为恒定，消除该问题）
+const _PRESET_LIGHT = {};
+const BUILTIN_PRESETS = Object.fromEntries(
+    Object.entries(_PRESET_BASE).map(([n, base]) => [n, { dark: { ...base }, light: { ...base, ...(_PRESET_LIGHT[n] || {}) } }])
+);
 function loadCustomPresets() { try { return JSON.parse(localStorage.getItem(PRESET_KEY) || "{}"); } catch { return {}; } }
 function saveCustomPresets(obj) { try { localStorage.setItem(PRESET_KEY, JSON.stringify(obj)); } catch {} }
 
 function openURL(url) { try { if (!/^https?:\/\//i.test(url)) url="https://"+url; window.open(url,"_blank","noopener,noreferrer"); } catch(e) {} }
+// 链接命中检测（统一三处调用：onMouseDown / processMouseDown / Vue link click）。
+// lx,ly 为节点内容坐标；统一叠加 _scrollY，修正滚动后链接错位。命中返回该 link，否则 null。
+function hitLinkArea(node, lx, ly) {
+    if (!node.linkAreas?.length) return null;
+    const sLy = ly + (node._scrollY || 0);
+    for (const a of node.linkAreas) {
+        if (lx >= a.x && lx <= a.x + a.width && sLy >= a.y && sLy <= a.y + a.height) return a;
+    }
+    return null;
+}
 
 // ========== DOM ==========
 const _vueSelCache = new Map();
@@ -122,6 +141,11 @@ function applyNodeStyle(node, isEditing) {
     const maxR = Math.min(node.size[0], node.size[1]) / 2, rad = Math.min(p.borderRadius||0, maxR)+"px";
     node.bgcolor = "transparent"; node.color = "#fff0";
     let el = document.getElementById(tid);
+    // 性能 memo：圆角值未变且 <style> 已存在 → 跳过整段重刷。
+    //   注入的 <style> 用 !important 且选择器含「节点 *」，已覆盖节点及全部后代（含 Vue
+    //   重渲后新出现的元素），圆角不变时每帧重写 textContent + 逐元素 inline 纯属白做。
+    if (el && node._styleRad === rad) return;
+    node._styleRad = rad;
     if (!el) { el = document.createElement("style"); el.id = tid; document.head.appendChild(el); }
     const sels = vueSels(node.id).join(",");
     el.textContent =
@@ -146,7 +170,7 @@ function ensureSliderCSS() {
     document.getElementById(`${DOM_PREFIX}-slider-css`)?.remove();
     const T = getThemeState(), s = document.createElement("style");
     s.id = `${DOM_PREFIX}-slider-css`;
-    s.textContent = `#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:${T.textAccent};cursor:pointer;transition:transform .15s,background .15s}#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.25)}#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb:active{transform:scale(1.4)}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:${T.textAccent};cursor:pointer;border:none;transition:transform .15s}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb:hover{transform:scale(1.25)}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb:active{transform:scale(1.4)}`;
+    s.textContent = `#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:${T.textAccent};cursor:pointer;transition:transform .15s,background .15s}#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.25)}#${DOM_PREFIX}-panel input[type="range"]::-webkit-slider-thumb:active{transform:scale(1.4)}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:${T.textAccent};cursor:pointer;border:none;transition:transform .15s}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb:hover{transform:scale(1.25)}#${DOM_PREFIX}-panel input[type="range"]::-moz-range-thumb:active{transform:scale(1.4)}#${DOM_PREFIX}-panel label[id$="-sw"]:hover{transform:scale(1.12)}#${DOM_PREFIX}-panel label[id$="-sw"]:hover svg{color:${T.activeBorder} !important}`;
     document.head.appendChild(s);
 }
 
@@ -165,14 +189,16 @@ function createTextEditor(node) {
     // 与 Vue 抢焦点叠加时引发剧烈抖动、输入位置漂移（已踩坑）
     requestAnimationFrame(() => { ta.focus({ preventScroll: true }); ta.select(); });
     // Nodes 2.0 焦点保卫：Vue 节点容器（tabindex=0）会在双击后异步抢焦点，
-    // 仅在打开后的 500ms 内补救，避免与 Vue 形成持续拉锯
+    // 使用 rAF 替代 setInterval，性能更好且自动随页面不可见暂停
     let _focusTries = 0;
-    node._focusGuard = setInterval(() => {
-        if (!node.editTextarea || ++_focusTries > 8) { clearInterval(node._focusGuard); node._focusGuard = null; return; }
-        if (node._composing) return;   // IME 组词中不干预
+    const _focusTick = () => {
+        if (!node.editTextarea || ++_focusTries > 8 || node._removed) { node._focusGuard = null; return; }
+        if (node._composing) { node._focusGuard = requestAnimationFrame(_focusTick); return; }
         const ae = document.activeElement;
         if (ae !== ta && !document.getElementById(`${DOM_PREFIX}-panel`)?.contains(ae)) ta.focus({ preventScroll: true });
-    }, 60);
+        node._focusGuard = requestAnimationFrame(_focusTick);
+    };
+    node._focusGuard = requestAnimationFrame(_focusTick);
     node._blurRetries = 0;   // blur 抢回次数上限计数（防 focus 拉锯战）
     const saveClose = () => {
         if (!node.editTextarea) return;
@@ -181,14 +207,18 @@ function createTextEditor(node) {
         if (newSize[1] !== node.size[1]) node.setSize([node.size[0], newSize[1]]);
         removeTextEditor(node); node.setDirtyCanvas?.(true, true); window.app?.graph?.setDirtyCanvas(true);
     };
-    node._posTimer = setInterval(() => {
-        if (!node.editTextarea) return;
-        const nr = getNodeViewportRect(node); if (!nr) return;
-        const s = nr.scale;
-        ta.style.left=nr.left+p.padding*s+"px"; ta.style.top=nr.top+8*s+"px";
-        ta.style.width=(node.size[0]-2*p.padding)*s+"px"; ta.style.height=(node.size[1]-16)*s+"px";
-        syncTextareaStyle(node);
-    }, 16);
+    const _posTick = () => {
+        if (!node.editTextarea) { node._posRaf = null; return; }   // 编辑器关闭即自停
+        const nr = getNodeViewportRect(node);
+        if (nr) {
+            const s = nr.scale;
+            ta.style.left=nr.left+p.padding*s+"px"; ta.style.top=nr.top+8*s+"px";
+            ta.style.width=(node.size[0]-2*p.padding)*s+"px"; ta.style.height=(node.size[1]-16)*s+"px";
+            syncTextareaStyle(node);
+        }
+        node._posRaf = requestAnimationFrame(_posTick);
+    };
+    node._posRaf = requestAnimationFrame(_posTick);
     ta.addEventListener("input", () => { node._userText = ta.value; });
     // IME 组合期间禁止任何 focus 干预（会打断输入法组词，中文输入无预览）
     ta.addEventListener("compositionstart", () => { node._composing = true; });
@@ -221,7 +251,7 @@ function syncTextareaStyle(node) {
 }
 function removeTextEditor(node) {
     if (node._focusGuard) { clearInterval(node._focusGuard); node._focusGuard=null; }
-    if (node._posTimer) { clearInterval(node._posTimer); node._posTimer=null; }
+    if (node._posRaf) { cancelAnimationFrame(node._posRaf); node._posRaf=null; }
     if (node._docClickHandler) { document.removeEventListener("click",node._docClickHandler,true); node._docClickHandler=null; }
     if (node.editTextarea) { node.editTextarea.remove(); node.editTextarea=null; }
     delete node._userText; node.isEditing=false;
@@ -255,7 +285,7 @@ function attachVueLinkClick(node) {
         let lx, ly;
         if (typeof cv.convertEventToCanvasOffset==='function') { const cp=cv.convertEventToCanvasOffset(e); if (cp) { lx=cp[0]-node.pos[0]; ly=cp[1]-node.pos[1]; } }
         if (lx===undefined||ly===undefined) { const vr=getNodeViewportRect(node); if(!vr)return; lx=(e.clientX-vr.left)/vr.scale; ly=(e.clientY-vr.top)/vr.scale; }
-        for (const a of node.linkAreas) { if (lx>=a.x&&lx<=a.x+a.width&&ly>=a.y&&ly<=a.y+a.height) { openURL(a.url); e.preventDefault(); e.stopPropagation(); return; } }
+        const a = hitLinkArea(node, lx, ly); if (a) { openURL(a.url); e.preventDefault(); e.stopPropagation(); return; }
     };
     const tryBind = () => {
         if (node._removed) return true;
@@ -275,8 +305,8 @@ function positionPanel(node) {
     const cv = window.app?.canvas||LGraphCanvas.active_canvas;
     if (!cv?.canvas) return;
     const cr=cv.canvas.getBoundingClientRect(), sc=cv.ds?.scale??1, off=cv.ds?.offset??[0,0];
-    // 面板随画布缩放（钳制 0.65~1.5 避免过小/过大），origin 固定 top-left 防错位
-    const pScale = Math.max(0.65, Math.min(sc, 1.5));
+    // 面板随画布缩放（钳制 1.0~1.5 避免过小/过大），origin 固定 top-left 防错位
+    const pScale = Math.max(1.0, Math.min(sc, 1.5));
     panel.style.transformOrigin = 'top left';
     panel.style.transform = `scale(${pScale})`;
     const nx=cr.left+(node.pos[0]+off[0])*sc, ny=cr.top+(node.pos[1]+off[1])*sc, nw=node.size[0]*sc;
@@ -289,10 +319,14 @@ function positionPanel(node) {
 }
 function openStylePanel(node) {
     const old = document.getElementById(`${DOM_PREFIX}-panel`);
-    if (old) { if (old._raf) cancelAnimationFrame(old._raf); old.remove(); }
+    if (old) { if (old._wosaiClose) old._wosaiClose(); else { if (old._raf) cancelAnimationFrame(old._raf); old.remove(); } }
     ensureSliderCSS();
     const p = node.properties, isDark = isDarkTheme(), T = getThemeState();
-    const swatchHTML = (id,val) => `<label id="${id}-sw" style="width:${SWATCH_SIZE}px;height:${SWATCH_SIZE}px;border-radius:50%;cursor:pointer;flex-shrink:0;border:2px solid ${T.borderNormal};position:relative;display:inline-flex;background:${val};"><input type="color" id="${id}" value="${val}" style="position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;"></label>`;
+    // 拾色器：复用 ColorBar「取色」样式 —— 中性圆形按钮底(T.controlBg) + 居中吸管 SVG。
+    //   吸管用固定主题色(T.textSecondary)，不随所选色变化；即时 tooltip 显示当前 HEX。
+    const swatchHTML = (id,val) => `<label id="${id}-sw" style="width:${SWATCH_SIZE}px;height:${SWATCH_SIZE}px;border-radius:50%;background:${T.controlBg};cursor:pointer;flex-shrink:0;position:relative;display:inline-flex;align-items:center;justify-content:center;transition:background .15s,transform .12s;"><input type="color" id="${id}" value="${val}" style="position:absolute;opacity:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;color:${T.textSecondary}"><path d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/></svg></label>`;
+    // 吸管固定色 + 固定提示文案，选色无需刷新外观（保留空函数兼容旧调用）
+    const repaintSwatch = (_id,_val) => {};
     const SP = { row:'margin-bottom:14px;', sect:'margin-bottom:12px;', labelW:'min-width:44px;' };
     const setSliderFill = (el) => { const min=parseFloat(el.min),max=parseFloat(el.max),val=parseFloat(el.value); const pct=((val-min)/(max-min)*100).toFixed(1); el.style.background=`linear-gradient(to right,${T.activeBorder} 0%,${T.activeBorder} ${pct}%,${T.sliderBg} ${pct}%,${T.sliderBg} 100%)`; };
     const sliderRow = (label,id,min,max,step,val,unit,last) => `<div style="display:flex;align-items:center;gap:12px;${last?'':SP.row}"><span style="color:${T.textSecondary};font-size:13px;${SP.labelW}flex-shrink:0;">${label}</span><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}" style="flex:1;height:6px;border-radius:3px;outline:none;-webkit-appearance:none;cursor:pointer;"><span id="${id}-v" style="color:${T.textAccent};font-size:13px;width:38px;text-align:right;flex-shrink:0;font-weight:500;">${val}${unit}</span></div>`;
@@ -418,7 +452,7 @@ function openStylePanel(node) {
         panel.querySelectorAll(".wosai-fw").forEach(b=>{const on=b.dataset.w===p.fontWeight;b.className=`wosai-fw${on?' wosai-active':''}`;Object.assign(b.style,{flex:'1',height:'34px',padding:'0',cursor:'pointer',borderRadius:'6px',fontSize:'14px',fontFamily:'inherit',...(on?btnActive():btnNorm())});});
         const set=(id,val)=>{const el=panel.querySelector(`#${id}`);if(el)el.value=val;};
         const txt=(id,val)=>{const el=panel.querySelector(`#${id}`);if(el)el.textContent=val;};
-        const sw=(id,val)=>{const el=panel.querySelector(`#${id}-sw`);if(el)el.style.background=val;};
+        const sw=(id,val)=>repaintSwatch(id,val);   // 同步背景 + 吸管对比色 + tooltip
         set('wosai-bgc',p.backgroundColor); sw('wosai-bgc',p.backgroundColor);
         set('wosai-fgc',p.fontColor); sw('wosai-fgc',p.fontColor);
         set('wosai-bdc',p.borderColor); sw('wosai-bdc',p.borderColor);
@@ -440,8 +474,7 @@ function openStylePanel(node) {
     }
     function buildCustomBtns() {
         const box=panel.querySelector("#wosai-custom-tags"); box.innerHTML="";
-        Object.keys(loadCustomPresets()).forEach(name=>{
-            const prData=loadCustomPresets()[name], dotColor=prData?.backgroundColor||"#5b21b6";
+        Object.keys(loadCustomPresets()).forEach(name=>{   // 单次解析；点击时再 fresh 读取防删改竞态
             const chip=document.createElement("div"); chip.className="wosai-custom-chip"; chip.style.cssText=`display:flex;border-radius:6px;overflow:hidden;min-width:0;`;
             const ab=document.createElement("button"); ab.className="wosai-custom-btn";
             ab.style.cssText=`padding:0 4px;height:34px;width:100%;min-width:0;display:flex;align-items:center;background:${T.controlBg};border:1.5px solid ${T.borderNormal};color:${T.textSecondary};cursor:pointer;font-size:10.5px;font-family:inherit;border-radius:6px;overflow:hidden;`;
@@ -458,7 +491,8 @@ function openStylePanel(node) {
     panel.querySelectorAll(".wosai-preset").forEach(btn=>{btn.onclick=()=>{const pr=BUILTIN_PRESETS[btn.dataset.p];if(!pr)return;const pc=isDark?pr.dark:pr.light;if(pc.height)node._presetHeight=pc.height;const currentText=node.editTextarea?node.editTextarea.value:node._userText;Object.assign(p,pc);if(btn.dataset.p!=='序号'&&currentText!==undefined&&currentText!==null)p.text=currentText;const pw=pc.width||node.size[0],ph=pc.height||node.size[1];node.setSize([pw,ph]);if(pc.height)node._manualHeight=pc.height;if(node.editTextarea){node.editTextarea.value=p.text;syncTextareaStyle(node);}applyNodeStyle(node,node.isEditing);_redraw();panel.querySelectorAll(".wosai-preset").forEach(b=>{b.classList.remove('wosai-active');Object.assign(b.style,btnNorm());});panel.querySelectorAll('.wosai-custom-btn').forEach(b=>{b.classList.remove('wosai-active');Object.assign(b.style,{background:T.controlBg,borderColor:T.borderNormal,color:T.textSecondary});});btn.classList.add('wosai-active');Object.assign(btn.style,btnActive());refreshPanel();};applyBtnHover(btn);applyBtnPress(btn);});
     panel.querySelector("#wosai-psave").onclick=()=>{const inp=panel.querySelector("#wosai-pname");const name=inp.value.trim();if(!name){inp.style.border=`1px solid ${T.danger}`;setTimeout(()=>inp.style.border=`1px solid ${T.borderNormal}`,1000);return;}const all=loadCustomPresets();const saved={...p};delete saved.text;all[name]=saved;saveCustomPresets(all);inp.value="";buildCustomBtns();const btn=panel.querySelector("#wosai-psave");btn.textContent="已存 ✓";btn.style.background=T.success;setTimeout(()=>{btn.textContent="保存";if(btn.matches(':hover')){btn.style.background=T.success;btn.style.borderColor=T.success;btn.style.color='#fff';}else{Object.assign(btn.style,{background:T.controlBg,border:'1.5px solid '+T.borderNormal,color:T.textSecondary});}},1200);};
     const saveBtn=panel.querySelector("#wosai-psave"); saveBtn.addEventListener('mouseenter',()=>{if(saveBtn.textContent==="保存"){saveBtn.style.background=T.success;saveBtn.style.borderColor=T.success;saveBtn.style.color='#fff';}}); saveBtn.addEventListener('mouseleave',()=>{if(saveBtn.textContent==="保存")Object.assign(saveBtn.style,{background:T.controlBg,border:'1.5px solid '+T.borderNormal,color:T.textSecondary});}); applyBtnPress(saveBtn);
-    const closePanel=()=>{if(panel._raf)cancelAnimationFrame(panel._raf);panel.remove();node._stylePanel=null;document.removeEventListener('click',onGlobalClick,true);};
+    const closePanel=()=>{if(panel._raf)cancelAnimationFrame(panel._raf);panel.remove();node._stylePanel=null;document.removeEventListener('click',onGlobalClick,true);try{_offGlassCN&&_offGlassCN();}catch(_){}};
+    panel._wosaiClose=closePanel;   // 暴露给"替换旧面板"时调用，解绑 document 监听/玻璃订阅，防累积泄漏
     const onGlobalClick=(e)=>{if(!panel.isConnected||node._stylePanel!==panel)return;if(panel.contains(e.target)||node.editTextarea?.contains(e.target))return;closePanel();};
     setTimeout(()=>{if(panel.isConnected&&node._stylePanel===panel)document.addEventListener('click',onGlobalClick,true);},200);
     const pname=panel.querySelector("#wosai-pname"); if(pname){pname.addEventListener('focus',()=>{pname.style.border=`1.5px solid ${T.textAccent}`;pname.style.outline='none';});pname.addEventListener('blur',()=>{pname.style.border=`1px solid ${T.borderNormal}`;});}
@@ -468,11 +502,13 @@ function openStylePanel(node) {
     panel.querySelectorAll(".wosai-gdir").forEach(btn=>{btn.onclick=()=>{p.gradientDirection=parseInt(btn.dataset.d);p.gradientEnabled=true;refreshPanel();};btn.addEventListener('mouseenter',()=>{if(!btn.classList.contains('wosai-active')){btn.style.background=T.activeHoverBg;btn.style.color=T.textHover;}});btn.addEventListener('mouseleave',()=>{const on=btn.classList.contains('wosai-active');btn.style.background=on?T.saveBg:'transparent';btn.style.color=on?T.textActive:T.textSecondary;});applyBtnPress(btn);});
     const _redraw=()=>{setTimeout(()=>{node.setDirtyCanvas?.(true,true);if(window.app?.graph){window.app.graph.setDirtyCanvas(true,true);window.app.graph.change();}const cv=window.app?.canvas||LGraphCanvas.active_canvas;if(cv){cv.dirty_foreground=true;cv.dirty_background=true;cv.draw(true,false);}applyNodeStyle(node,node.isEditing);},0);};
     const _pick=(id,fn)=>{const el=panel.querySelector(id);if(!el)return;const _update=()=>{fn(el.value);_redraw();};el.oninput=_update;el.onchange=_update;};
-    _pick("#wosai-bgc",v=>{p.backgroundColor=v;panel.querySelector("#wosai-bgc-sw").style.background=v;applyNodeStyle(node,node.isEditing);});
-    _pick("#wosai-fgc",v=>{p.fontColor=v;panel.querySelector("#wosai-fgc-sw").style.background=v;});
-    _pick("#wosai-bdc",v=>{p.borderColor=v;p.borderEnabled=true;panel.querySelector("#wosai-bdc-sw").style.background=v;applyNodeStyle(node,node.isEditing);});
-    _pick("#wosai-sdc",v=>{p.shadowColor=v;panel.querySelector("#wosai-sdc-sw").style.background=v;applyNodeStyle(node,node.isEditing);});
-    _pick("#wosai-gdc",v=>{p.gradientColor=v;panel.querySelector("#wosai-gdc-sw").style.background=v;});
+    _pick("#wosai-bgc",v=>{p.backgroundColor=v;repaintSwatch('wosai-bgc',v);applyNodeStyle(node,node.isEditing);});
+    _pick("#wosai-fgc",v=>{p.fontColor=v;repaintSwatch('wosai-fgc',v);});
+    _pick("#wosai-bdc",v=>{p.borderColor=v;p.borderEnabled=true;repaintSwatch('wosai-bdc',v);applyNodeStyle(node,node.isEditing);});
+    _pick("#wosai-sdc",v=>{p.shadowColor=v;repaintSwatch('wosai-sdc',v);applyNodeStyle(node,node.isEditing);});
+    _pick("#wosai-gdc",v=>{p.gradientColor=v;repaintSwatch('wosai-gdc',v);});
+    // 拾色器共享即时提示（统一 lib/tooltip.js）
+    ['wosai-bgc','wosai-fgc','wosai-bdc','wosai-sdc','wosai-gdc'].forEach(id=>{const sw=panel.querySelector(`#${id}-sw`);if(sw)bindTip(sw,'自定义取色');});
     panel.querySelectorAll('input[type="range"]').forEach(el=>setSliderFill(el));
     const bind=(id,key,parse,unit,extra)=>{const el=panel.querySelector(`#${id}`),vl=panel.querySelector(`#${id}-v`);if(!el)return;el.oninput=()=>{p[key]=parse(el.value);if(vl)vl.textContent=(unit==='%')?Math.round(p[key]*100)+'%':p[key]+unit;setSliderFill(el);if(extra)extra();applyNodeStyle(node,node.isEditing);_redraw();};};
     bind('wosai-fs','fontSize',parseInt,'px'); bind('wosai-ba','backgroundAlpha',parseFloat,'%'); bind('wosai-lh','lineHeight',parseFloat,'');
@@ -497,17 +533,6 @@ function openStylePanel(node) {
 app.registerExtension({
     name: NODE_TYPE,
 
-    topbarBadges: [
-        // 已注释：右上角 WOSAI v1.0 徽标
-        // {
-        //     text: "WOSAI",
-        //     label: "v1.0",
-        //     variant: "info",
-        //     icon: "pi pi-palette",
-        //     tooltip: "WOSAI-ComfyUI | 穿山阅海",
-        // },
-    ],
-
     async beforeRegisterNodeDef(nodeType, nodeData) {
         if (nodeData.name !== NODE_TYPE) return;
 
@@ -528,7 +553,7 @@ app.registerExtension({
             this.editTextarea        = null;
             this.linkAreas           = [];
             this._stylePanel         = null;
-            this._posTimer           = null;
+            this._posRaf             = null;
             this._docClickHandler    = null;
             this._addedTimer         = null;
             this._dblClickBindTimer  = null;
@@ -593,10 +618,13 @@ app.registerExtension({
             if (info.size)  this.size  = info.size;
             if (info.flags) this.flags = info.flags;
             let tries = 0;
-            this._configureTimer = setInterval(() => {
+            const _cfgTick = () => {
+                if (this._removed) { this._configureTimer = null; return; }
                 attachVueDblClick(this); attachVueLinkClick(this); applyNodeStyle(this, false);
-                if (++tries >= 15 || this._removed) { clearInterval(this._configureTimer); this._configureTimer = null; }
-            }, 100);
+                if (++tries >= 15) { this._configureTimer = null; return; }
+                this._configureTimer = setTimeout(_cfgTick, 100);
+            };
+            this._configureTimer = setTimeout(_cfgTick, 100);
         };
 
         const _origSerialize = nodeType.prototype.serialize;
@@ -619,27 +647,37 @@ app.registerExtension({
             delete this.properties.aux_id;
             attachVueDblClick(this); attachVueLinkClick(this);
             let tries = 0;
-            this._addedTimer = setInterval(() => {
+            const _addedTick = () => {
+                if (this._removed) { this._addedTimer = null; return; }
                 applyNodeStyle(this, false);
                 if (!this._domWidthSynced && hasVueDomNode(this)) {
                     const cv = app.canvas || LGraphCanvas.active_canvas;
                     if (cv?.ds) { const sc = cv.ds.scale || 1; for (const sel of vueSels(this.id)) { const el = document.querySelector(sel); if (!el) continue; const domW = el.getBoundingClientRect().width; if (domW > 0) { this.size[0] = Math.round(domW / sc); this._lastWidth = this.size[0]; this._domWidthSynced = true; this._csKey = undefined; break; } } }
                 }
-                if (++tries >= 10 || this._removed) { clearInterval(this._addedTimer); this._addedTimer = null; }
-            }, 80);
+                if (++tries >= 10) { this._addedTimer = null; return; }
+                this._addedTimer = setTimeout(_addedTick, 80);
+            };
+            this._addedTimer = setTimeout(_addedTick, 80);
         };
 
         nodeType.prototype.onRemoved = function () {
             this._removed = true;
             if (this._addedTimer)        { clearInterval(this._addedTimer);        this._addedTimer        = null; }
             if (this._configureTimer)    { clearInterval(this._configureTimer);    this._configureTimer    = null; }
-            if (this._posTimer)          { clearInterval(this._posTimer);          this._posTimer          = null; }
+            if (this._posRaf)            { cancelAnimationFrame(this._posRaf);     this._posRaf            = null; }
             if (this._stylePanel) { if (this._stylePanel._raf) cancelAnimationFrame(this._stylePanel._raf); this._stylePanel.remove(); this._stylePanel = null; }
             removeTextEditor(this); detachVueDblClick(this); detachVueLinkClick(this); removeNodeStyle(this.id); clearVueSelCache(this.id);
         };
 
         nodeType.prototype.onDrawBackground = function (ctx) {
             ctx.save();
+            // 整数设备像素对齐：拖动时 canvas 文字会按亚像素重栅格化 → 边缘"抖/闪"
+            //   （DOM 节点平滑移动时尤其明显）。把当前变换平移分量吸附到整数像素，
+            //   文字/边框落在像素网格上，移动时更清晰稳定。在 save/restore 内，自动复原。
+            try {
+                const _tf = ctx.getTransform();
+                if (_tf.a && _tf.d) ctx.translate((Math.round(_tf.e) - _tf.e) / _tf.a, (Math.round(_tf.f) - _tf.f) / _tf.d);
+            } catch (_) {}
             const p = this.properties, r = p.borderRadius || 0, w = this.size[0], h = this.size[1];
             if (p.backgroundAlpha > 0) {
                 const hasShadowOnly = p.shadowBlur > 0 && !(p.borderEnabled && p.borderWidth > 0);
@@ -713,9 +751,7 @@ app.registerExtension({
                 else { const ratio = (ly - sb.y - sb.thumbH / 2) / (sb.h - sb.thumbH); const maxScroll = sb.contentH - this.size[1]; this._scrollY = Math.max(0, Math.min(Math.round(ratio * maxScroll), maxScroll)); this._scrollDragging = true; this._scrollDragStartY = ly; this._scrollDragStartVal = this._scrollY; }
                 return true;
             }
-            if (!this.linkAreas?.length) return false;
-            const sLy = ly + (this._scrollY || 0);
-            for (const a of this.linkAreas) { if (lx >= a.x && lx <= a.x+a.width && sLy >= a.y && sLy <= a.y+a.height) { openURL(a.url); return true; } }
+            const a = hitLinkArea(this, lx, ly); if (a) { openURL(a.url); return true; }
             return false;
         };
         nodeType.prototype.onMouseMove = function (evt, pos) {
@@ -764,32 +800,43 @@ app.registerExtension({
         }
         ensureSliderCSS();
 
-        _refs.drawNodeTitle = LGraphCanvas.prototype.drawNodeTitle;
-        LGraphCanvas.prototype.drawNodeTitle = function (node, ctx) { if (node.type === NODE_TYPE) return; return _refs.drawNodeTitle.apply(this, arguments); };
+        // 全局原型 hook 幂等安装：防热重载/重复 setup 叠套。首次记录真实原函数到 _refs
+        //   供 remove() 还原；若当前方法已是本插件包装(_wosaiWrapped)，直接复用、返回其保存的原函数。
+        function hookProto(obj, name, makeWrapper) {
+            const cur = obj[name];
+            if (cur && cur._wosaiWrapped) return cur._wosaiOrig;
+            const w = makeWrapper(cur);
+            w._wosaiWrapped = true; w._wosaiOrig = cur;
+            obj[name] = w;
+            return cur;
+        }
 
-        _refs.drawNode = LGraphCanvas.prototype.drawNode;
-        LGraphCanvas.prototype.drawNode = function (node, ctx) {
-            if (node.type !== NODE_TYPE) return _refs.drawNode.apply(this, arguments);
-            if (!node.properties) node.properties = { ...DEFAULT_PROPS };
-            const cv = app.canvas || LGraphCanvas.active_canvas;
-            node.selected = !!(cv?.selected_nodes?.[node.id]);
-            node.bgcolor = "transparent"; node.color = "#fff0";
-            node.onDrawBackground(ctx);
-            if (hasVueDomNode(node)) applyNodeStyle(node, node.isEditing);
-            drawResizeHandle(ctx, node);
-        };
+        _refs.drawNodeTitle = hookProto(LGraphCanvas.prototype, 'drawNodeTitle', (orig) =>
+            function (node, ctx) { if (node.type === NODE_TYPE) return; return orig.apply(this, arguments); });
 
-        _refs.processMouseDown = LGraphCanvas.prototype.processMouseDown;
-        LGraphCanvas.prototype.processMouseDown = function (e) {
-            if (this.graph) {
-                const cp = this.convertEventToCanvasOffset(e), node = this.graph.getNodeOnPos(cp[0], cp[1], this.visible_nodes);
-                if (node?.type === NODE_TYPE && !node.isEditing) {
-                    const lx = cp[0] - node.pos[0], ly = cp[1] - node.pos[1];
-                    if (node.linkAreas?.length) { for (const a of node.linkAreas) { if (lx >= a.x && lx <= a.x+a.width && ly >= a.y && ly <= a.y+a.height) { openURL(a.url); e.preventDefault(); e.stopPropagation(); return false; } } }
+        _refs.drawNode = hookProto(LGraphCanvas.prototype, 'drawNode', (orig) =>
+            function (node, ctx) {
+                if (node.type !== NODE_TYPE) return orig.apply(this, arguments);
+                if (!node.properties) node.properties = { ...DEFAULT_PROPS };
+                const cv = app.canvas || LGraphCanvas.active_canvas;
+                node.selected = !!(cv?.selected_nodes?.[node.id]);
+                node.bgcolor = "transparent"; node.color = "#fff0";
+                node.onDrawBackground(ctx);
+                if (hasVueDomNode(node)) applyNodeStyle(node, node.isEditing);
+                drawResizeHandle(ctx, node);
+            });
+
+        _refs.processMouseDown = hookProto(LGraphCanvas.prototype, 'processMouseDown', (orig) =>
+            function (e) {
+                if (this.graph) {
+                    const cp = this.convertEventToCanvasOffset(e), node = this.graph.getNodeOnPos(cp[0], cp[1], this.visible_nodes);
+                    if (node?.type === NODE_TYPE && !node.isEditing) {
+                        const lx = cp[0] - node.pos[0], ly = cp[1] - node.pos[1];
+                        const a = hitLinkArea(node, lx, ly); if (a) { openURL(a.url); e.preventDefault(); e.stopPropagation(); return false; }
+                    }
                 }
-            }
-            return _refs.processMouseDown.call(this, e);
-        };
+                return orig.call(this, e);
+            });
 
         const _mouseState = { down: false, evt: null };
         _refs.onMouseDown_pinned = (e) => { _mouseState.down = true; _mouseState.evt = e; };

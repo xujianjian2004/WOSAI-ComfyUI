@@ -15,31 +15,42 @@ import { app } from "../../../scripts/app.js";
 const LS_KEY = 'wosai-glass-theme';
 const LS_LEGACY = 'wosai-colorbar-theme';   // 旧 ColorBar 偏好，首次迁移
 
-// ── 液态玻璃双 token（与 ColorBar 同源标准）─────────────────
+// ── 液态玻璃双 token（玻璃独有属性 + 文字/图标镜像 --ws-* CSS 令牌）──
+// 注意：text/textMuted/iconColor/iconAccent 是 --ws-* CSS 令牌的 JS 镜像，
+//   用于 canvas/JS 内联样式等无法引用 CSS 变量的场景。
+//   修改时需同步更新 wosai-variables.css 中的对应令牌。
 export const GLASS_TOKENS = {
     dark: {
+        // 玻璃独有
         glass: 'rgba(26,27,32,0.5)',
         blur: 'blur(40px) saturate(1.8)',
         border: '1px solid rgba(255,255,255,.16)',
         shadow: '0 8px 32px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.10)',
-        text: '#E8E8EC',
-        textMuted: '#A8A8B0',
-        btnBg: 'rgba(255,255,255,.09)',
         divider: 'rgba(255,255,255,.16)',
         chipRing: 'rgba(255,255,255,.25)',
         rowHover: 'rgba(221,111,74,.22)',
+        // 文字/图标（镜像 --ws-*，保持与 wosai-variables.css 同步）
+        text: '#E4E4E7',             // --ws-text
+        textMuted: '#7A7A7A',         // --ws-text-muted
+        btnBg: '#2C2C2E',             // --ws-surface-raised (玻璃内按钮底色)
+        iconColor: '#AEBFD0',         // --ws-icon
+        iconAccent: '#DD6F4A',        // --ws-accent
     },
     light: {
+        // 玻璃独有
         glass: 'rgba(255,255,255,0.55)',
         blur: 'blur(40px) saturate(1.8)',
         border: '1px solid rgba(0,0,0,.10)',
         shadow: '0 8px 32px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.65)',
-        text: '#1D1D1F',
-        textMuted: '#55555C',
-        btnBg: 'rgba(0,0,0,.06)',
         divider: 'rgba(0,0,0,.14)',
         chipRing: 'rgba(0,0,0,.16)',
         rowHover: 'rgba(221,111,74,.18)',
+        // 文字/图标（镜像 --ws-*，保持与 wosai-variables.css 同步）
+        text: '#201914',              // --ws-text
+        textMuted: '#8A7A70',         // --ws-text-muted
+        btnBg: '#F2EDE8',             // --ws-surface-raised (玻璃内按钮底色)
+        iconColor: '#5E6B7A',         // --ws-icon
+        iconAccent: '#DD6F4A',        // --ws-accent
     },
 };
 

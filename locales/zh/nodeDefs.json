@@ -1,53 +1,30 @@
 {
     "WOSAI_OmniSlider": {
         "display_name": "万能滑条 OmniSlider",
-        "description": "多通道滑条控制，支持浮点/整数/填充样式",
-        "inputs": {
-            "active_value": {
-                "display_name": "当前值",
-                "tooltip": "内部缓存键，自动同步滑条值"
-            }
-        },
-        "outputs": {
-            "滑条1": { "display_name": "滑条1" },
-            "滑条2": { "display_name": "滑条2" },
-            "滑条3": { "display_name": "滑条3" },
-            "滑条4": { "display_name": "滑条4" },
-            "滑条5": { "display_name": "滑条5" }
-        }
+        "description": "多通道滑条控制，支持浮点/整数/填充样式"
     },
     "WOSAI_SizeSelect": {
         "display_name": "尺寸选择 SizeSelect",
         "description": "预设/自定义双模式分辨率选择，自动8倍数对齐",
         "inputs": {
-            "Manual_Mode": {
-                "display_name": "模式切换",
-                "tooltip": "off=预设模式 on=自定义模式"
-            },
-            "Resolution": {
-                "display_name": "分辨率",
-                "tooltip": "选择预设分辨率档位"
-            },
-            "Aspect_Ratio": {
-                "display_name": "宽高比",
-                "tooltip": "选择画面宽高比"
-            },
-            "Custom_Width": {
-                "display_name": "自定义宽度",
-                "tooltip": "自定义宽度（仅自定义模式）"
-            },
-            "Custom_Height": {
-                "display_name": "自定义高度",
-                "tooltip": "自定义高度（仅自定义模式）"
-            }
+            "Manual_Mode":      { "name": "模式切换",   "tooltip": "off=预设模式 on=自定义模式" },
+            "scale_method":     { "name": "缩放方式",   "tooltip": "中心裁剪=按目标比例裁剪 / 等比缩放=按倍数缩放" },
+            "scale_multiplier": { "name": "缩放倍数",   "tooltip": "等比缩放模式下生效，以原始尺寸为基准" },
+            "Resolution":       { "name": "分辨率",     "tooltip": "选择预设分辨率档位" },
+            "Aspect_Ratio":     { "name": "宽高比",     "tooltip": "选择画面宽高比" },
+            "Custom_Width":     { "name": "自定义宽度", "tooltip": "自定义宽度（仅自定义模式）" },
+            "Custom_Height":    { "name": "自定义高度", "tooltip": "自定义高度（仅自定义模式）" },
+            "image":            { "name": "图像",       "tooltip": "输入图像（可选，将缩放至目标尺寸）" },
+            "mask":             { "name": "遮罩",       "tooltip": "输入遮罩（可选，将同步缩放）" },
+            "latent":           { "name": "Latent",     "tooltip": "输入 Latent（可选，将缩放至目标尺寸）" },
+            "vae":              { "name": "VAE",        "tooltip": "VAE 模型（可选，图像将通过 VAE 编码为 Latent）" }
         },
         "outputs": {
-            "width": {
-                "display_name": "宽度"
-            },
-            "height": {
-                "display_name": "高度"
-            }
+            "0": { "name": "图像" },
+            "1": { "name": "遮罩" },
+            "2": { "name": "Latent" },
+            "3": { "name": "宽度" },
+            "4": { "name": "高度" }
         }
     },
     "WOSAI_CanvasNote": {

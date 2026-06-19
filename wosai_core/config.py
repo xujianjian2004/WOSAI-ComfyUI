@@ -1,4 +1,4 @@
-﻿VERSION = "1.0"
+VERSION = "1.1"
 AUTHOR = "穿山阅海"
 EMAIL = "xujianjian2004@126.com"
 STUDIO = "WOSAI STUDIO"

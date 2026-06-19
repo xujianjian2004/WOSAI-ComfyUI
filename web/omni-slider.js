@@ -3,8 +3,11 @@
  * WOSAI OmniSlider — 万能滑条前端 (CSS已提取至 web/css/os-slider.css)
  */
 import { app } from "../../../scripts/app.js";
-import { WS_ICONS } from "./lib/shared-utils.js";
-import { getGlassTheme, getGlassMode, cycleGlassMode, onGlassChange, GLASS_MODE_DEFS, glassT } from "./lib/glass-theme.js";
+import { WS_ICONS, retryUntil } from "./lib/shared-utils.js";
+import { getGlassTheme, getGlassMode, cycleGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./lib/glass-theme.js";
+import { showTip as osShowDotTip, hideTip as osHideDotTip } from "./lib/tooltip.js";
+import { _osRefreshDOMHide, applyNodeDisplay } from "./lib/omni-hide.js";
+import { hideEl, hideWidgetRow, ghostWidget, injectGlobalHideCSS, createHiddenObserver } from "./lib/nodes2-hide.js";
 
 const SETTING_MAX_CH = 'WOSAI.OmniSlider.MaxChannels';
 function getMaxChannels() {
@@ -15,15 +18,28 @@ function getMaxChannels() {
     return 5;
 }
 
+// ═══ 节点精简显示控制（三项独立，持久化在 node.properties）══════════════════
+//   osHideTitle / osHideBadge / osHidePortLabel —— LiteGraph 自动序列化。
+//   画布层隐藏（标题/角标）统一由 node-color.js 的 drawNodeShape wrapper 执行，
+//   omni-slider 不再单独 hook 画布方法（避免双钩子冲突）。
+
 // CSS 已迁移至 web/css/os-slider.css，通过 extension.json 加载
 
 // ── 辅助 ────────────────────────────────────────────────────────────────────
 const COLORS = ["#3498DB","#27AE60","#9B59B6","#E74C3C","#F39C12","#E91E63","#DD6F4A","#1ABC9C","#3498DB","#F1C40F"];
 
+// 设置面板预设色板（含 🎲 随机源）
+const OS_PRESET_COLORS = ["#3498DB","#27AE60","#9B59B6","#E74C3C","#F39C12","#E91E63","#DD6F4A","#1ABC9C"];
+
+// 填充滑条自定义参数常量（模块级，避免每次 openSettingsPanel 重复分配）
+const FILL_TAB_KEYS = ["trackColor", "trackBg", "thumbColor", "textColor"];
+const FILL_TAB_LABELS = { trackColor: "左侧颜色", trackBg: "右侧颜色", thumbColor: "按钮颜色", textColor: "数字颜色" };
+const FILL_TAB_DEFAULTS = { trackColor: "", trackBg: "#2A2A2E", thumbColor: "", textColor: "#E4E4E7" };
+
 // 注意：默认值须与 wosai_core/config.py::default_omni_config() 保持一致
 function defaultCfg(i) {
     return {
-        label: "", type: "FLOAT", min: 0, max: 1, step: 0.01, value: 0.5,   // 标签留空 → 滑条显示占位符"双击设置滑条"；端口名仍兜底为 CN
+        label: "", type: "FLOAT", min: 0, max: 1, step: 0.01, value: 0.5,   // 标签留空 → 滑条显示占位符"右键此处设置滑条"；端口名仍兜底为 CN
         color: COLORS[(i - 1) % COLORS.length], scale: 0.5, style: "float",
         scale_float: 0.5, scale_fill: 0.5,
         // 填充滑条自定义参数
@@ -64,366 +80,117 @@ function getTheme() { return getGlassTheme(); }
 // eslint-disable-next-line no-unused-vars
 function autoQueue(_node) { /* 已禁用：不再自动触发工作流执行 */ }
 
-// ── 设置面板 ────────────────────────────────────────────────────────────────
-function openSettingsPanel(node, channelIndex, onClose) {
-    const old = document.querySelector(".os-panel");
-    if (old) old.remove();
+// ═══ 精简模式显示控制（已提取到 lib/omni-hide.js）═══════════════════════════
+//   applyNodeDisplay()    — 应用/恢复精简模式（隐藏标题/角标/端口）
+//   _osRefreshDOMHide()   — Nodes 2.0 DOM 隐藏 CSS 刷新
+//   隐藏三项独立标志持久化在 node.properties，LiteGraph 自动序列化。
+//   画布隐藏统一由 node-color.js 的 drawNodeShape wrapper 执行（读取这些标志）。
 
-    const chCount = node._osChannelCount;
-    let curCh = Math.max(0, Math.min(chCount - 1, channelIndex));
-    const drafts = [];
-    for (let i = 0; i < chCount; i++) {
-        drafts.push(Object.assign(defaultCfg(i + 1), node._osConfigs[i] || {}));
-    }
-    // 快照：取消时恢复用（防止预览改动在取消后残留）
-    const _snapshot = node._osConfigs.map(c => ({ ...c }));
+// ── 预设色中文名（用于悬浮提示：中文名 + #HEX）──
 
-    // 6 个预设颜色
-    const PRESET_COLORS = ["#3498DB","#27AE60","#9B59B6","#E74C3C","#F39C12","#E91E63","#DD6F4A"];
+// ── 预设色中文名（用于悬浮提示：中文名 + #HEX）──
+const OS_COLOR_NAMES = {
+    "#3498DB": "蓝色", "#27AE60": "绿色", "#9B59B6": "紫色", "#E74C3C": "红色",
+    "#F39C12": "橙色", "#E91E63": "粉红", "#DD6F4A": "橙红", "#1ABC9C": "青色",
+};
+function osColorTipText(hex) {
+    const n = OS_COLOR_NAMES[(hex || "").toUpperCase()];
+    return n ? `${n}  ${hex.toUpperCase()}` : (hex || "").toUpperCase();
+}
 
-    const panel = document.createElement("div");
-    panel.className = "os-panel";
-    panel.setAttribute("data-wosai-panel", "");
-    panel.setAttribute("data-theme", getTheme());
-    panel.onpointerdown = e => e.stopPropagation();
+// 即时悬浮提示改用共享 lib/tooltip.js（osShowDotTip/osHideDotTip 为顶部别名导入）
 
-    // ── 标题行：居中标题 + 深/浅切换 ──
-    const titleRow = document.createElement("div");
-    titleRow.className = "os-panel-title-row";
-    const titleEl = document.createElement("div");
-    titleEl.className = "os-panel-title";
-    titleEl.textContent = "万能滑条 OmniSlider";
-    // 主题按钮：全插件共享三态（自动/浅色/深色），切换广播至所有 WOSAI 面板
-    const themeBtn = document.createElement("div");
-    themeBtn.className = "os-theme-toggle";
-    const MODE_ICONS_OS = { auto: WS_ICONS.auto, light: WS_ICONS.sun, dark: WS_ICONS.moon };
-    const refreshThemeBtn = () => {
-        const m = getGlassMode();
-        themeBtn.innerHTML = MODE_ICONS_OS[m];
-        themeBtn.title = GLASS_MODE_DEFS[m].tip;
-    };
-    refreshThemeBtn();
-    themeBtn.onclick = () => cycleGlassMode();
-    const _offGlassOS = onGlassChange((t) => { panel.setAttribute("data-theme", t); refreshThemeBtn(); });
-    panel._offGlass = _offGlassOS;   // 面板清理时退订
-    titleRow.appendChild(titleEl);
-    titleRow.appendChild(themeBtn);
-    panel.appendChild(titleRow);
-
-    // ── 通道标签（段控件） ──
-    if (chCount > 1) {
-        const chTabs = document.createElement("div");
-        chTabs.className = "os-seg";
-        const chBtns = [];
-        for (let i = 0; i < chCount; i++) {
-            const btn = document.createElement("button");
-            btn.className = "os-seg-btn" + (i === curCh ? " on" : "");
-            btn.textContent = "C" + (i + 1);
-            btn.onclick = () => {
-                if (_snapshot[curCh]) {
-                    node._osConfigs[curCh] = { ..._snapshot[curCh] };
-                }
-                curCh = i;
-                refreshForm();
-                chBtns.forEach((b, bi) => b.classList.toggle("on", bi === i));
-                nameInp.focus();
-                nameInp.select();
-            };
-            chBtns.push(btn);
-            chTabs.appendChild(btn);
-        }
-        panel.appendChild(chTabs);
-    }
-
-    // ── 显示名称（第一行） ──
-    const nameLabel = document.createElement("div");
-    nameLabel.className = "os-row-label";
-    nameLabel.textContent = "修改滑条名称";
-    panel.appendChild(nameLabel);
-    const nameInp = document.createElement("input");
-    nameInp.type = "text";
-    nameInp.className = "os-text-input";
-    nameInp.placeholder = "自动识别端口名 / 自定义滑条名";
-    nameInp.oninput = () => { drafts[curCh].label = nameInp.value; };
-    panel.appendChild(nameInp);
-
-    // ── 类型（段控件） ──
-    const typeLabel = document.createElement("div");
-    typeLabel.className = "os-row-label";
-    typeLabel.textContent = "类型";
-    panel.appendChild(typeLabel);
-    const typeSeg = document.createElement("div");
-    typeSeg.className = "os-seg";
-    const btnFloat = document.createElement("button");
-    btnFloat.className = "os-seg-btn on";
-    btnFloat.textContent = "浮点";
-    btnFloat.onclick = () => {
-        drafts[curCh].type = "FLOAT";
-        node._osConfigs[curCh].type = "FLOAT";
-        syncTypeBtns("FLOAT");
-        rebuildUI(node);
-        updateOutputLabel(node);
-        app.graph?.setDirtyCanvas(true, true);
-    };
-    const btnInt = document.createElement("button");
-    btnInt.className = "os-seg-btn";
-    btnInt.textContent = "整数";
-    btnInt.onclick = () => {
-        drafts[curCh].type = "INT";
-        node._osConfigs[curCh].type = "INT";
-        syncTypeBtns("INT");
-        rebuildUI(node);
-        updateOutputLabel(node);
-        app.graph?.setDirtyCanvas(true, true);
-    };
-    typeSeg.appendChild(btnFloat);
-    typeSeg.appendChild(btnInt);
-    function syncTypeBtns(type) {
-        btnFloat.classList.toggle("on", type === "FLOAT");
-        btnInt.classList.toggle("on", type === "INT");
-    }
-    panel.appendChild(typeSeg);
-
-    // ── 范围（三数字联排，每列上方有子标签） ──
-    const rangeLabel = document.createElement("div");
-    rangeLabel.className = "os-row-label";
-    rangeLabel.textContent = "范围";
-    panel.appendChild(rangeLabel);
-    const numGroup = document.createElement("div");
-    numGroup.className = "os-num-group";
-    // 最小值列
-    const minCol = document.createElement("div"); minCol.className = "os-num-col";
-    const minSub = document.createElement("div"); minSub.className = "os-num-sub-label"; minSub.textContent = "最小值";
-    const minInp = document.createElement("input");
-    minInp.type = "number"; minInp.className = "os-num-inline"; minInp.step = "0.01";
-    minInp.oninput = () => { const v = parseFloat(minInp.value); if (!isNaN(v)) drafts[curCh].min = v; };
-    minCol.appendChild(minSub); minCol.appendChild(minInp);
-    // 最大值列
-    const maxCol = document.createElement("div"); maxCol.className = "os-num-col";
-    const maxSub = document.createElement("div"); maxSub.className = "os-num-sub-label"; maxSub.textContent = "最大值";
-    const maxInp = document.createElement("input");
-    maxInp.type = "number"; maxInp.className = "os-num-inline"; maxInp.step = "0.01";
-    maxInp.oninput = () => { const v = parseFloat(maxInp.value); if (!isNaN(v)) drafts[curCh].max = v; };
-    maxCol.appendChild(maxSub); maxCol.appendChild(maxInp);
-    // 步长列
-    const stepCol = document.createElement("div"); stepCol.className = "os-num-col";
-    const stepSub = document.createElement("div"); stepSub.className = "os-num-sub-label"; stepSub.textContent = "步长";
-    const stepInp = document.createElement("input");
-    stepInp.type = "number"; stepInp.className = "os-num-inline"; stepInp.step = "0.001";
-    stepInp.oninput = () => { const v = parseFloat(stepInp.value); if (!isNaN(v)) drafts[curCh].step = v; };
-    stepCol.appendChild(stepSub); stepCol.appendChild(stepInp);
-    const sep1 = document.createElement("span"); sep1.className = "os-num-sep"; sep1.textContent = "~";
-    const sep2 = document.createElement("span"); sep2.className = "os-num-sep"; sep2.textContent = "·";
-    numGroup.appendChild(minCol);
-    numGroup.appendChild(sep1);
-    numGroup.appendChild(maxCol);
-    numGroup.appendChild(sep2);
-    numGroup.appendChild(stepCol);
-    panel.appendChild(numGroup);
-
-    // ── 颜色行 — 圆形取色器 + 6 预设色点（挂载到底部，取消/确认按钮上方）──
-    const colorLabel = document.createElement("div");
-    colorLabel.className = "os-row-label";
-    colorLabel.textContent = "颜色";
-    // 不在此处 appendChild，延迟到底部统一挂载
-    const colorRow = document.createElement("div");
-    colorRow.className = "os-color-row";
-    // 圆形取色器（带吸管图标，区别于预设色点）
-    const colorDot = document.createElement("div");
-    colorDot.className = "os-color-dot";
-    const colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none;border:none;padding:0";
-    colorDot.appendChild(colorInput);
-    const eyeIcon = document.createElement("span");
-    // 滴管图标（与全插件线性图标体系一致）；白描边+阴影确保任意彩色圆底上可见
-    eyeIcon.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;inset:0;margin:auto;pointer-events:none;color:rgba(255,255,255,0.9);filter:drop-shadow(0 1px 2px rgba(0,0,0,0.6))"><path d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/></svg>`;
-    colorDot.appendChild(eyeIcon);
-    colorInput.oninput = () => {
-        const hex = colorInput.value;
-        // 填充滑条模式：写入当前激活的填充参数标签页
-        if (drafts[curCh].style === "fill" && _fillActiveTab) {
-            drafts[curCh][_fillActiveTab] = hex;
-            node._osConfigs[curCh][_fillActiveTab] = hex;
-            colorDot.style.background = hex;
-            // 同步到该标签页的隐藏 input
-            if (_fillHiddens[_fillActiveTab]) _fillHiddens[_fillActiveTab].value = hex;
-            rebuildUI(node);
-            presetDots.forEach(d => d.classList.remove("on"));
-            return;
-        }
-        // 默认：写入主通道颜色
-        colorDot.style.background = hex;
-        drafts[curCh].color = hex;
-        node._osConfigs[curCh].color = hex;
-        rebuildUI(node);
-        presetDots.forEach(d => d.classList.remove("on"));
-        scaleRange.style.setProperty("--os-scale-color", hex);
-    };
-    colorDot.onclick = () => {
-        // 填充滑条模式：显示当前激活标签页的颜色
-        if (drafts[curCh].style === "fill" && _fillActiveTab) {
-            _syncFillColorToPicker();
-        } else {
-            colorLabel.textContent = "颜色";
-            colorInput.value = drafts[curCh].color;
-            colorDot.style.background = drafts[curCh].color;
-        }
-        colorInput.click();
-    };
-    colorRow.appendChild(colorDot);
-    // 6 个预设色点
-    const presetDots = [];
-    PRESET_COLORS.forEach(hex => {
-        const dot = document.createElement("div");
-        dot.className = "os-preset-dot";
-        dot.style.background = hex;
-        dot.title = hex;
-        dot.onclick = () => {
-            // 填充滑条模式：将预设色写入当前激活的填充参数标签页
-            if (drafts[curCh].style === "fill" && _fillActiveTab) {
-                drafts[curCh][_fillActiveTab] = hex;
-                node._osConfigs[curCh][_fillActiveTab] = hex;
-                colorDot.style.background = hex;
-                colorInput.value = hex;
-                if (_fillHiddens[_fillActiveTab]) _fillHiddens[_fillActiveTab].value = hex;
-                presetDots.forEach(d => d.classList.remove("on"));
-                dot.classList.add("on");
-                rebuildUI(node);
-                return;
-            }
-            // 默认：写入主通道取色器
-            colorInput.value = hex;
-            colorDot.style.background = hex;
-            drafts[curCh].color = hex;
-            presetDots.forEach(d => d.classList.remove("on"));
-            dot.classList.add("on");
-            // 实时更新滑条颜色
-            node._osConfigs[curCh].color = hex;
-            rebuildUI(node);
-            scaleRange.style.setProperty("--os-scale-color", hex);
-        };
-        presetDots.push(dot);
-        colorRow.appendChild(dot);
+// ── 设置面板全局单例监听（Esc 关闭 / 点击面板外关闭）──
+//   ⚠ 必须单例：旧实现每次开面板都 document.addEventListener 且清理在竞态/多路径下不稳，
+//     导致 keydown/pointerdown 监听暴涨累积 → 反复开面板后假死。改为「永远只有一对」全局监听，
+//     只作用于当前打开的 _osActivePanel，绝不随开关次数增长。
+let _osActivePanel = null;
+let _osGlobalHandlersInstalled = false;
+function _osInstallGlobalHandlers() {
+    if (_osGlobalHandlersInstalled) return;
+    _osGlobalHandlersInstalled = true;
+    document.addEventListener("keydown", (e) => {
+        const p = _osActivePanel;
+        if (e.key === "Escape" && p && document.body.contains(p)) { e.preventDefault(); p._cleanup?.(); }
     });
-    // colorRow 延迟挂载到底部，此处不 appendChild
+    document.addEventListener("pointerdown", (e) => {
+        const p = _osActivePanel;
+        if (p && p._armed && document.body.contains(p) && !p.contains(e.target)) p._cleanup?.();
+    }, { capture: true });
+}
 
-    // ── 样式（段控件） ──
-    const styleLabel = document.createElement("div");
-    styleLabel.className = "os-row-label";
-    styleLabel.textContent = "样式";
-    panel.appendChild(styleLabel);
-    const styleSeg = document.createElement("div");
-    styleSeg.className = "os-seg";
-    const btnFloatStyle = document.createElement("button");
-    btnFloatStyle.className = "os-seg-btn on";
-    btnFloatStyle.textContent = "进度滑条";
-    const _applyStylePreview = (style) => {
-        // 样式切换对所有通道统一生效
-        for (let i = 0; i < chCount; i++) {
-            drafts[i].style = style;
-            // 从独立记忆恢复当前样式的缩放比例
-            const ps = drafts[i][_scaleField(style)] ?? drafts[i].scale ?? 0.5;
-            node._osConfigs[i] = Object.assign({}, node._osConfigs[i], { style, scale: ps });
-        }
-        syncStyleBtns(style);
-        rebuildUI(node);
-        // rebuildUI 末尾的 updateSize → setSize 已触发 ComfyUI 内部 canvas 重绘，
-        // 无需额外调用 setDirtyCanvas，避免同一帧内重复重绘导致卡顿
-    };
-    btnFloatStyle.onclick = () => _applyStylePreview("float");
-    const btnFillStyle = document.createElement("button");
-    btnFillStyle.className = "os-seg-btn";
-    btnFillStyle.textContent = "温度滑条";
-    btnFillStyle.onclick = () => _applyStylePreview("fill");
-    styleSeg.appendChild(btnFloatStyle);
-    styleSeg.appendChild(btnFillStyle);
-    function syncStyleBtns(style) {
-        btnFloatStyle.classList.toggle("on", style === "float");
-        btnFillStyle.classList.toggle("on", style === "fill");
-    }
-    panel.appendChild(styleSeg);
-
-    // ── 填充滑条自定义参数（仅 style === "fill" 可见）──
-    const fillParams = document.createElement("div");
-    fillParams.className = "os-fill-params";
-    fillParams.style.display = (drafts[curCh].style === "fill") ? "block" : "none";
-    fillParams.style.marginTop = "-4px";
-
-    // 当前激活的填充参数标签页
-    let _fillActiveTab = "trackColor";
-
-    const FILL_TAB_KEYS = ["trackColor", "trackBg", "thumbColor", "textColor"];
-    const FILL_TAB_LABELS = { trackColor: "左边", trackBg: "右边", thumbColor: "按钮", textColor: "数字" };
-    const FILL_TAB_DEFAULTS = { trackColor: "", trackBg: "#2A2A2E", thumbColor: "", textColor: "#E4E4E7" };
-
-    // 4 个隐藏 color input，用于持久化存储
-    const _fillHiddens = {};
-    FILL_TAB_KEYS.forEach(key => {
-        const inp = document.createElement("input");
-        inp.type = "color";
-        inp.className = "os-fill-color-input";
-        inp.value = FILL_TAB_DEFAULTS[key];
-        inp.oninput = () => {
-            const hex = inp.value;
-            drafts[curCh][key] = hex;
-            if (key === _fillActiveTab) { colorDot.style.background = hex; }
-        };
-        _fillHiddens[key] = inp;
-        fillParams.appendChild(inp);
-    });
-
-    // 将当前激活标签页颜色同步给面板颜色区
-    function _syncFillColorToPicker() {
-        const key = _fillActiveTab;
-        const d = drafts[curCh];
-        const hex = d[key] || FILL_TAB_DEFAULTS[key];
-        colorInput.value = hex;
-        colorDot.style.background = hex;
-        colorLabel.textContent = FILL_TAB_LABELS[key];
-        colorLabel.style.display = "none"; // 分段标签页已标明，隐藏 colorLabel
-        const norm = hex.toLowerCase();
-        presetDots.forEach(dot => {
-            dot.classList.toggle("on", dot.style.background.toLowerCase() === norm);
+// 构建隐藏模式分段按钮（面板、角标、端口），抽出为模块级以减小 openSettingsPanel 体积
+function _mkHideChip(node, label, propKey, flagKey) {
+    const b = document.createElement("button");
+    b.className = "os-seg-btn" + (node[flagKey] ? " on" : "");
+    b.textContent = label;
+    b.onclick = (e) => {
+        e.stopPropagation();
+        node[flagKey] = !node[flagKey];
+        if (!node.properties) node.properties = {};
+        node.properties[propKey] = node[flagKey];
+        b.classList.toggle("on", node[flagKey]);
+        applyNodeDisplay(node, syncOutputPorts, updateOutputLabel);
+        app.graph?.change();
+        requestAnimationFrame(() => {
+            app.graph?.setDirtyCanvas(true, true);
+            app.canvas?.setDirty?.(true, true);
         });
-    }
+    };
+    return b;
+}
 
-    // 分段标签页
-    const fillLabel = document.createElement("div");
-    fillLabel.className = "os-row-label";
-    fillLabel.style.marginBottom = "4px";
-    fillLabel.textContent = "颜色";
-    fillParams.appendChild(fillLabel);
-    const fillSeg = document.createElement("div");
-    fillSeg.className = "os-fill-tabs";
-    const fillTabBtns = {};
-    FILL_TAB_KEYS.forEach(key => {
+// 通用分段控制按钮组工厂（类型/样式行复用）
+function _osSegmentedControl(options, activeValue, onChange) {
+    const el = document.createElement("div");
+    el.className = "os-seg os-seg-compact";
+    const btns = [];
+    options.forEach(opt => {
         const btn = document.createElement("button");
-        btn.className = "os-fill-tab" + (key === _fillActiveTab ? " on" : "");
-        btn.textContent = FILL_TAB_LABELS[key];
-        btn.onclick = () => {
-            _fillActiveTab = key;
-            Object.values(fillTabBtns).forEach(b => b.classList.remove("on"));
-            btn.classList.add("on");
-            _syncFillColorToPicker();
-        };
-        fillSeg.appendChild(btn);
-        fillTabBtns[key] = btn;
+        btn.className = "os-seg-btn" + (opt.value === activeValue ? " on" : "");
+        btn.textContent = opt.label;
+        btn.onclick = (e) => { e.stopPropagation(); onChange(opt.value); };
+        btns.push(btn);
+        el.appendChild(btn);
     });
-    fillParams.appendChild(fillSeg);
-    panel.appendChild(fillParams);
+    // 暴露 sync 方法供外部更新高亮
+    el._sync = (val) => btns.forEach((b, i) => b.classList.toggle("on", options[i].value === val));
+    return el;
+}
 
-    // ── 统一缩放比例滑条（浮点/填充滑条共用）──
+// 通道数选择按钮组（1~6），点击时调用 setChannelCount + onCountChange 回调
+function _osBuildMaxChButtons(node, onCountChange) {
+    const wrap = document.createElement("div");
+    wrap.className = "os-maxch-btns";
+    const curCount = node._osChannelCount || 1;
+    for (let i = 1; i <= 6; i++) {
+        const btn = document.createElement("button");
+        btn.className = "os-maxch-btn";
+        btn.textContent = i;
+        btn.dataset.val = i;
+        if (i === curCount) btn.classList.add("active");
+        btn.addEventListener("click", () => {
+            const v = parseInt(btn.dataset.val);
+            setChannelCount(node, v);
+            onCountChange(v);
+            // 更新按钮高亮
+            wrap.querySelectorAll(".os-maxch-btn").forEach(b =>
+                b.classList.toggle("active", parseInt(b.dataset.val) === v));
+        });
+        wrap.appendChild(btn);
+    }
+    return wrap;
+}
+
+// 缩放滑条（浮点/填充共用），返回 { scaleRange, scaleVal, _panelStyle }
+function _osBuildScaleSection(styleScaleGroup, fillParams, node, drafts, curCh) {
     const scaleSection = document.createElement("div");
     scaleSection.style.display = "block";
-
     const scaleRow = document.createElement("div");
     scaleRow.className = "os-scale-row";
-
     const scaleLbl = document.createElement("label");
     scaleLbl.textContent = "缩放";
     scaleRow.appendChild(scaleLbl);
-
     const scaleRange = document.createElement("input");
     scaleRange.type = "range";
     scaleRange.className = "os-scale-range";
@@ -433,27 +200,19 @@ function openSettingsPanel(node, channelIndex, onClose) {
     scaleRange.value = _getScaleByStyle(drafts[curCh]);
     scaleRange.style.setProperty("--os-scale-color", drafts[curCh].color);
     scaleRow.appendChild(scaleRange);
-
     const scaleVal = document.createElement("span");
     scaleVal.style.cssText = "font-size:12px;color:var(--ws-text-secondary);min-width:36px;text-align:right;flex-shrink:0";
     scaleVal.textContent = parseFloat(scaleRange.value).toFixed(2);
     scaleRow.appendChild(scaleVal);
-
-    // 获取当前样式名称（面板内 drafts/curCh 始终存在）
     const _panelStyle = () => drafts[curCh]?.style || "float";
-
-    // scale 调整时重算高度——统一走 updateSize（目标记忆 + Classic/Nodes2.0 口径分流），
-    // 旧实现直接 setSize(内容高) 在 Classic 下会被 LiteGraph 撑回形成拉锯卡顿
     let _scaleDebounceTimer = null;
     const _applyScaleResize = () => updateSize(node);
     scaleRange.oninput = () => {
         const v = parseFloat(scaleRange.value);
         scaleVal.textContent = v.toFixed(2);
         node._osWrap?.style.setProperty("--os-scale", v);
-        // 写入当前样式对应的独立缩放字段 + 同步 scale 主字段
         const field = _scaleField(_panelStyle());
         node._osConfigs.forEach(d => { d[field] = v; d.scale = v; });
-        // debounce: CSS/文字即时更新，重排版延迟执行
         clearTimeout(_scaleDebounceTimer);
         _scaleDebounceTimer = setTimeout(() => _applyScaleResize(v), 100);
     };
@@ -466,9 +225,507 @@ function openSettingsPanel(node, channelIndex, onClose) {
         _applyScaleResize(v);
         app.graph?.change();
     };
+    scaleRange.addEventListener("wheel", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const step = parseFloat(scaleRange.step) || 0.01;
+        const mn = parseFloat(scaleRange.min), mx = parseFloat(scaleRange.max);
+        let v = parseFloat(scaleRange.value) + (e.deltaY < 0 ? step : -step);
+        v = Math.max(mn, Math.min(mx, parseFloat(v.toFixed(2))));
+        if (v !== parseFloat(scaleRange.value)) { scaleRange.value = v; scaleRange.oninput(); scaleRange.onchange(); }
+    }, { passive: false });
     scaleSection.appendChild(scaleRow);
-    // 插到 fillParams 之前（样式段控件正下方）
-    panel.insertBefore(scaleSection, fillParams);
+    styleScaleGroup.insertBefore(scaleSection, fillParams);
+    return { scaleRange, scaleVal, _panelStyle };
+}
+
+// ── 颜色行 + 填充参数（闭包紧密，合并提取为单函数）──────────────────────────
+// 返回 { fillParams, _fillHiddens, _syncFillColorToPicker, colorLabel, colorDot, colorInput, colorRow }
+// 注：scaleRange 通过 getter 函数传入，因其在调用时尚未创建（由 _osBuildScaleSection 稍后创建）
+// 数字输入组（最小值/最大值/步长）
+function _osBuildNumGroup(typeRangeGroup, drafts, curCh) {
+    const numGroup = document.createElement("div");
+    numGroup.className = "os-num-group";
+    const minCol = document.createElement("div"); minCol.className = "os-num-col";
+    const minSub = document.createElement("div"); minSub.className = "os-num-sub-label"; minSub.textContent = "最小值";
+    const minInp = document.createElement("input");
+    minInp.type = "number"; minInp.className = "os-num-inline"; minInp.step = "0.01";
+    minInp.oninput = () => { const v = parseFloat(minInp.value); if (!isNaN(v)) drafts[curCh].min = v; };
+    minCol.appendChild(minSub); minCol.appendChild(minInp);
+    const maxCol = document.createElement("div"); maxCol.className = "os-num-col";
+    const maxSub = document.createElement("div"); maxSub.className = "os-num-sub-label"; maxSub.textContent = "最大值";
+    const maxInp = document.createElement("input");
+    maxInp.type = "number"; maxInp.className = "os-num-inline"; maxInp.step = "0.01";
+    maxInp.oninput = () => { const v = parseFloat(maxInp.value); if (!isNaN(v)) drafts[curCh].max = v; };
+    maxCol.appendChild(maxSub); maxCol.appendChild(maxInp);
+    const stepCol = document.createElement("div"); stepCol.className = "os-num-col";
+    const stepSub = document.createElement("div"); stepSub.className = "os-num-sub-label"; stepSub.textContent = "步长";
+    const stepInp = document.createElement("input");
+    stepInp.type = "number"; stepInp.className = "os-num-inline"; stepInp.step = "0.001";
+    stepInp.oninput = () => { const v = parseFloat(stepInp.value); if (!isNaN(v)) drafts[curCh].step = v; };
+    stepCol.appendChild(stepSub); stepCol.appendChild(stepInp);
+    const sep1 = document.createElement("span"); sep1.className = "os-num-sep"; sep1.textContent = "~";
+    const sep2 = document.createElement("span"); sep2.className = "os-num-sep"; sep2.textContent = "·";
+    numGroup.appendChild(minCol); numGroup.appendChild(sep1);
+    numGroup.appendChild(maxCol); numGroup.appendChild(sep2);
+    numGroup.appendChild(stepCol);
+    typeRangeGroup.appendChild(numGroup);
+    return { minInp, maxInp, stepInp };
+}
+
+// 名称输入行 + 确认按钮
+function _osBuildNameRow(topGroup, node, drafts, curCh, cleanupPanel) {
+    const nameRow = document.createElement("div");
+    nameRow.style.cssText = "display:flex;align-items:center;gap:6px";
+    const nameInp = document.createElement("input");
+    nameInp.type = "text";
+    nameInp.className = "os-text-input";
+    nameInp.spellcheck = false;
+    nameInp.setAttribute("autocomplete", "off");
+    nameInp.placeholder = "自动识别端口名 / 自定义滑条名";
+    nameInp.style.cssText = "flex:1;padding:4px 8px;font-size:11px;height:28px";
+    nameInp.oninput = () => {
+        const newLabel = nameInp.value;
+        drafts[curCh].label = newLabel;
+        node._osConfigs[curCh].label = newLabel;
+        syncConfigToWidget(node, curCh);
+        updateOutputLabel(node);
+        if (node._osWrap) {
+            const rows = node._osWrap.querySelectorAll(".os-slider-row");
+            const row = rows[curCh];
+            if (row) {
+                const labelEl = row.querySelector(".os-fill-text-label") || row.querySelector(".os-label-area");
+                if (labelEl) labelEl.textContent = newLabel || "右键此处设置滑条";
+            }
+        }
+        app.graph?.setDirtyCanvas(true, true);
+    };
+    nameRow.appendChild(nameInp);
+    const nameConfirmBtn = document.createElement("button");
+    nameConfirmBtn.textContent = "确认";
+    nameConfirmBtn.style.cssText = "flex:none;padding:4px 10px;font-size:11px;height:28px;border-radius:6px;cursor:pointer;border:1px solid var(--ws-accent);background:var(--ws-accent);color:var(--ws-text-on-accent,#fff);font-weight:500;line-height:1";
+    nameConfirmBtn.onclick = (e) => {
+        e.stopPropagation();
+        node._osConfigs[curCh].label = nameInp.value;
+        syncConfigToWidget(node, curCh);
+        rebuildUI(node);
+        updateOutputLabel(node);
+        app.graph?.setDirtyCanvas(true, true);
+        cleanupPanel();
+    };
+    nameRow.appendChild(nameConfirmBtn);
+    topGroup.appendChild(nameRow);
+    return { nameRow, nameInp };
+}
+
+// 通道标签：C1~CN 圆形按钮，返回 tabs DOM 元素（由调用者管理挂载位置）
+function _osBuildChannelTabs(topGroup, nameRow, chCount, curCh, drafts, _snapshot, node, refreshForm, nameInp, setCurCh) {
+    if (chCount <= 1) return null;
+    const t = document.createElement("div");
+    t.className = "os-seg os-seg-tabs";
+    const btns = [];
+    for (let i = 0; i < chCount; i++) {
+        const btn = document.createElement("button");
+        btn.className = "os-seg-btn" + (i === curCh ? " on" : "");
+        btn.textContent = "C" + (i + 1);
+        btn.onclick = () => {
+            _snapshot[curCh] = { ...node._osConfigs[curCh] };
+            setCurCh(i);  // 更新外部 curCh（参数 curCh 仅用于初始高亮）
+            refreshForm();
+            drafts[i].label && (nameInp.value = drafts[i].label);
+            btns.forEach((b, bi) => b.classList.toggle("on", bi === i));
+            nameInp.focus();
+            nameInp.select();
+        };
+        btns.push(btn);
+        t.appendChild(btn);
+    }
+    topGroup.insertBefore(t, nameRow);
+    return t;
+}
+
+// ── 颜色行 + 填充参数（闭包紧密，合并提取为单函数）──────────────────────────
+function _osBuildColorAndFillSection(panel, drafts, curCh, node, getScaleRange, styleScaleGroup) {
+    const colorLabel = document.createElement("div");
+    colorLabel.className = "os-row-label";
+    colorLabel.textContent = "颜色";
+    const colorRow = document.createElement("div");
+    colorRow.className = "os-color-row";
+    const colorDot = document.createElement("div");
+    colorDot.className = "os-color-dot";
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.style.cssText = "position:absolute;width:0;height:0;opacity:0;pointer-events:none;border:none;padding:0;margin:0;appearance:none;-webkit-appearance:none;-moz-appearance:none;clip-path:inset(50%)";
+    colorDot.appendChild(colorInput);
+    const eyeIcon = document.createElement("span");
+    eyeIcon.style.cssText = "display:flex;align-items:center;justify-content:center;width:100%;height:100%";
+    eyeIcon.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block"><path d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/></svg>`;
+    colorDot.appendChild(eyeIcon);
+    colorDot.addEventListener("mouseenter", () => osShowDotTip(colorDot, "自定义取色"));
+    colorDot.addEventListener("mouseleave", osHideDotTip);
+    let _colorRebuildRaf = 0;
+    const _scheduleRebuild = () => {
+        if (_colorRebuildRaf) return;
+        _colorRebuildRaf = requestAnimationFrame(() => { _colorRebuildRaf = 0; rebuildUI(node); });
+    };
+    // 当前激活的填充参数标签页（mutable ref，与 fill params 共享）
+    const _fillActiveTab = { value: "trackColor" };
+
+    colorInput.oninput = () => {
+        const hex = colorInput.value;
+        if (drafts[curCh].style === "fill" && _fillActiveTab.value) {
+            drafts[curCh][_fillActiveTab.value] = hex;
+            node._osConfigs[curCh][_fillActiveTab.value] = hex;
+            colorDot.style.color = hex;
+            if (_fillHiddens[_fillActiveTab.value]) _fillHiddens[_fillActiveTab.value].value = hex;
+            _scheduleRebuild();
+            presetDots.forEach(d => d.classList.remove("on"));
+            return;
+        }
+        colorDot.style.color = hex;
+        drafts[curCh].color = hex;
+        node._osConfigs[curCh].color = hex;
+        _scheduleRebuild();
+        presetDots.forEach(d => d.classList.remove("on"));
+        getScaleRange()?.style.setProperty("--os-scale-color", hex);
+    };
+    colorDot.onclick = () => {
+        if (drafts[curCh].style === "fill" && _fillActiveTab.value) {
+            _syncFillColorToPicker();
+        } else {
+            colorLabel.textContent = "颜色";
+            colorInput.value = drafts[curCh].color;
+            colorDot.style.color = drafts[curCh].color;
+        }
+        colorInput.click();
+    };
+    colorRow.appendChild(colorDot);
+
+    // 预色色点 + 随机色点
+    const presetDots = [];
+    OS_PRESET_COLORS.forEach(hex => {
+        const dot = document.createElement("div");
+        dot.className = "os-preset-dot";
+        dot.style.background = hex;
+        dot.onmouseenter = () => osShowDotTip(dot, osColorTipText(hex));
+        dot.onmouseleave = osHideDotTip;
+        dot.onclick = () => {
+            if (drafts[curCh].style === "fill" && _fillActiveTab.value) {
+                drafts[curCh][_fillActiveTab.value] = hex;
+                node._osConfigs[curCh][_fillActiveTab.value] = hex;
+                colorDot.style.color = hex;
+                colorInput.value = hex;
+                if (_fillHiddens[_fillActiveTab.value]) _fillHiddens[_fillActiveTab.value].value = hex;
+                presetDots.forEach(d => d.classList.remove("on"));
+                dot.classList.add("on");
+                rebuildUI(node);
+                return;
+            }
+            colorInput.value = hex;
+            colorDot.style.color = hex;
+            drafts[curCh].color = hex;
+            presetDots.forEach(d => d.classList.remove("on"));
+            dot.classList.add("on");
+            node._osConfigs[curCh].color = hex;
+            rebuildUI(node);
+            getScaleRange()?.style.setProperty("--os-scale-color", hex);
+        };
+        presetDots.push(dot);
+        colorRow.appendChild(dot);
+    });
+
+    // 随机色点（仅显示 SVG 骰子图标）
+    const randomDot = document.createElement("div");
+    randomDot.className = "os-random-btn";
+    randomDot.innerHTML = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+    randomDot.onmouseenter = () => { osShowDotTip(randomDot, "随机配色"); };
+    randomDot.onmouseleave = () => { osHideDotTip(); };
+    randomDot.onclick = () => {
+        if (drafts[curCh].style === "fill" && _fillActiveTab.value) {
+            let hex = OS_PRESET_COLORS[Math.floor(Math.random() * OS_PRESET_COLORS.length)];
+            const cur = drafts[curCh][_fillActiveTab.value];
+            if (hex === cur && OS_PRESET_COLORS.length > 1) {
+                hex = OS_PRESET_COLORS[(OS_PRESET_COLORS.indexOf(hex) + 1) % OS_PRESET_COLORS.length];
+            }
+            drafts[curCh][_fillActiveTab.value] = hex;
+            node._osConfigs[curCh][_fillActiveTab.value] = hex;
+            colorDot.style.color = hex;
+            colorInput.value = hex;
+            if (_fillHiddens[_fillActiveTab.value]) _fillHiddens[_fillActiveTab.value].value = hex;
+            presetDots.forEach(d => d.classList.remove("on"));
+            rebuildUI(node);
+            return;
+        }
+        const hue = 30 + Math.floor(Math.random() * 300);
+        const sat = 0.65 + Math.random() * 0.25;
+        const val = 0.5 + Math.random() * 0.3;
+        const f = n => { const k = (n + hue / 60) % 6; return Math.round((val - val * sat * Math.max(0, Math.min(k, 4 - k, 1))) * 255); };
+        const rVal = f(5), gVal = f(3), bVal = f(1);
+        const hex = '#' + [rVal, gVal, bVal].map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase();
+        const darkBg = '#' + [Math.round(rVal * 0.12), Math.round(gVal * 0.12), Math.round(bVal * 0.12)].map(c => c.toString(16).padStart(2, '0')).join('').toUpperCase();
+        const lum = rVal * 0.299 + gVal * 0.587 + bVal * 0.114;
+        const textHex = lum > 140 ? '#1A1A1A' : '#F0F0F0';
+        drafts[curCh].color = hex;
+        drafts[curCh].trackColor = hex;
+        drafts[curCh].trackBg = darkBg;
+        drafts[curCh].thumbColor = hex;
+        drafts[curCh].textColor = textHex;
+        node._osConfigs[curCh].color = hex;
+        node._osConfigs[curCh].trackColor = hex;
+        node._osConfigs[curCh].trackBg = darkBg;
+        node._osConfigs[curCh].thumbColor = hex;
+        node._osConfigs[curCh].textColor = textHex;
+        colorInput.value = hex;
+        colorDot.style.color = hex;
+        if (_fillHiddens) {
+            _fillHiddens.trackBg && (_fillHiddens.trackBg.value = darkBg);
+            _fillHiddens.trackColor && (_fillHiddens.trackColor.value = hex);
+            _fillHiddens.thumbColor && (_fillHiddens.thumbColor.value = hex);
+            _fillHiddens.textColor && (_fillHiddens.textColor.value = textHex);
+        }
+        presetDots.forEach(d => d.classList.remove("on"));
+        getScaleRange()?.style.setProperty("--os-scale-color", hex);
+        rebuildUI(node);
+    };
+    colorRow.appendChild(randomDot);
+
+    // ── 填充滑条自定义参数 ──
+    const fillParams = document.createElement("div");
+    fillParams.className = "os-fill-params";
+    fillParams.style.display = (drafts[curCh].style === "fill") ? "block" : "none";
+    fillParams.style.marginTop = "0";
+    const _fillHiddens = {};
+    FILL_TAB_KEYS.forEach(key => {
+        const inp = document.createElement("input");
+        inp.type = "color";
+        inp.className = "os-fill-color-input";
+        inp.value = FILL_TAB_DEFAULTS[key];
+        inp.oninput = () => {
+            const hex = inp.value;
+            drafts[curCh][key] = hex;
+            if (key === _fillActiveTab.value) { colorDot.style.color = hex; }
+        };
+        _fillHiddens[key] = inp;
+        fillParams.appendChild(inp);
+    });
+    function _syncFillColorToPicker() {
+        const key = _fillActiveTab.value;
+        const d = drafts[curCh];
+        const hex = d[key] || FILL_TAB_DEFAULTS[key];
+        colorInput.value = hex;
+        colorDot.style.color = hex;
+        colorLabel.textContent = FILL_TAB_LABELS[key];
+        colorLabel.style.display = "none";
+        const norm = hex.toLowerCase();
+        presetDots.forEach(dot => {
+            dot.classList.toggle("on", dot.style.background.toLowerCase() === norm);
+        });
+    }
+    const fillSeg = document.createElement("div");
+    fillSeg.className = "os-fill-tabs";
+    const fillTabBtns = {};
+    FILL_TAB_KEYS.forEach(key => {
+        const btn = document.createElement("button");
+        btn.className = "os-fill-tab" + (key === _fillActiveTab.value ? " on" : "");
+        btn.textContent = FILL_TAB_LABELS[key];
+        btn.onclick = () => {
+            _fillActiveTab.value = key;
+            Object.values(fillTabBtns).forEach(b => b.classList.remove("on"));
+            btn.classList.add("on");
+            _syncFillColorToPicker();
+        };
+        fillSeg.appendChild(btn);
+        fillTabBtns[key] = btn;
+    });
+    fillParams.appendChild(fillSeg);
+    styleScaleGroup.appendChild(fillParams);
+
+    return { fillParams, _fillHiddens, _syncFillColorToPicker, colorLabel, colorDot, colorInput, colorRow, presetDots };
+}
+
+// 设置面板标题行：居中标题 + 深/浅主题切换
+function _osBuildPanelTitle(panel) {
+    const titleRow = document.createElement("div");
+    titleRow.className = "os-panel-title-row";
+    const titleEl = document.createElement("div");
+    titleEl.className = "os-panel-title";
+    titleEl.textContent = "万能滑条 OmniSlider";
+    const themeBtn = document.createElement("div");
+    themeBtn.className = "os-theme-toggle";
+    const MODE_ICONS_OS = { auto: WS_ICONS.auto, light: WS_ICONS.sun, dark: WS_ICONS.moon };
+    const refreshThemeBtn = () => { const m = getGlassMode(); themeBtn.innerHTML = MODE_ICONS_OS[m]; themeBtn.title = GLASS_MODE_DEFS[m].tip; };
+    refreshThemeBtn();
+    themeBtn.onclick = () => cycleGlassMode();
+    const _offGlassOS = onGlassChange((t) => { panel.setAttribute("data-theme", t); refreshThemeBtn(); });
+    panel._offGlass = _offGlassOS;
+    titleRow.appendChild(titleEl);
+    titleRow.appendChild(themeBtn);
+    panel.appendChild(titleRow);
+}
+
+// 面板定位 + 画布缩放同步 + cleanup
+function _osPositionPanel(panel, node, commitPanel) {
+    document.body.appendChild(panel);
+    const canvas = app.canvas;
+    if (canvas?.canvas && node) {
+        const cEl = canvas.canvas;
+        const cR = cEl.getBoundingClientRect();
+        const sc = canvas.ds.scale;
+        const off = canvas.ds.offset;
+        const pR = panel.getBoundingClientRect();
+        const gap = 14;
+        const nodeRight = cR.left + (node.pos[0] + node.size[0] + off[0]) * sc;
+        const nodeLeft  = cR.left + (node.pos[0] + off[0]) * sc;
+        let px = nodeRight + gap;
+        if (px + pR.width > window.innerWidth - 10) px = nodeLeft - pR.width - gap;
+        if (px < 10 || px + pR.width > window.innerWidth - 10) px = Math.max(10, Math.min(px, window.innerWidth - pR.width - 10));
+        let py = cR.top + (node.pos[1] + node.size[1] / 2 + off[1]) * sc - pR.height / 2;
+        py = Math.min(Math.max(py, 10), window.innerHeight - pR.height - 10);
+        panel.style.left = px + "px";
+        panel.style.top = py + "px";
+        panel.style.transformOrigin = 'top left';
+        let _lastZoom = null;
+        const _zoomTick = () => {
+            if (!panel.isConnected || _osActivePanel !== panel) return;
+            const zs = canvas?.ds?.scale ?? 1;
+            if (zs !== _lastZoom) {
+                _lastZoom = zs;
+                const ps = Math.max(1.0, Math.min(zs, 1.5));
+                panel.style.transform = `scale(${ps})`;
+                const r = panel.getBoundingClientRect();
+                const cx = Math.max(10, Math.min(r.left, window.innerWidth - r.width - 10));
+                const cy = Math.max(10, Math.min(r.top, window.innerHeight - r.height - 10));
+                if (Math.abs(cx - r.left) > 0.5) panel.style.left = cx + 'px';
+                if (Math.abs(cy - r.top) > 0.5) panel.style.top = cy + 'px';
+            }
+            requestAnimationFrame(_zoomTick);
+        };
+        requestAnimationFrame(_zoomTick);
+    } else {
+        panel.style.left = "50%";
+        panel.style.top = "50%";
+        panel.style.transform = "translate(-50%,-50%)";
+    }
+    function cleanupPanel() {
+        if (panel._cleaned) return;
+        panel._cleaned = true;
+        try { commitPanel(); } catch (e) { console.warn("[WOSAI OmniSlider] cleanupPanel error:", e); }
+        if (panel._offGlass) { panel._offGlass(); panel._offGlass = null; }
+        panel.remove();
+        if (_osActivePanel === panel) _osActivePanel = null;
+    }
+    panel._cleanup = cleanupPanel;
+    _osActivePanel = panel;
+    panel._armed = false;
+    setTimeout(() => { panel._armed = true; }, 0);
+    _osInstallGlobalHandlers();
+    return { cleanupPanel };
+}
+
+// ── 设置面板 ────────────────────────────────────────────────────────────────
+function openSettingsPanel(node, channelIndex, onClose) {
+    const old = document.querySelector(".os-panel");
+    if (old) { if (old._cleanup) old._cleanup(); else old.remove(); }   // 调用旧面板清理(退订/移除监听)，防累积泄漏
+
+    let chCount = node._osChannelCount;
+    let curCh = Math.max(0, Math.min(chCount - 1, channelIndex));
+    const drafts = [];
+    for (let i = 0; i < chCount; i++) {
+        drafts.push(Object.assign(defaultCfg(i + 1), node._osConfigs[i] || {}));
+    }
+    // 快照：取消时恢复用（防止预览改动在取消后残留）
+    const _snapshot = node._osConfigs.map(c => ({ ...c }));
+    const origChCount = node._osChannelCount;   // 记录关闭时的通道数，commitPanel 据此检测通道数是否已变
+
+    const panel = document.createElement("div");
+    panel.className = "os-panel";
+    panel.setAttribute("data-wosai-panel", "");
+    panel.setAttribute("data-theme", getTheme());
+    panel.onpointerdown = e => e.stopPropagation();
+
+    // ── 标题行（已提取到 _osBuildPanelTitle）──
+    _osBuildPanelTitle(panel);
+
+    // 顶部组：滑条总数 + 通道标签 + 修改名称 共用一个背景容器
+    const topGroup = document.createElement("div");
+    topGroup.className = "os-group os-group-top";
+    panel.appendChild(topGroup);
+
+    // ── 通道标签：C1~C6 圆形按钮（在输入框上方，已提取到 _osBuildChannelTabs）──
+    let chTabs = null;
+    const _rebuildTabs = () => {
+        if (chTabs) { chTabs.remove(); chTabs = null; }
+        chTabs = _osBuildChannelTabs(topGroup, nameRow, chCount, curCh, drafts, _snapshot, node, refreshForm, nameInp, (v) => { curCh = v; });
+    };
+
+    // ── 显示名称（已提取到 _osBuildNameRow）──
+    const { nameRow, nameInp } = _osBuildNameRow(topGroup, node, drafts, curCh, () => cleanupPanel());
+    // 初始化通道标签（在 nameRow 上方；nameRow 已挂载，可用作 insertBefore 锚点）
+    _rebuildTabs();
+
+    // ── 类型（按钮式：浮点 | 整数，点选高亮）──
+    const typeRow = document.createElement("div");
+    typeRow.className = "os-display-row";
+    const typeLbl = document.createElement("div");
+    typeLbl.className = "os-display-row-label";
+    typeLbl.textContent = "参数类型：";
+    const syncTypeBtns = (type) => typeCtl._sync(type);
+    const _setType = (t) => {
+        drafts[curCh].type = t;
+        node._osConfigs[curCh].type = t;
+        syncTypeBtns(t);
+        rebuildUI(node);
+        updateOutputLabel(node);
+        app.graph?.setDirtyCanvas(true, true);
+    };
+    const typeCtl = _osSegmentedControl(
+        [{value:"FLOAT", label:"浮点"}, {value:"INT", label:"整数"}],
+        drafts[curCh].type || "FLOAT", _setType);
+    typeRow.appendChild(typeLbl);
+    typeRow.appendChild(typeCtl);
+    // 类型 + 范围 共用一个背景容器（同属一组设置项）
+    const typeRangeGroup = document.createElement("div");
+    typeRangeGroup.className = "os-group";
+    typeRangeGroup.appendChild(typeRow);
+    panel.appendChild(typeRangeGroup);
+
+    // ── 范围（三数字联排，已提取到 _osBuildNumGroup）──
+    const { minInp, maxInp, stepInp } = _osBuildNumGroup(typeRangeGroup, drafts, curCh);
+
+    // ── 样式（标签 + 按钮组同一行）──
+    const styleRow = document.createElement("div");
+    styleRow.className = "os-style-row";
+    const styleLbl = document.createElement("div");
+    styleLbl.className = "os-style-label";
+    styleLbl.textContent = "滑条样式：";
+    let syncStyleBtns = (style) => styleCtl._sync(style);
+    const _applyStylePreview = (style) => {
+        for (let i = 0; i < chCount; i++) {
+            drafts[i].style = style;
+            const ps = drafts[i][_scaleField(style)] ?? drafts[i].scale ?? 0.5;
+            node._osConfigs[i] = Object.assign({}, node._osConfigs[i], { style, scale: ps });
+        }
+        syncStyleBtns(style);
+        rebuildUI(node);
+    };
+    const styleCtl = _osSegmentedControl(
+        [{value:"float", label:"一体式"}, {value:"fill", label:"圆点式"}],
+        drafts[curCh]?.style || "float", _applyStylePreview);
+    const styleScaleGroup = document.createElement("div");
+    styleScaleGroup.className = "os-group";
+    styleRow.appendChild(styleLbl);
+    styleRow.appendChild(styleCtl);
+    styleScaleGroup.appendChild(styleRow);
+    panel.appendChild(styleScaleGroup);
+
+    // ── 颜色 + 填充参数（已提取到 _osBuildColorAndFillSection）──
+    const { fillParams, _fillHiddens, _syncFillColorToPicker, colorLabel, colorDot, colorInput, colorRow, presetDots }
+        = _osBuildColorAndFillSection(panel, drafts, curCh, node, () => scaleRange, styleScaleGroup);
+
+    // 颜色行延迟挂载（等 colorRow 构建完成后 append 到 styleScaleGroup）
+    styleScaleGroup.appendChild(colorRow);
+
+    // ── 统一缩放比例滑条（浮点/填充滑条共用）──
+    const { scaleRange, scaleVal, _panelStyle } = _osBuildScaleSection(styleScaleGroup, fillParams, node, drafts, curCh);
 
     // ── 更新 syncStyleBtns：切换填充/浮点滑条时显示/隐藏 fillParams ──
     const _origSyncStyle = syncStyleBtns;
@@ -491,7 +748,7 @@ function openSettingsPanel(node, channelIndex, onClose) {
             colorLabel.textContent = "颜色";
             colorLabel.style.display = "";
             colorInput.value = drafts[curCh].color;
-            colorDot.style.background = drafts[curCh].color;
+            colorDot.style.color = drafts[curCh].color;
             fillParams.style.display = "none";
         }
         // 同步缩放滑条到当前样式的独立记忆值
@@ -534,7 +791,7 @@ function openSettingsPanel(node, channelIndex, onClose) {
         minInp.value = d.min;
         maxInp.value = d.max;
         stepInp.value = d.step;
-        colorDot.style.background = d.color;
+        colorDot.style.color = d.color;
         colorInput.value = d.color;
         // 高亮匹配的预设
         const norm = d.color.toLowerCase();
@@ -553,205 +810,91 @@ function openSettingsPanel(node, channelIndex, onClose) {
     }
     refreshForm();
 
-    // ── 滑条总数上限设置 ──
+    // ── 滑条总数：点击 1~6 直接在当前节点增加/减少滑条（实时生效） ──
     const maxChSection = document.createElement("div");
     maxChSection.className = "os-maxch-section";
     maxChSection.style.cssText = "display:block;margin-bottom:4px";
-
     const maxChRow = document.createElement("div");
     maxChRow.className = "os-scale-row";
-
     const maxChLbl = document.createElement("label");
-    maxChLbl.textContent = "选择滑条总数：";
+    maxChLbl.textContent = "滑条总数：";
     maxChRow.appendChild(maxChLbl);
-
-    // 悬浮提示（点击后短暂显示，不挤占按钮位置）
-    const maxChTip = document.createElement("span");
-    maxChTip.className = "os-maxch-tip";
-    maxChTip.textContent = "";
-    // 不 append 到 maxChRow，改为点击时 append 到 document.body
-
-    // 1~6 数字按钮
-    const maxChBtnsWrap = document.createElement("div");
-    maxChBtnsWrap.className = "os-maxch-btns";
-    const maxChCurrent = getMaxChannels();
-
-    for (let i = 1; i <= 6; i++) {
-        const btn = document.createElement("button");
-        btn.className = "os-maxch-btn";
-        btn.textContent = i;
-        btn.dataset.val = i;
-        if (i === maxChCurrent) btn.classList.add("active");
-
-        btn.addEventListener("click", () => {
-            const v = parseInt(btn.dataset.val);
-            if (app.ui?.settings?.setSettingValue) {
-                app.ui.settings.setSettingValue(SETTING_MAX_CH, v);
-            }
-            maxChBtnsWrap.querySelectorAll(".os-maxch-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.val) === v));
-
-            // 悬浮提示：append 到 body，定位到按钮行正上方
-            maxChTip.textContent = "已保存，重新添加节点后生效！";
-            maxChTip.style.opacity = "0";
-            maxChTip.style.position = "fixed";
-            maxChTip.style.zIndex = "100010";
-            maxChTip.style.pointerEvents = "none";
-
-            if (!document.body.contains(maxChTip)) {
-                document.body.appendChild(maxChTip);
-            }
-
-            // 强制回流获取正确尺寸
-            const tipRect = maxChTip.getBoundingClientRect();
-            const btnsRect = maxChBtnsWrap.getBoundingClientRect();
-
-            maxChTip.style.left = (btnsRect.left + btnsRect.width / 2 - tipRect.width / 2) + "px";
-            maxChTip.style.top  = (btnsRect.top + btnsRect.height / 2 - tipRect.height / 2) + "px";
-            maxChTip.style.opacity = "1";
-
-            clearTimeout(maxChTip._t);
-            maxChTip._t = setTimeout(() => {
-                maxChTip.style.opacity = "0";
-                setTimeout(() => {
-                    if (document.body.contains(maxChTip)) {
-                        document.body.removeChild(maxChTip);
-                    }
-                }, 350);
-            }, 2000);
-        });
-
-        maxChBtnsWrap.appendChild(btn);
-    }
-
+    const maxChBtnsWrap = _osBuildMaxChButtons(node, (v) => {
+        chCount = node._osChannelCount;
+        if (curCh >= chCount) curCh = chCount - 1;
+        while (drafts.length < chCount) {
+            const i = drafts.length;
+            drafts.push(Object.assign(defaultCfg(i + 1), node._osConfigs[i] || {}));
+            _snapshot.push({ ...node._osConfigs[i] });
+        }
+        if (drafts.length > chCount) {
+            drafts.length = chCount;
+            _snapshot.length = chCount;
+        }
+        refreshForm();
+        nameInp.value = drafts[curCh].label;
+        _rebuildTabs();
+        const curMax = getMaxChannels();
+        if (v > curMax && app.ui?.settings?.setSettingValue) {
+            app.ui.settings.setSettingValue(SETTING_MAX_CH, v);
+        }
+    });
     maxChRow.appendChild(maxChBtnsWrap);
     maxChSection.appendChild(maxChRow);
 
-    // 位置：通道标签上方（面板顶部全局设置区）
-    panel.insertBefore(maxChSection, titleRow.nextSibling);
+    // 位置：顶部组最前（滑条总数 → 通道标签 → 名称，共用一个背景容器）
+    topGroup.insertBefore(maxChSection, topGroup.firstChild);
 
-    // ── 底部按钮 ──
-    const footer = document.createElement("div");
-    footer.className = "os-footer";
-    const cancelBtn = document.createElement("button");
-    cancelBtn.className = "os-btn os-btn-cancel";
-    cancelBtn.textContent = "清除";
-    cancelBtn.onclick = () => {
-        // 完整还原快照（撤销所有预览改动：样式、缩放等），但不关闭窗口
-        for (let i = 0; i < _snapshot.length; i++) {
-            node._osConfigs[i] = { ..._snapshot[i] };
-        }
-        const origScale = _snapshot[0]?.scale ?? 1.0;
-        node._osWrap?.style.setProperty("--os-scale", origScale);
-        rebuildUI(node);
-        app.graph?.setDirtyCanvas(true, true);
-    };
-    const okBtn = document.createElement("button");
-    okBtn.className = "os-btn os-btn-ok";
-    okBtn.textContent = "确认";
-    okBtn.onclick = () => {
-        saveFillParams(); // 保存当前通道的填充滑条参数
-        for (let i = 0; i < chCount; i++) {
-            node._osConfigs[i] = drafts[i];
-            syncConfigToWidget(node, i);
-        }
-        rebuildUI(node);
-        // 全通道激活：active_value 始终取通道0
-        const avW = node._osHiddenWidgets?.["active_value"];
-        if (avW && node._osConfigs[0]) avW.value = node._osConfigs[0].value;
-        app.graph?.setDirtyCanvas(true, true);
-        app.graph?.change();
-        autoQueue(node);
-        cleanupPanel();
-        onClose?.();
-    };
-    footer.appendChild(cancelBtn);
-    footer.appendChild(okBtn);
-    // 颜色行：取消/确认按钮上方
-    panel.appendChild(colorLabel);
-    panel.appendChild(colorRow);
-    panel.appendChild(footer);
+    // ── 节点显示控制（隐藏标题 / 隐藏角标，per-node） ──────────────────
+    // 状态持久化在 node.properties.osHideTitle / osHideBadge（LiteGraph 自动序列化）
+    const displaySection = document.createElement("div");
+    displaySection.className = "os-display-section";
+
+    // 精简显示：一行紧凑多选按钮（标题面板 | 右上角标 | 端口名称），各自独立开关
+    const hideRow = document.createElement("div");
+    hideRow.className = "os-display-row";
+    const hideLbl = document.createElement("div");
+    hideLbl.className = "os-display-row-label";
+    hideLbl.textContent = "隐藏模式：";
+    const hideCtl = document.createElement("div");
+    hideCtl.className = "os-seg os-seg-compact os-seg-hide";
+    // 使用模块级 _mkHideChip（已在 openSettingsPanel 上方定义）
+    hideCtl.appendChild(_mkHideChip(node, "面板", "osHideTitle", "_osHideTitle"));
+    hideCtl.appendChild(_mkHideChip(node, "角标", "osHideBadge", "_osHideBadge"));
+    hideCtl.appendChild(_mkHideChip(node, "端口", "osHidePortLabel", "_osHidePortLabel"));
+    hideRow.appendChild(hideLbl);
+    hideRow.appendChild(hideCtl);
+    displaySection.appendChild(hideRow);
+
+    // 颜色行（取色器 + 预设点）并入容器；去掉"颜色"标签文字（colorLabel 不挂载，
+    //   填充模式相关逻辑仍可安全引用该元素，只是不显示）
+    styleScaleGroup.appendChild(colorRow);
+    // 隐藏节点开关行：直接挂到面板（实时生效，无需确认）
+    panel.appendChild(displaySection);
+
+    // 关闭即提交（无"清除/确认"按钮，全程实时预览，关闭面板时落库 drafts→configs）
+    // （实际逻辑已提取到模块级 _osCommitPanel）
+    const commitPanel = () => _osCommitPanel(node, chCount, drafts, origChCount, saveFillParams);
 
     const cr = document.createElement("div");
     cr.className = "os-cr";
     cr.textContent = "COPYRIGHT © WOSAI STUDIO | 穿山阅海";
     panel.appendChild(cr);
 
-    document.body.appendChild(panel);
+    // 面板定位 + 缩放同步 + cleanup（已提取到 _osPositionPanel）
+    const { cleanupPanel } = _osPositionPanel(panel, node, commitPanel);
     nameInp.focus();
     nameInp.select();
+}
 
-    // 定位面板
-    const canvas = app.canvas;
-    if (canvas?.canvas && node) {
-        const cEl = canvas.canvas;
-        const cR = cEl.getBoundingClientRect();
-        const sc = canvas.ds.scale;
-        const off = canvas.ds.offset;
-        const pR = panel.getBoundingClientRect();
-        const gap = 14;
-        // 智能定位：优先右侧，溢出则尝试左侧，最后兜底 clamp
-        const nodeRight = cR.left + (node.pos[0] + node.size[0] + off[0]) * sc;
-        const nodeLeft  = cR.left + (node.pos[0] + off[0]) * sc;
-        let px = nodeRight + gap;
-        if (px + pR.width > window.innerWidth - 10) {
-            // 右侧溢出 → 尝试左侧
-            px = nodeLeft - pR.width - gap;
-        }
-        if (px < 10 || px + pR.width > window.innerWidth - 10) {
-            // 左侧也不够 → clamp
-            px = Math.max(10, Math.min(px, window.innerWidth - pR.width - 10));
-        }
-        let py = cR.top + (node.pos[1] + node.size[1] / 2 + off[1]) * sc - pR.height / 2;
-        py = Math.min(Math.max(py, 10), window.innerHeight - pR.height - 10);
-        panel.style.left = px + "px";
-        panel.style.top = py + "px";
-
-        // ── 面板随画布缩放同步（0.65~1.5 钳制；origin top-left + 视口钳制防错位）──
-        panel.style.transformOrigin = 'top left';
-        let _lastZoom = null;
-        const _zoomTick = () => {
-            if (!panel.isConnected) return;   // 面板关闭即停止
-            const zs = canvas?.ds?.scale ?? 1;
-            if (zs !== _lastZoom) {
-                _lastZoom = zs;
-                const ps = Math.max(0.65, Math.min(zs, 1.5));
-                panel.style.transform = `scale(${ps})`;
-                const r = panel.getBoundingClientRect();
-                const cx = Math.max(10, Math.min(r.left, window.innerWidth - r.width - 10));
-                const cy = Math.max(10, Math.min(r.top, window.innerHeight - r.height - 10));
-                if (Math.abs(cx - r.left) > 0.5) panel.style.left = cx + 'px';
-                if (Math.abs(cy - r.top) > 0.5) panel.style.top = cy + 'px';
-            }
-            requestAnimationFrame(_zoomTick);
-        };
-        requestAnimationFrame(_zoomTick);
-    } else {
-        panel.style.left = "50%";
-        panel.style.top = "50%";
-        panel.style.transform = "translate(-50%,-50%)";
-    }
-
-    function closeHandler(e) {
-        if (e && panel.contains(e.target)) return;
-        cleanupPanel();
-    }
-    function cleanupPanel() {
-        if (panel._offGlass) { panel._offGlass(); panel._offGlass = null; }
-        panel.remove();
-        document.removeEventListener("pointerdown", closeHandler, { capture: true });
-        document.removeEventListener("keydown", _escHandler);
-    }
-    const _escHandler = (e) => {
-        if (e.key === "Escape" && document.body.contains(panel)) {
-            e.preventDefault();
-            cleanupPanel();
-            onClose?.();
-        }
-    };
-    setTimeout(() => {
-        document.addEventListener("pointerdown", closeHandler, { capture: true });
-        document.addEventListener("keydown", _escHandler);
-    }, 0);
+// ── 强制更新 active_value 的 tooltip/DOM title（消除 buildUI 与 onConfigure 重复代码）──
+const _AV_TIP = "内部缓存键，自动同步滑条值";
+function _forceActiveValueTooltip(node) {
+    const avW = node._osHiddenWidgets?.["active_value"];
+    if (!avW) return;
+    avW.tooltip = _AV_TIP;
+    const el = avW.element || avW.dom;
+    if (el) { el.title = _AV_TIP; const inner = el.querySelector("input,textarea,[title]"); if (inner) inner.title = _AV_TIP; }
 }
 
 // ── 同步 active_value → 后端 execute() 实际读取的 widget（全通道激活，取通道0）─
@@ -832,6 +975,24 @@ function setChannelCount(node, targetCount) {
     }
 }
 
+// ── 将“滑条总数上限”设置实时应用到画布上所有 OmniSlider 节点 ──────────────
+//   超过新上限的节点条数 clamp 下来（含端口同步）；未超的也重建以刷新“+”显隐。
+function applyMaxChannelsToAllNodes() {
+    const maxCh = getMaxChannels();
+    const graph = app.graph;
+    if (!graph) return;
+    const nodes = (graph._nodes || graph.nodes || []).filter(
+        n => n && n.type === "WOSAI_OmniSlider" && n._osWrap);
+    for (const node of nodes) {
+        const cur = node._osChannelCount || 1;
+        if (cur > maxCh) {
+            setChannelCount(node, maxCh);   // 内部含 rebuildUI + 端口同步
+        } else {
+            rebuildUI(node);                // 条数未变也重建，刷新“+”按钮显隐
+        }
+    }
+}
+
 // ── 通道数弹窗：居中渐变滑条，拖拽实时调整 ────────────────────────
 let _chPop = null, _chPopOutside = null;
 function closeChannelPop() {
@@ -841,7 +1002,6 @@ function closeChannelPop() {
 function openChannelCountPopover(node, anchor) {
     closeChannelPop();
     const maxCh = getMaxChannels();
-    const T = glassT();
     let liveCount = node._osChannelCount || 1;
 
     const pop = document.createElement('div');
@@ -851,75 +1011,52 @@ function openChannelCountPopover(node, anchor) {
     pop.style.cssText = `position:fixed;z-index:100003;box-sizing:border-box;pointer-events:auto`;
     pop.onpointerdown = e => e.stopPropagation();
 
-    // 悬浮提示（悬停弹窗时浮现于上方，零高度占用）
-    const tip = document.createElement('div');
-    tip.className = 'os-ch-pop-tip';
-    tip.textContent = `任选 1~${maxCh} 根滑条`;
+    // 文字行（温度滑条样式：标签左 / 数值右）
+    const textRow = document.createElement('div');
+    textRow.className = 'os-ch-textrow';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'os-ch-label';
+    labelEl.textContent = `滑条数量 (1~${maxCh})`;
+    const valueEl = document.createElement('span');
+    valueEl.className = 'os-ch-value';
+    textRow.appendChild(labelEl);
+    textRow.appendChild(valueEl);
 
-    // 渐变轨道容器
+    // 细轨道（彩虹渐变填充 + 白圈圆把手）
     const trackWrap = document.createElement('div');
     trackWrap.className = 'os-ch-track-wrap';
-
-    // 温度滑条样式：暗色轨道 + 渐变填充 + 单拇指，拖动时数字气泡淡入淡出
     const track = document.createElement('div');
     track.className = 'os-ch-track';
-
-    // 渐变填充（通道颜色，宽度随当前档位）
-    const gradStops = COLORS.slice(0, maxCh).map((c, i) => {
-        const pct = maxCh <= 1 ? 50 : (i / (maxCh - 1)) * 100;
-        return `${c} ${pct}%`;
-    }).join(', ');
     const fill = document.createElement('div');
     fill.className = 'os-ch-fill';
+    // 彩虹渐变：各档位一个预设色，宽度随当前档位
+    const gradStops = COLORS.slice(0, maxCh).map((c, i) => {
+        const p = maxCh <= 1 ? 50 : (i / (maxCh - 1)) * 100;
+        return `${c} ${p}%`;
+    }).join(', ');
     fill.style.background = `linear-gradient(to right, ${gradStops})`;
     track.appendChild(fill);
-
-    // 单拇指（白圈 + 橙芯）+ 数字气泡（拖动时浮现于拇指上方）
     const thumb = document.createElement('div');
     thumb.className = 'os-ch-thumb';
-    const bubble = document.createElement('div');
-    bubble.className = 'os-ch-bubble';
-    thumb.appendChild(bubble);
     track.appendChild(thumb);
-
     trackWrap.appendChild(track);
 
     // 组装
-    pop.appendChild(tip);
+    pop.appendChild(textRow);
     pop.appendChild(trackWrap);
     document.body.appendChild(pop);
 
-    // 弹出时立即显示悬浮提示，1.6s 后淡出（之后悬停仍可再现）
-    pop.classList.add('tip-show');
-    setTimeout(() => pop.classList.remove('tip-show'), 1600);
-
-    // ── 与画布缩放同步 ──
-    const sc = app.canvas?.ds?.scale || 1;
-    pop.style.transform = `scale(${sc})`;
-    pop.style.transformOrigin = 'top left';
-
-    // 数字气泡淡入淡出
-    let _bubbleTimer = null;
-    function showBubble() {
-        clearTimeout(_bubbleTimer);
-        bubble.classList.add('show');
-    }
-    function hideBubbleSoon() {
-        clearTimeout(_bubbleTimer);
-        _bubbleTimer = setTimeout(() => bubble.classList.remove('show'), 600);
-    }
-
-    // 更新显示：拇指位置 + 填充宽度 + 气泡数字（数字变化时弹跳放大）
+    // 更新显示：拇指位置 + 填充宽度 + 数值（数字变化时弹跳放大）
     function updateDisplay(count) {
         count = Math.max(1, Math.min(maxCh, count));
         const pct = maxCh <= 1 ? 1 : (count - 1) / (maxCh - 1);
         thumb.style.left = (pct * 100) + '%';
         fill.style.width = (pct * 100) + '%';
-        if (bubble.textContent !== String(count)) {
-            bubble.textContent = count;
-            bubble.classList.remove('pop');
-            void bubble.offsetWidth;   // 强制重排，重新触发动画
-            bubble.classList.add('pop');
+        if (valueEl.textContent !== String(count)) {
+            valueEl.textContent = count;
+            valueEl.classList.remove('pop');
+            void valueEl.offsetWidth;   // 强制重排，重新触发动画
+            valueEl.classList.add('pop');
         }
     }
 
@@ -950,32 +1087,38 @@ function openChannelCountPopover(node, anchor) {
         e.stopPropagation();
         dragging = true;
         track.setPointerCapture?.(e.pointerId);
-        showBubble();
         applyCount(countFromX(e.clientX));
     }
 
     track.addEventListener('pointerdown', onPointerDown);
 
+    // 滚轮调节滑条数量（上滚 +1 / 下滚 -1）
+    trackWrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        applyCount((node._osChannelCount || 1) + (e.deltaY < 0 ? 1 : -1));
+    }, { passive: false });
+
     const onMove = (e) => {
         if (!dragging) return;
-        showBubble();
         applyCount(countFromX(e.clientX));
     };
     const onUp = () => {
         if (!dragging) return;
         dragging = false;
-        hideBubbleSoon();
     };
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
 
-    // 定位：与节点面板等宽、水平居中对齐，出现在节点正上方——
-    // 节点增减滑条时高度向下扩展，上方位置天然稳定，透明弹窗不会盖到节点内容；
-    // 上方放不下翻到节点下方；取不到节点矩形时退回屏幕居中
+    // 定位 + 缩放：与节点等宽居中、出现在节点正上方；放不下翻到下方；取不到节点矩形退回屏幕居中。
+    // place() 每次按当前画布缩放重设 transform 并重新锚定到节点，供初次定位与缩放跟随复用。
     pop.style.minWidth = '0';
     pop.style.width = (node?.size?.[0] || 320) + 'px';   // 未缩放宽度，scale 后与节点屏幕宽度一致
-    requestAnimationFrame(() => {
+    pop.style.transformOrigin = 'top left';
+    function place() {
+        const zs = app.canvas?.ds?.scale || 1;
+        pop.style.transform = `scale(${zs})`;
         const gap = 10;
         let nLeft, nTop, nBottom, nWidth;
         // Nodes 2.0 优先：节点 DOM 实际矩形（含标题，宽高已含缩放）
@@ -985,12 +1128,11 @@ function openChannelCountPopover(node, anchor) {
             nLeft = dr.left; nTop = dr.top; nBottom = dr.bottom; nWidth = dr.width;
         } else if (app.canvas?.canvas && node) {
             const cR  = app.canvas.canvas.getBoundingClientRect();
-            const s   = app.canvas.ds?.scale || 1;
             const off = app.canvas.ds?.offset || [0, 0];
-            nLeft   = cR.left + (node.pos[0] + off[0]) * s;
-            nTop    = cR.top  + (node.pos[1] + off[1] - 30) * s;   // 含标题高度
-            nBottom = cR.top  + (node.pos[1] + node.size[1] + off[1]) * s;
-            nWidth  = node.size[0] * s;
+            nLeft   = cR.left + (node.pos[0] + off[0]) * zs;
+            nTop    = cR.top  + (node.pos[1] + off[1] - 30) * zs;   // 含标题高度
+            nBottom = cR.top  + (node.pos[1] + node.size[1] + off[1]) * zs;
+            nWidth  = node.size[0] * zs;
         }
         const pr = pop.getBoundingClientRect();
         let px, py;
@@ -999,7 +1141,7 @@ function openChannelCountPopover(node, anchor) {
             // Nodes 2.0：角标在节点左下角，上方无遮挡，贴近节点顶即可；
             // Classic：角标悬浮在节点顶上方，留 ~8px×scale 让圆钮底部贴近角标而不压住
             const isVue = !!(dr && dr.width > 0);
-            const badgeGap = isVue ? gap : gap + Math.round(16 * (app.canvas?.ds?.scale || 1));
+            const badgeGap = isVue ? gap : gap + Math.round(16 * zs);
             py = nTop - pr.height - badgeGap;
             if (py < 8) py = nBottom + gap;
         } else {
@@ -1010,7 +1152,17 @@ function openChannelCountPopover(node, anchor) {
         py = Math.max(8, Math.min(py, window.innerHeight - pr.height - 8));
         pop.style.left = px + 'px';
         pop.style.top = py + 'px';
-    });
+    }
+    requestAnimationFrame(place);
+    // 实时跟随画布缩放：scale 变化即重设缩放并重新锚定（弹窗关闭即停止；平移会触发外侧 pointerdown 自动关闭）
+    let _lastScale = null;
+    const _zoomTick = () => {
+        if (!pop.isConnected) return;
+        const zs = app.canvas?.ds?.scale ?? 1;
+        if (zs !== _lastScale) { _lastScale = zs; place(); }
+        requestAnimationFrame(_zoomTick);
+    };
+    requestAnimationFrame(_zoomTick);
 
     // 点击外侧关闭
     _chPopOutside = (e) => {
@@ -1112,10 +1264,10 @@ function syncOutputPorts(node) {
         node.addOutput(`ch${idx + 1}`, "*");
     }
 
-    // 2. 从末端移除多余端口（遇到有连线的端口停止，保护已有连接）
+    // 2. 从末端移除多余端口，使端口数严格等于滑条数。
+    //    removeOutput 会自动断开该端口上的连线——减少滑条即同步断开对应输出，
+    //    这是用户期望的行为（端口数始终与滑条数一致），不再保护残留连线。
     while (node.outputs.length > target) {
-        const last = node.outputs[node.outputs.length - 1];
-        if (last.links && last.links.length > 0) break;
         node.removeOutput(node.outputs.length - 1);
     }
 }
@@ -1123,24 +1275,40 @@ function syncOutputPorts(node) {
 // ── 更新全部输出端口标签与类型（使用通道配置中的 label/type）──────────────
 function updateOutputLabel(node) {
     if (!node.outputs) return;
-    for (let i = 0; i < getMaxChannels(); i++) {
+    const hidePort = !!node._osHidePortLabel;   // 隐藏端口名（保留圆点/连线）
+    const count = node._osChannelCount || getMaxChannels();
+    for (let i = 0; i < count; i++) {
         const cfg = node._osConfigs?.[i];
         const chLabel = (cfg?.label) || ("C" + (i + 1));
         const typeLabel = (cfg && cfg.type === "INT") ? "INT" : "FLOAT";
         const name = chLabel + " (" + typeLabel + ")";
         if (node.outputs[i]) {
-            if (node.outputs[i].name !== name || node.outputs[i].label !== chLabel) {
-                node.outputs[i].name = name;
-                node.outputs[i].label = chLabel;
-            }
-            // 类型保持通配 "*"，标签已通过端口名显示（如 "batch_size (INT)"）
+            node.outputs[i].name = name;
+            // 隐藏端口名：用零宽空格（非空，绕过 v10 的 label||name 回退；不可见、零宽度）
+            //   保留端口圆点与连线，仅文字消失
+            node.outputs[i].label = hidePort ? "​" : chLabel;
         }
     }
     app.graph?.setDirtyCanvas(true, true);
 }
 
 // ── 按样式计算 widget 内容区高度（填充滑条行更高）─────────────────────────
-function _calcContentH(node) {
+function _calcContentH(node, noMeasure) {
+    // ⚡ 缓存：键 = 通道数 + 全局世代号，世代号在 rebuildUI 末尾递增。
+    //   除非通道数或配置变化导致 rebuildUI 触发，否则复用上次计算值，
+    //   避免每次 updateSize 都强制回流（scrollHeight 读 DOM 布局）。
+    const gen = node._osContentHGen || 0;
+    const chCount = node._osChannelCount || 1;
+    const cacheKey = chCount + '_' + gen;
+    if (node._osContentHCache && node._osContentHCache.key === cacheKey) {
+        return node._osContentHCache.height;
+    }
+
+    // ⚡ 性能关键：getMinHeight 被 ComfyUI 每次布局调用，缓存失效瞬间若读 scrollHeight 会强制同步
+    //   reflow → 反复开面板时「重新计算样式」暴涨假死。故 noMeasure=true 时直接走公式、绝不量 DOM；
+    //   精确 scrollHeight 测量只在 updateSize（每次重建后一次）做并写入缓存。
+    if (noMeasure) return _calcContentHFormula(node, chCount);
+
     // 优先 DOM 实测：rebuildUI 后 wrap 已挂载，scrollHeight 强制同步 reflow。
     // ⚠ 测量瞬间必须临时解除高度拉伸（height:auto + flex:none + align-self）——
     // scrollHeight 取"内容高与容器拉伸高的较大者"，减少滑条后 wrap 仍被旧容器
@@ -1152,34 +1320,41 @@ function _calcContentH(node) {
         s.height = 'auto'; s.minHeight = '0'; s.flex = 'none'; s.alignSelf = 'flex-start';
         const h = wrap.scrollHeight;   // 纯内容高（scrollHeight 是布局值，不受画布 transform 缩放影响）
         s.height = prev.h; s.minHeight = prev.mh; s.flex = prev.flex; s.alignSelf = prev.as;
-        if (h > 10) return h + 8;   // 少量底部呼吸
+        if (h > 10) { const result = h + 6; node._osContentHCache = { key: cacheKey, height: result }; return result; }
     }
-    // 回退公式（wrap 未挂载时）
-    const n = node._osChannelCount || 1;
+    // 回退公式（wrap 未挂载时）：复用 _calcContentHFormula，并写缓存
+    const result = _calcContentHFormula(node, chCount);
+    node._osContentHCache = { key: cacheKey, height: result };
+    return result;
+}
+
+// 纯公式估算内容高（不读 DOM、不写缓存）——供 getMinHeight 的零 reflow 快路径与 wrap 未挂载兜底复用
+function _calcContentHFormula(node, chCount) {
+    const n = chCount;
     const s = node._osConfigs[0]?.scale ?? 1.0;
-    const gap = Math.max(28 * s, 20); // 行间间距（与 CSS .os-wrap gap 对齐）
+    const gap = Math.max(12 * s, 6); // 行间间距（与 CSS .os-wrap gap 对齐）
     let h = 0;
     for (let i = 0; i < n; i++) {
         const cfg = node._osConfigs[i];
         const style = cfg?.style || "float";
         if (style === "fill") {
-            // 文字行高 = 值字号(16px×scale*1.45) + 上下 padding
+            // 文字行高 = 值字号(16px×scale*1.45)，padding 已归零
             const valFont = 16;
-            const textRowH = Math.round(valFont * s * 1.45) + Math.max(4 * s, 3);
-            // 文字行 + 间隙(10px) + 细轨道(16px)
-            h += textRowH + Math.max(10 * s, 6) + Math.max(16 * s, 12);
+            const textRowH = Math.round(valFont * s * 1.45);
+            // 文字行 + 间隙(5px) + 细轨道(16px)
+            h += textRowH + Math.max(5 * s, 3) + Math.max(16 * s, 12);
         } else {
             // 浮点滑条：轨道高度跟随 scale（CSS --os-scale 驱动）
-            h += Math.max(Math.round(24 * s), 18);
+            h += Math.max(Math.round(24 * s), 14);
         }
         if (i < n - 1) h += gap;
     }
-    // 底部控制行（单组 − / +）
-    h += 26;
-    // 底部留白：基础 12px + 10px/通道。⚠ 按通道数而非 outputs.length——
+    // 顶部控制行（胶囊或极小+）+ 其与首行之间的一道 gap —— 仅在会渲染时计入
+    if (n >= 2 || getMaxChannels() > 1) h += 20 + gap;
+    // 底部留白：基础 6px + 4px/通道。⚠ 按通道数而非 outputs.length——
     // 旧节点可能残留多余端口（如 10 个），按端口算会多出上百像素空白
     const outputCount = node._osChannelCount || n;
-    const padding = 12 + Math.round(10 * outputCount);
+    const padding = 6 + Math.round(4 * outputCount);
     return h + padding;
 }
 
@@ -1233,138 +1408,136 @@ function _addKeyboardAccess(trackWrap, node, cfg, chIdx, updateDisplay, syncWidg
     });
 }
 
-// ── 重建整个 UI（所有通道垂直堆叠，按钮列独立保证对齐）──────────────────
-function rebuildUI(node) {
-    if (!node._osWrap) return;
-    const wrap = node._osWrap;
-    // 从配置恢复缩放比例
-    const scale = node._osConfigs[0]?.scale ?? 1.0;
-    wrap.style.setProperty("--os-scale", scale);
-    wrap.classList.remove("locked"); // 移除旧全局锁定 class（向下兼容）
-    wrap.innerHTML = "";
-
-    const chCount = node._osChannelCount;
-
-    for (let i = 0; i < chCount; i++) {
-        const cfg = node._osConfigs[i] || Object.assign(defaultCfg(i + 1));
-        const chIdx = i;
-        const chLocked = !!cfg.locked;
-
-        const row = document.createElement("div");
-        row.className = "os-slider-row" + (chLocked ? " ch-locked" : "");
-
-        // ── 轨道区域：根据样式分支构建 DOM ────────────────────────────
-        // dragEl  = 绑定 pointer 事件的元素
-        // posEl   = 计算拖动位置的参考元素
-        let dragEl, posEl, updateDisplay;
-
-        if (cfg.style === "fill") {
-            row.setAttribute("data-style", "fill");
-            // ── 填充滑条：文字行在上 + 细轨道在下 ──────────────────────
-            const fillSlot = document.createElement("div");
-            fillSlot.className = "os-fill-slot";
-
-            // 文字行
-            const fillText = document.createElement("div");
-            fillText.className = "os-fill-text";
-            const fillLabel = document.createElement("span");
-            fillLabel.className = "os-fill-text-label";
-            fillLabel.textContent = cfg.label || "双击设置滑条";
-            const fillVal = document.createElement("span");
-            fillVal.className = "os-fill-text-val";
-            fillVal.style.color = cfg.textColor || cfg.color;
-            fillText.appendChild(fillLabel);
-            fillText.appendChild(fillVal);
-
-            // 细轨道
-            const railWrap = document.createElement("div");
-            railWrap.className = "os-fill-rail-wrap";
-            const rail = document.createElement("div");
-            rail.className = "os-fill-rail";
-            rail.style.background = cfg.trackBg || "#1a1a1e";
-            const rf = document.createElement("div");
-            rf.className = "os-fill-rf";
-            rf.style.background = cfg.trackColor || cfg.color;
-            const thumbEl = document.createElement("div");
-            thumbEl.className = "os-fill-thumb-el";
-            const tc = cfg.thumbColor || cfg.color;
-            thumbEl.style.background = tc;
-            rail.appendChild(rf);
-            railWrap.appendChild(rail);
-            railWrap.appendChild(thumbEl); // thumb 在 rail 外，不受 overflow:hidden 裁剪
-
-            fillSlot.appendChild(fillText);
-            fillSlot.appendChild(railWrap);
-
-            // trackWrap 仍用于 refreshActiveState 的 active 样式，但填充模式不显示外圈
-            const trackWrap = document.createElement("div");
-            trackWrap.className = "os-track-wrap";
-            trackWrap.setAttribute("data-style", "fill");
-            trackWrap.appendChild(fillSlot);
-            row.appendChild(trackWrap);
-
-            dragEl = fillSlot;
-            posEl  = railWrap;
-
-            // updateDisplay 对填充样式
-            const stepDecimals = Math.max(0, Math.ceil(-Math.log10(cfg.step || 0.01)));
-            updateDisplay = (val) => {
-                const mn = parseFloat(cfg.min) || 0;
-                const mx = parseFloat(cfg.max) || 1;
-                const pct = mx !== mn ? Math.max(0, Math.min(1, (val - mn) / (mx - mn))) : 0;
-                const pct100 = (pct * 100) + "%";
-                rf.style.width = pct100;
-                rf.setAttribute("data-full", pct >= 0.995 ? "1" : "0");
-                thumbEl.style.left = pct100;
-                const disp = cfg.type === "INT" ? String(Math.round(val)) : val.toFixed(stepDecimals);
-                fillVal.textContent = disp;
-                fillLabel.textContent = cfg.label || "双击设置滑条";
-            };
-
-        } else {
-            // ── 浮点滑条（默认）：标签+值嵌入轨道内 ────────────────
-            const trackWrap = document.createElement("div");
-            trackWrap.className = "os-track-wrap";
-
-            const track = document.createElement("div");
-            track.className = "os-track";
-
-            const fill = document.createElement("div");
-            fill.className = "os-fill";
-            fill.style.background = cfg.color;
-
-            const labelArea = document.createElement("div");
-            labelArea.className = "os-label-area";
-            labelArea.textContent = cfg.label || "双击设置滑条";
-            const valPill = document.createElement("div");
-            valPill.className = "os-val-pill";
-            valPill.style.color = cfg.color;
-
-            track.appendChild(fill);
-            track.appendChild(labelArea);
-            track.appendChild(valPill);
-            trackWrap.appendChild(track);
-            row.appendChild(trackWrap);
-
-            dragEl = track;
-            posEl  = track;
-
-            const stepDecimals = Math.max(0, Math.ceil(-Math.log10(cfg.step || 0.01)));
-            updateDisplay = (val) => {
-                const mn = parseFloat(cfg.min) || 0;
-                const mx = parseFloat(cfg.max) || 1;
-                const pct = mx !== mn ? Math.max(0, Math.min(1, (val - mn) / (mx - mn))) : 0;
-                fill.style.width = (pct * 100) + "%";
-                fill.setAttribute("data-full", pct >= 0.995 ? "1" : "0");
-                labelArea.setAttribute("data-on-fill", pct > 0.6 ? "1" : "0");
-                valPill.style.color = pct > 0.85 ? "#fff" : cfg.color;
-                const disp = cfg.type === "INT" ? String(Math.round(val)) : val.toFixed(stepDecimals);
-                valPill.textContent = disp;
-                labelArea.textContent = cfg.label || "双击设置滑条";
-            };
+// ── 设置面板提交：将 drafts 落库到 node._osConfigs（抽出为模块级函数以减小 openSettingsPanel 体积）──
+function _osCommitPanel(node, chCount, drafts, origChCount, saveFillParams) {
+    try {
+        saveFillParams();
+        // 检测是否有布局影响的变更——跳过无变更时的全量重建（通道数已由 setChannelCount → rebuildUI 处理过）
+        let needsRebuild = false;
+        const channelsChanged = chCount !== origChCount;
+        if (!channelsChanged) {
+            for (let i = 0; i < chCount && !needsRebuild; i++) {
+                const d = drafts[i];
+                const c = node._osConfigs[i];
+                if (!c) { needsRebuild = true; break; }
+                for (const k of Object.keys(d)) {
+                    if (d[k] !== c[k]) { needsRebuild = true; break; }
+                }
+            }
         }
+        for (let i = 0; i < chCount; i++) {
+            node._osConfigs[i] = drafts[i];
+            syncConfigToWidget(node, i);
+        }
+        if (needsRebuild || channelsChanged) {
+            rebuildUI(node);
+        }
+        const avW = node._osHiddenWidgets?.["active_value"];
+        if (avW && node._osConfigs[0]) avW.value = node._osConfigs[0].value;
+        app.graph?.setDirtyCanvas(true, true);
+        app.graph?.change();
+        autoQueue(node);
+    } catch (e) { console.warn("[WOSAI OmniSlider] commitPanel:", e.message); }
+}
 
-        // ── 右按钮列：🔓/🔒 锁定 + + 新增，并排 ──
+// ── 构建单条滑行 DOM 及交互（从 rebuildUI 提取，减小主循环体积）───────────
+function _osBuildSliderRow(node, cfg, chIdx, chCount) {
+    if (chCount <= 1 && cfg.locked) { cfg.locked = false; syncConfigToWidget(node, chIdx); }
+    const chLocked = !!cfg.locked;
+    const row = document.createElement("div");
+    row.className = "os-slider-row" + (chLocked ? " ch-locked" : "");
+
+    // ── 轨道区域：根据样式分支构建 DOM ────────────────────────────
+    let dragEl, posEl, updateDisplay;
+
+    if (cfg.style === "fill") {
+        row.setAttribute("data-style", "fill");
+        const fillSlot = document.createElement("div");
+        fillSlot.className = "os-fill-slot";
+        const fillText = document.createElement("div");
+        fillText.className = "os-fill-text";
+        const fillLabel = document.createElement("span");
+        fillLabel.className = "os-fill-text-label";
+        fillLabel.textContent = cfg.label || "右键此处设置滑条";
+        const fillVal = document.createElement("span");
+        fillVal.className = "os-fill-text-val";
+        fillVal.style.color = cfg.textColor || cfg.color;
+        fillText.appendChild(fillLabel);
+        fillText.appendChild(fillVal);
+        const railWrap = document.createElement("div");
+        railWrap.className = "os-fill-rail-wrap";
+        const rail = document.createElement("div");
+        rail.className = "os-fill-rail";
+        rail.style.background = cfg.trackBg || "#1a1a1e";
+        const rf = document.createElement("div");
+        rf.className = "os-fill-rf";
+        rf.style.background = cfg.trackColor || cfg.color;
+        const thumbEl = document.createElement("div");
+        thumbEl.className = "os-fill-thumb-el";
+        thumbEl.style.background = cfg.thumbColor || cfg.color;
+        rail.appendChild(rf);
+        railWrap.appendChild(rail);
+        railWrap.appendChild(thumbEl);
+        fillSlot.appendChild(fillText);
+        fillSlot.appendChild(railWrap);
+        const trackWrap = document.createElement("div");
+        trackWrap.className = "os-track-wrap";
+        trackWrap.setAttribute("data-style", "fill");
+        trackWrap.appendChild(fillSlot);
+        row.appendChild(trackWrap);
+        dragEl = fillSlot;
+        posEl  = railWrap;
+        const stepDecimals = Math.max(0, Math.ceil(-Math.log10(cfg.step || 0.01)));
+        updateDisplay = (val) => {
+            const mn = parseFloat(cfg.min) || 0;
+            const mx = parseFloat(cfg.max) || 1;
+            const pct = mx !== mn ? Math.max(0, Math.min(1, (val - mn) / (mx - mn))) : 0;
+            const pct100 = (pct * 100) + "%";
+            rf.style.width = pct100;
+            rf.setAttribute("data-full", pct >= 0.995 ? "1" : "0");
+            thumbEl.style.left = pct100;
+            const disp = cfg.type === "INT" ? String(Math.round(val)) : val.toFixed(stepDecimals);
+            fillVal.textContent = disp;
+            fillLabel.textContent = cfg.label || "右键此处设置滑条";
+        };
+    } else {
+        const trackWrap = document.createElement("div");
+        trackWrap.className = "os-track-wrap";
+        const track = document.createElement("div");
+        track.className = "os-track";
+        const fill = document.createElement("div");
+        fill.className = "os-fill";
+        fill.style.background = cfg.color;
+        const labelArea = document.createElement("div");
+        labelArea.className = "os-label-area";
+        labelArea.textContent = cfg.label || "右键此处设置滑条";
+        const valPill = document.createElement("div");
+        valPill.className = "os-val-pill";
+        valPill.style.color = cfg.color;
+        track.appendChild(fill);
+        track.appendChild(labelArea);
+        track.appendChild(valPill);
+        trackWrap.appendChild(track);
+        row.appendChild(trackWrap);
+        dragEl = track;
+        posEl  = track;
+        const stepDecimals = Math.max(0, Math.ceil(-Math.log10(cfg.step || 0.01)));
+        updateDisplay = (val) => {
+            const mn = parseFloat(cfg.min) || 0;
+            const mx = parseFloat(cfg.max) || 1;
+            const pct = mx !== mn ? Math.max(0, Math.min(1, (val - mn) / (mx - mn))) : 0;
+            fill.style.width = (pct * 100) + "%";
+            fill.setAttribute("data-full", pct >= 0.995 ? "1" : "0");
+            labelArea.setAttribute("data-on-fill", pct > 0.6 ? "1" : "0");
+            valPill.style.color = pct > 0.85 ? "#fff" : cfg.color;
+            const disp = cfg.type === "INT" ? String(Math.round(val)) : val.toFixed(stepDecimals);
+            valPill.textContent = disp;
+            labelArea.textContent = cfg.label || "右键此处设置滑条";
+        };
+    }
+
+    // ── 右按钮列：锁定图标 ──
+    if (chCount > 1 || node._osHideTitle) {
         const rightCol = document.createElement("div");
         rightCol.className = "os-btn-col os-btn-col-right";
         const lockBtn = document.createElement("button");
@@ -1375,139 +1548,173 @@ function rebuildUI(node) {
             e.stopPropagation();
             cfg.locked = !cfg.locked;
             syncConfigToWidget(node, chIdx);
-            // 原地更新：锁定态只影响样式与交互开关（拖动处理实时读 cfg.locked），
-            // 全量 rebuildUI 会造成高度抖动，不再使用
             row.classList.toggle("ch-locked", cfg.locked);
             lockBtn.classList.toggle("locked", cfg.locked);
             lockBtn.innerHTML = cfg.locked ? WS_ICONS.lock : WS_ICONS.lockOpen;
             lockBtn.setAttribute("data-tooltip", cfg.locked ? "点击解锁" : "上锁防误触");
             app.graph?.setDirtyCanvas(true, true);
         };
-        // 每行只保留锁按钮（− / + 收拢到底部控制行，减少行宽占用）
         rightCol.appendChild(lockBtn);
         row.appendChild(rightCol);
-
-        wrap.appendChild(row);
-
-        // 初始渲染
-        updateDisplay(parseFloat(cfg.value) || parseFloat(cfg.min) || 0);
-
-        // ── 拖动交互（dragEl 绑定事件，posEl 计算位置）──────────────────
-        let dragging = false;
-        let _dragDirty = false;
-        // 双击检测：pointerdown + setPointerCapture 会阻止浏览器生成 click/dblclick
-        // 因此手动跟踪双击（两次 pointerdown 间隔 <400ms 且位移 <6px）
-        node._osLastClick = node._osLastClick || { time: 0, x: 0, y: 0 };
-
-        const valFromX = (clientX) => {
-            const rect = posEl.getBoundingClientRect();
-            const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-            const mn = parseFloat(cfg.min) || 0;
-            const mx = parseFloat(cfg.max) || 1;
-            const st = parseFloat(cfg.step) || 0.01;
-            let raw = mn + pct * (mx - mn);
-            raw = Math.round((raw - mn) / st) * st + mn;
-            raw = Math.max(mn, Math.min(mx, raw));
-            return cfg.type === "INT" ? Math.round(raw) : parseFloat(raw.toFixed(8));
-        };
-
-        const syncWidget = () => {
-            syncConfigToWidget(node, chIdx); // 同步 cfg + active_value 到后端
-        };
-
-        dragEl.addEventListener("pointerdown", e => {
-            // ── 通道锁定检查：此条滑条锁定时禁止拖动与双击 ──
-            // 必须实时读 cfg.locked，不能依赖 build 时捕获的 chLocked const
-            if (cfg.locked) { e.stopPropagation(); return; }
-            // ── 双击检测：两次 pointerdown 在 400ms 内、位移<6px 视为双击 ──
-            const now = Date.now();
-            const prev = node._osLastClick;
-            const dt = now - prev.time;
-            const dist = Math.hypot(e.clientX - prev.x, e.clientY - prev.y);
-            node._osLastClick = { time: now, x: e.clientX, y: e.clientY };
-            if (dt < 400 && dist < 6) {
-                e.preventDefault();
-                e.stopPropagation();
-                node._osLastClick.time = 0; // 防止三击连续弹窗
-                openSettingsPanel(node, chIdx, () => rebuildUI(node));
-                return;
-            }
-            // ── 正常拖动（全通道激活，无需切换）──
-            e.preventDefault();
-            dragging = true;
-            dragEl.closest(".os-track-wrap")?.classList.add("dragging");
-            const newVal = valFromX(e.clientX);
-            cfg.value = newVal;
-            updateDisplay(newVal);
-            const _avW = node._osHiddenWidgets?.["active_value"];
-            if (_avW) _avW.value = cfg.type === "INT" ? Math.round(newVal) : newVal;
-            dragEl.setPointerCapture(e.pointerId);
-            syncWidget();
-            app.graph?.change();
-        });
-
-        dragEl.addEventListener("pointermove", e => {
-            if (!dragging) return;
-            const newVal = valFromX(e.clientX);
-            if (newVal !== cfg.value) {
-                cfg.value = newVal;
-                updateDisplay(newVal);
-                const _avW = node._osHiddenWidgets?.["active_value"];
-                if (_avW)
-                    _avW.value = cfg.type === "INT" ? Math.round(newVal) : newVal;
-                _dragDirty = true;  // 标记脏，延迟到 pointerup 统一同步
-                app.graph?.setDirtyCanvas(true, true);
-            }
-        });
-
-        dragEl.addEventListener("pointerup", () => {
-            dragging = false;
-            dragEl.closest(".os-track-wrap")?.classList.remove("dragging");
-            if (_dragDirty) { syncWidget(); _dragDirty = false; }
-            app.graph?.setDirtyCanvas(true, true);
-            app.graph?.change();
-            autoQueue(node);
-        });
-        dragEl.addEventListener("pointercancel", () => {
-            dragging = false;
-            dragEl.closest(".os-track-wrap")?.classList.remove("dragging");
-            if (_dragDirty) { syncWidget(); _dragDirty = false; }
-            app.graph?.setDirtyCanvas(true, true);
-            app.graph?.change();
-            autoQueue(node);
-        });
-
-        // 双击检测已集成到 pointerdown 中（Chromium 中 preventDefault+setPointerCapture 会阻止原生 dblclick）
-
-        // ── 键盘无障碍：方向键调节滑条值 ──
-        if (cfg.style !== "fill") {
-            // 浮点滑条：trackWrap 是直接的轨道容器
-            const tw = row.querySelector(".os-track-wrap");
-            if (tw) _addKeyboardAccess(tw, node, cfg, chIdx, updateDisplay, syncWidget);
-        } else {
-            // 填充滑条：trackWrap 在 row 内部
-            const tw = row.querySelector(".os-track-wrap[data-style='fill']");
-            if (tw) _addKeyboardAccess(tw, node, cfg, chIdx, updateDisplay, syncWidget);
-        }
     }
 
-    // ── 底部控制行：单组 − / +（开通道数弹窗），替代每行重复按钮 ──
-    const ctrlRow = document.createElement("div");
-    ctrlRow.className = "os-ctrl-row";
-    const mkCtl = (txt, tip, enabled) => {
-        const b = document.createElement("button");
-        b.className = "os-ctrl-btn";
-        b.textContent = txt;
-        b.setAttribute("data-tooltip", tip);
-        b.style.opacity = enabled ? "1" : "0.35";
-        b.style.cursor = enabled ? "pointer" : "not-allowed";
-        b.onclick = (e) => { e.stopPropagation(); openChannelCountPopover(node, b); };
-        return b;
-    };
-    ctrlRow.appendChild(mkCtl("−", chCount > 1 ? "减少滑条" : "至少保留1根", chCount > 1));
-    ctrlRow.appendChild(mkCtl("+", chCount < getMaxChannels() ? "新增滑条" : `已达上限${getMaxChannels()}根`, chCount < getMaxChannels()));
-    wrap.appendChild(ctrlRow);
+    // 初始渲染
+    updateDisplay(parseFloat(cfg.value) || parseFloat(cfg.min) || 0);
 
+    // ── 拖动交互 ──
+    let dragging = false;
+    let _dragDirty = false;
+    let _pressed = false;
+    let _pressX = 0;
+    const DRAG_THRESH = 4;
+
+    const valFromX = (clientX) => {
+        const rect = posEl.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const mn = parseFloat(cfg.min) || 0;
+        const mx = parseFloat(cfg.max) || 1;
+        const st = parseFloat(cfg.step) || 0.01;
+        let raw = mn + pct * (mx - mn);
+        raw = Math.round((raw - mn) / st) * st + mn;
+        raw = Math.max(mn, Math.min(mx, raw));
+        return cfg.type === "INT" ? Math.round(raw) : parseFloat(raw.toFixed(8));
+    };
+
+    const _applyVal = (clientX) => {
+        const newVal = valFromX(clientX);
+        if (newVal === cfg.value) return;
+        cfg.value = newVal;
+        updateDisplay(newVal);
+        const _avW = node._osHiddenWidgets?.["active_value"];
+        if (_avW) _avW.value = cfg.type === "INT" ? Math.round(newVal) : newVal;
+    };
+
+    const syncWidget = () => { syncConfigToWidget(node, chIdx); };
+
+    dragEl.addEventListener("pointerdown", e => {
+        if (e.button !== 0) return;
+        if (cfg.locked) { e.stopPropagation(); return; }
+        e.preventDefault();
+        _pressed = true;
+        _pressX = e.clientX;
+        dragEl.setPointerCapture(e.pointerId);
+        if (!node._osHideTitle) {
+            dragging = true;
+            dragEl.closest(".os-track-wrap")?.classList.add("dragging");
+            _applyVal(e.clientX);
+            _dragDirty = true;
+            syncWidget();
+            app.graph?.change();
+        }
+    });
+
+    dragEl.addEventListener("pointermove", e => {
+        if (!_pressed) return;
+        if (!dragging) {
+            if (Math.abs(e.clientX - _pressX) < DRAG_THRESH) return;
+            dragging = true;
+            dragEl.closest(".os-track-wrap")?.classList.add("dragging");
+        }
+        const _before = cfg.value;
+        _applyVal(e.clientX);
+        if (cfg.value !== _before) {
+            _dragDirty = true;
+            app.graph?.setDirtyCanvas(true, true);
+        }
+    });
+
+    const _endDrag = () => {
+        _pressed = false;
+        dragging = false;
+        dragEl.closest(".os-track-wrap")?.classList.remove("dragging");
+        if (_dragDirty) { syncWidget(); _dragDirty = false; }
+        app.graph?.setDirtyCanvas(true, true);
+        app.graph?.change();
+        autoQueue(node);
+    };
+    dragEl.addEventListener("pointerup", _endDrag);
+    dragEl.addEventListener("pointercancel", _endDrag);
+
+    // ── 滚轮调节 ──
+    dragEl.addEventListener("wheel", e => {
+        if (cfg.locked) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const mn = parseFloat(cfg.min) || 0;
+        const mx = parseFloat(cfg.max) || 1;
+        const st = parseFloat(cfg.step) || (cfg.type === "INT" ? 1 : 0.01);
+        const dir = e.deltaY < 0 ? 1 : -1;
+        let v = (parseFloat(cfg.value) || 0) + dir * st;
+        v = Math.max(mn, Math.min(mx, v));
+        v = cfg.type === "INT" ? Math.round(v) : parseFloat(v.toFixed(8));
+        if (v !== cfg.value) {
+            cfg.value = v;
+            updateDisplay(v);
+            const _avW = node._osHiddenWidgets?.["active_value"];
+            if (_avW) _avW.value = cfg.type === "INT" ? Math.round(v) : v;
+            syncWidget();
+            app.graph?.setDirtyCanvas(true, true);
+            app.graph?.change();
+        }
+    }, { passive: false });
+
+    // ── 键盘无障碍 ──
+    if (cfg.style !== "fill") {
+        const tw = row.querySelector(".os-track-wrap");
+        if (tw) _addKeyboardAccess(tw, node, cfg, chIdx, updateDisplay, syncWidget);
+    } else {
+        const tw = row.querySelector(".os-track-wrap[data-style='fill']");
+        if (tw) _addKeyboardAccess(tw, node, cfg, chIdx, updateDisplay, syncWidget);
+    }
+
+    // ── 右键打开该通道的设置面板（直接绑在行上，不依赖冒泡到 wrap）──
+    row.addEventListener("contextmenu", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        const cfgCh = node._osConfigs[chIdx];
+        if (cfgCh && cfgCh.locked) return;
+        const activeTw = row.querySelector(".os-track-wrap.dragging");
+        if (activeTw) activeTw.classList.remove("dragging");
+        try {
+            openSettingsPanel(node, chIdx, () => rebuildUI(node));
+        } catch (err) {
+            console.error("[WOSAI OmniSlider] openSettingsPanel failed:", err.message, err.stack);
+        }
+    });
+
+    return row;
+}
+
+// ── 重建整个 UI（所有通道垂直堆叠，按钮列独立保证对齐）──────────────────
+function rebuildUI(node) {
+    if (!node._osWrap) return;
+    // 防重入：commitPanel→rebuildUI 链中，若用户连续快速右键，上一个 rebuildUI 未完成时
+    // 下一个 commitPanel 又触发 rebuildUI → wrap.innerHTML="" 清空正在构建的 DOM → 崩溃。
+    if (node._osRebuilding) { console.warn("[OmniSlider] rebuildUI re-entered, skipping"); return; }
+    node._osRebuilding = true;
+    try {
+        const wrap = node._osWrap;
+    // 从配置恢复缩放比例
+    const scale = node._osConfigs[0]?.scale ?? 1.0;
+    wrap.style.setProperty("--os-scale", scale);
+    wrap.classList.remove("locked"); // 移除旧全局锁定 class（向下兼容）
+    wrap.innerHTML = "";
+
+    const chCount = node._osChannelCount;
+
+    // ⚡ 用 DocumentFragment 批量构建 DOM，减少逐次 appendChild 触发的布局抖动
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 0; i < chCount; i++) {
+        const cfg = node._osConfigs[i] || Object.assign(defaultCfg(i + 1));
+        fragment.appendChild(_osBuildSliderRow(node, cfg, i, chCount));
+    }
+
+    // ⚡ 批量写入 DOM（DocumentFragment 零开销，只触发一次布局重算）
+    wrap.appendChild(fragment);
+
+    // ⚡ 增量内容高世代号，下次 _calcContentH 会重新测量（不命中旧缓存）
+    node._osContentHGen = (node._osContentHGen || 0) + 1;
     try {
         syncOutputPorts(node);   // 先收紧端口数，再算高度
         updateSize(node);
@@ -1518,11 +1725,14 @@ function rebuildUI(node) {
     }
     // 强制下一帧重绘 canvas，消除高度变化视觉延迟
     requestAnimationFrame(() => app.graph?.setDirtyCanvas(true, true));
+    } finally {
+        node._osRebuilding = false;  // 防重入锁释放（无论 try 中是否抛异常）
+    }
 }
 
 function updateSize(node) {
     if (!node.size) node.size = [340, 100];
-    if (node.size[0] < 280) node.size[0] = 280;
+    if (node.size[0] < 220) node.size[0] = 220;
     // 直接用 _calcContentH，不走 computeSize：
     // computeSize 在 Nodes 2.0 里依赖 DOM 实测高度，
     // 而 rebuildUI 刚重建完 DOM、浏览器尚未 reflow，测量结果为旧值或 0。
@@ -1538,7 +1748,9 @@ function updateSize(node) {
     // 口径分流：Nodes 2.0 直接用内容高；Classic 用 computeSize 得到正确总高
     // （computeSize 会经由 DOM widget 的 getMinHeight 取到 _calcContentH，
     //  直接 setSize(内容高) 会把节点压扁再被 LiteGraph 撑回，形成拉锯抖动）
-    const isVue = !!document.querySelector(`[data-node-id="${node.id}"]`);
+    // ⚡ Vue 检测懒缓存：首次调用后缓存，后续不再 querySelector
+    if (node._osIsVue === undefined) node._osIsVue = !!document.querySelector(`[data-node-id="${node.id}"]`);
+    const isVue = node._osIsVue;
     const targetH = (!isVue && typeof node.computeSize === "function") ? node.computeSize()[1] : newH;
     if (Math.abs(node.size[1] - targetH) >= 0.5) {
         node.size[1] = targetH;
@@ -1549,8 +1761,11 @@ function updateSize(node) {
         app.graph?.setDirtyCanvas(true, true);
     }
     // 下一帧复确认（Vue 异步重渲可能覆盖 size）
-    requestAnimationFrame(() => {
-        if (!node.size) return;
+    // ⚡ 取消上一帧未执行的 RAF，防止快速重建时堆积
+    if (node._osSizeRAF) cancelAnimationFrame(node._osSizeRAF);
+    node._osSizeRAF = requestAnimationFrame(() => {
+        node._osSizeRAF = null;
+        if (!node.size || !node._osWrap?.isConnected) return;
         if (Math.abs(node.size[1] - targetH) < 0.5) return;
         node.size[1] = targetH;
         if (typeof node.setSize === "function") node.setSize([node.size[0], targetH]);
@@ -1576,6 +1791,14 @@ function refreshActiveState(node) {
 function buildUI(node) {
     // CSS 已通过 extension.json 加载
 
+    // ⚠ 防累积泄漏：buildUI 每次重建都会新建 _hiddenObserver(MutationObserver)/_widthObserver(ResizeObserver)
+    //   + _osTimers。原仅在 node.onRemoved 断开 → 每次重建(含每次开设置面板触发的 rebuildUI)都多挂一组观察器，
+    //   多次后 N 个 observer 同时监听节点子树、每次 DOM 变动跑 N 份回调 → 渐进卡顿直至假死。
+    //   故此处在重建前先断开上一轮的观察器与定时器。
+    if (node._osHiddenObserver) { try { node._osHiddenObserver.disconnect(); } catch (_) {} node._osHiddenObserver = null; }
+    if (node._osWidthObserver) { try { node._osWidthObserver.disconnect(); } catch (_) {} node._osWidthObserver = null; }
+    if (node._osTimers) { node._osTimers.forEach(t => clearTimeout(t)); node._osTimers = []; }
+
     // 注入节点元信息（cnr_id + ver），对齐 ComfyUI 内置节点属性面板格式
     // ComfyUI-Manager 无法从 python_module ("nodes.slider.omni_slider") 识别本节点所属包
     node.properties = node.properties || {};
@@ -1592,68 +1815,15 @@ function buildUI(node) {
     // ⚡ 关键：不 splice widget，只隐藏 DOM 元素
     // ComfyUI 依赖 node.widgets 数组索引来序列化 widgets_values
     // 如果 splice 掉 hidden widget，索引会错乱，导致后端收不到值
-    // 完整隐藏方式：hidden=true + computeSize=[0,0]
-    // 确保 widget 仍在 node.widgets 数组中（ComfyUI 序列化依赖此），但不占 UI 空间
-    // 策略：absolute 脱离文档流 + 扔出视口 + pointer-events:none，比 display:none 更彻底
-    // 因为 Nodes 2.0 的 flex 布局会对 display:none 的兄弟容器仍分配间隙
-    const _hideEl = (el, addClass = false) => {
-        if (!el || el.nodeType !== 1) return;
-        const s = el.style;
-        s.setProperty("position", "absolute", "important");
-        s.setProperty("left", "-9999px", "important");
-        s.setProperty("top", "-9999px", "important");
-        s.setProperty("width", "0", "important");
-        s.setProperty("height", "0", "important");
-        s.setProperty("min-width", "0", "important");
-        s.setProperty("min-height", "0", "important");
-        s.setProperty("max-width", "0", "important");
-        s.setProperty("max-height", "0", "important");
-        s.setProperty("overflow", "hidden", "important");
-        s.setProperty("padding", "0", "important");
-        s.setProperty("margin", "0", "important");
-        s.setProperty("border", "none", "important");
-        s.setProperty("pointer-events", "none", "important");
-        s.setProperty("opacity", "0", "important");
-        s.setProperty("visibility", "hidden", "important");
-        if (addClass) el.classList.add("wosai-hidden-widget");
-    };
-    const _hideWidgetRow = (childEl, root) => {
-        // 从子元素向上走 8 层，将所有祖先容器全部扔出文档流
-        let p = childEl.parentElement;
-        for (let i = 0; i < 8 && p && p !== root && p !== document.body && p !== document.documentElement; i++) {
-            _hideEl(p);
-            p = p.parentElement;
-        }
-    };
-    function hideWidget(w) {
-        // w.type 不变 —— type 变 "hidden" 会导致 Nodes2.0 跳过序列化
-        // w.hidden 保留但补充显式序列化标记
-        w.hidden = true;
-        // GJJ 标准藏参五件套（gjj_utils.js / sigmas_editor.js 实测验证）
-        w.computeSize = () => [0, 0];
-        w.getHeight = () => 0;
-        w.draw = () => {};
-        w.label = "";
-        // ⭐ 关键布局属性：last_y=0 而非负值（GJJ 代码注释明确警告「必须 0」）
-        w.last_y = 0;
-        w.computedHeight = 0;
-        w.margin_top = 0;
-        w.size = [0, 0];
-        // ⭐ ComfyUI v10 新版布局引擎使用 computeLayoutSize（而非 computeSize）
-        // 计算 widget 行高，未覆盖时每个隐藏 widget 仍占 ~24px → 节点顶部大片空白
-        w.computeLayoutSize = () => ({ minHeight: 0, maxHeight: 0, height: 0, minWidth: 0 });
-        // 显式标记可序列化，防止某些 ComfyUI 版本对 hidden widget 自动设 serialize:false
-        if (w.options) {
-            w.options.serialize = true;
-        } else if (w.options !== false) {
-            w.options = { serialize: true };
-        }
+    // ═══ 隐藏工具：使用 nodes2-hide.js 模块（支持 Classic + Nodes 2.0 双模式）═══
+    const _doHideWidget = (w) => {
+        ghostWidget(w);
         const el = w.element || w.dom;
         if (el) {
-            _hideEl(el, true);
-            _hideWidgetRow(el, node.element || node.dom);
+            hideEl(el, true);
+            hideWidgetRow(el, node.element || node.dom);
         }
-    }
+    };
 
     // ═══ 确保 node.widgets 是数组（ComfyUI v10 可能不是数组）══════════
     if (!Array.isArray(node.widgets)) node.widgets = [];
@@ -1663,20 +1833,20 @@ function buildUI(node) {
         for (const w of node.widgets) {
             if (w.name === "active_value") {
                 node._osHiddenWidgets["active_value"] = w;
-                hideWidget(w);
+                _doHideWidget(w);
             } else if (w.name === "channel_count") {
                 node._osChannelCount = Math.max(1, Math.min(getMaxChannels(), parseInt(w.value) || 1));
                 node._osHiddenWidgets["channel_count"] = w;
-                hideWidget(w);
+                _doHideWidget(w);
             } else if (w.name === "active_channel") {
                 // 保留隐藏 widget 用于序列化兼容，全通道激活模式下不再依赖此值
                 node._osHiddenWidgets["active_channel"] = w;
-                hideWidget(w);
+                _doHideWidget(w);
             } else if (w.name && /^ch\d+_cfg$/.test(w.name)) {
                 const idx = parseInt(w.name.match(/^ch(\d+)_cfg$/)[1]) - 1;
                 node._osConfigs[idx] = Object.assign(defaultCfg(idx + 1), parseCfg(w.value));
                 node._osHiddenWidgets[w.name] = w;
-                hideWidget(w);
+                _doHideWidget(w);
             }
         }
     }
@@ -1727,20 +1897,7 @@ function buildUI(node) {
         _ensureProxy("active_value", 0.0, "FLOAT");
     }
     // 强制覆盖 tooltip（Python 端更新后旧 DOM / 缓存可能仍持旧值）
-    // 注释说明：内部缓存键 — 自动同步滑条值，用于触发工作流重执行，勿手动修改
-    const avWidget = node._osHiddenWidgets["active_value"];
-    if (avWidget) {
-        const newTip = "内部缓存键，自动同步滑条值";
-        avWidget.tooltip = newTip;
-        const el = avWidget.element || avWidget.dom;
-        if (el) {
-            // 同时更新 DOM title（经典节点模式悬浮提示的源头）
-            el.title = newTip;
-            // 如果有内部的 input/textarea，也可能挂了 title
-            const inner = el.querySelector("input,textarea,[title]");
-            if (inner) inner.title = newTip;
-        }
-    }
+    _forceActiveValueTooltip(node);
 
     // ── DOM 容器 ─────────────────────────────────────────────────────────
     const wrap = document.createElement("div");
@@ -1755,11 +1912,17 @@ function buildUI(node) {
     // 将前端初始配置同步回隐藏 widget（确保拖拽前已有正确 widget.value）
     for (let i = 0; i < node._osChannelCount; i++) syncConfigToWidget(node, i);
     // 初始输出端口标签对齐激活通道类型
-    setTimeout(() => updateOutputLabel(node), 80);
+    node._osTimers = node._osTimers || [];
+    node._osTimers.push(setTimeout(() => {
+        if (!node || node.is_removed || !node.graph) return;
+        updateOutputLabel(node);
+    }, 80));
 
-    const MIN_WIDTH = 280;
-    const dw = node.addDOMWidget("os_ui", "os_panel", wrap, {
-        getMinHeight: () => _calcContentH(node),
+    const MIN_WIDTH = 220;
+    node.addDOMWidget("os_ui", "os_panel", wrap, {
+        // ⚡ noMeasure=true：getMinHeight 每帧被调，绝不读 scrollHeight 触发 reflow；
+        //   命中缓存(updateSize 已测)返精确值，未命中走公式 —— 消除「重新计算样式」热点。
+        getMinHeight: () => _calcContentH(node, true),
         getMinWidth: () => MIN_WIDTH,
     });
     // 移除 ComfyUI widget 外层容器的默认底部分割线（延迟 + 重试确保 DOM 就绪）
@@ -1776,179 +1939,33 @@ function buildUI(node) {
         }
         return removed;
     };
-    let _divTries = 0;
-    const _tryDivider = () => {
-        if (_removeDivider() || ++_divTries >= 6) return;
-        requestAnimationFrame(_tryDivider);
-    };
-    requestAnimationFrame(_tryDivider);
+    retryUntil(_removeDivider, { maxTries: 6 });
 
-    // ── Nodes 2.0 兼容：多策略隐藏内部 widget ─────────────────────────────────
-    // 目标：隐藏 active_value / channel_count / active_channel / ch1_cfg~ch10_cfg
-    // ⚠ 名单必须覆盖 Python 端全量定义（10 个 cfg），与前端上限设置无关——
-    //   曾硬编码到 ch5 导致 ch6_cfg 原生框在 Nodes 2.0 泄漏显示
+    // ── Nodes 2.0 兼容：使用 nodes2-hide.js 模块隐藏内部 widget ────────────
     const HIDDEN_WIDGET_NAMES = ["active_value", "channel_count", "active_channel",
-        ...Array.from({ length: 10 }, (_, i) => `ch${i + 1}_cfg`)];
+        ...Array.from({ length: 6 }, (_, i) => `ch${i + 1}_cfg`)];
 
-    // 策略1: 通过 widget.element 直接隐藏（经典模式有效）
-    const _hideByWidgetEl = (root) => {
-        for (const name of HIDDEN_WIDGET_NAMES) {
-            const w = node._osHiddenWidgets?.[name];
-            if (!w) continue;
-            const we = w.element || w.dom || w.inputEl;
-            if (we && we.parentElement) {
-                _hideEl(we, true);
-                _hideWidgetRow(we, root);
-            }
-        }
-    };
+    injectGlobalHideCSS(HIDDEN_WIDGET_NAMES, "wosai-os-hide-av-global");
 
-    // 策略2: 在 node.element DOM 中，隐藏 DOM widget 容器之前的所有原生 widget 行
-    // Nodes 2.0 中隐藏字段渲染为 DOM 元素，位于我们的 osWrap 之前
-    const _hideByDomPosition = (root) => {
-        const wrap = node._osWrap;
-        if (!wrap) return false;
-        // 找到 wrap 在 root 内的最近祖先
-        let ourContainer = wrap;
-        while (ourContainer.parentElement && ourContainer.parentElement !== root) {
-            ourContainer = ourContainer.parentElement;
-        }
-        if (!ourContainer || ourContainer === root) return false;
-        // 隐藏 osWrap 之前的所有 widget 行。
-        // v10/Nodes 2.0 中 FLOAT/INT widget 渲染为 div 行（无 <input>），
-        // 旧版只匹配 input 行导致这些行保留高度 → 滑条上方大片空白。
-        // 唯一保护对象：含 slot/socket 标记的行（输出端口等）不动。
-        const SLOT_GUARD = '[class*="slot"], [class*="socket"], [data-testid*="slot"], .lg-slot, .output, .outputs';
-        let found = false;
-        let prev = ourContainer.previousElementSibling;
-        while (prev) {
-            const isSlotRow = prev.matches?.(SLOT_GUARD) || prev.querySelector?.(SLOT_GUARD);
-            if (!isSlotRow) {
-                prev.style.setProperty("display", "none", "important");
-                prev.style.setProperty("height", "0", "important");
-                prev.style.setProperty("min-height", "0", "important");
-                prev.style.setProperty("margin", "0", "important");
-                prev.style.setProperty("padding", "0", "important");
-                prev.style.setProperty("overflow", "hidden", "important");
-                found = true;
-            }
-            prev = prev.previousElementSibling;
-        }
-        return found;
-    };
-
-    // 策略3: MutationObserver 监听后续动态渲染的 widget
-    const _hiddenElementObserver = new MutationObserver(() => {
-        const root = node.element || node.dom;
-        if (!root) return;
-        _hideByWidgetEl(root);
-        _hideByDomPosition(root);
+    const _hideMgr = createHiddenObserver(node, node._osHiddenWidgets, {
+        onCollapsed: () => updateSize(node),
+        updateSize: () => updateSize(node)
     });
-    node._osHiddenObserver = _hiddenElementObserver;
+    node._osHiddenObserver = _hideMgr.observer;
+    _hideMgr.start();
 
-    let _hideTries = 0;
-    const _tryHideHiddenWidgets = () => {
-        const root = node.element || node.dom;
-        if (!root) {
-            if (++_hideTries < 20) setTimeout(_tryHideHiddenWidgets, 150);
-            return;
-        }
-        _hiddenElementObserver.observe(root, { childList: true, subtree: true });
-        _hideByWidgetEl(root);
-        const collapsed = _hideByDomPosition(root);
-        // ⭐ 隐藏后必须刷新节点尺寸，否则空白不会消失（SKILL 检查清单）
-        if (collapsed) updateSize(node);
-        // 延迟二次确认（Nodes 2.0 Vue 渲染可能在下一帧完成）
-        if (_hideTries++ < 5) setTimeout(_tryHideHiddenWidgets, 300);
+    // 节点销毁时清理
+    const _origOnRemoved = (() => {
+        const f = node.onRemoved;
+        return typeof f === 'function' ? f : null;
+    })();
+    node.onRemoved = function () {
+        _hideMgr?.disconnect();
+        if (node._osWidthObserver) { node._osWidthObserver.disconnect(); node._osWidthObserver = null; }
+        if (node._osTimers) { node._osTimers.forEach(t => clearTimeout(t)); node._osTimers = []; }
+        node._osWrap = null;
+        if (_origOnRemoved) _origOnRemoved.call(this);
     };
-    requestAnimationFrame(_tryHideHiddenWidgets);
-
-    // ── 核武器隐藏所有原生 widget（Nodes 2.0 兼容） ──
-    // 策略：全局 CSS 规则（按 name 匹配）+ MutationObserver + rAF 帧同步兜底
-    {
-        const STYLE_ID = "wosai-os-hide-av-global";
-        if (!document.getElementById(STYLE_ID)) {
-            const s = document.createElement("style");
-            s.id = STYLE_ID;
-            const rules = [];
-            for (const n of HIDDEN_WIDGET_NAMES) {
-                rules.push(
-                    `[data-testid="node-widget"]:has([aria-label="${n}"])`,
-                    `.lg-node-widget:has([aria-label="${n}"])`,
-                    `.lg-node-widget:has([data-path*="${n}"])`,
-                    `.lg-node-widget:has(input[name="${n}"])`,
-                );
-            }
-            s.textContent = rules.join(",") + `{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;max-height:0!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important;padding:0!important;margin:0!important;border:none!important;}`;
-            document.head.appendChild(s);
-        }
-
-        // 兜底主动隐藏：找 osWrap 之前的原生 widget input 并隐藏
-        // 使用 compareDocumentPosition 精准定位（而非 contains 全扫）
-        const _nukeHidden = () => {
-            if (!node._osWrap) return;
-            const root = node.element || node.dom;
-            if (!root) return;
-            const inputs = root.querySelectorAll("input, textarea");
-            for (const inp of inputs) {
-                if (!inp.offsetParent) continue;
-                // 只隐藏位于 osWrap 之前的元素（文档顺序）
-                const pos = inp.compareDocumentPosition(node._osWrap);
-                if (pos & Node.DOCUMENT_POSITION_FOLLOWING) continue;
-                // 跳过已隐藏的（被全局 CSS 处理）
-                if (inp.closest(".wosai-hidden-widget")) continue;
-                let el = inp;
-                while (el && el !== root) {
-                    el.style.setProperty("display", "none", "important");
-                    el.style.setProperty("visibility", "hidden", "important");
-                    el.style.setProperty("height", "0", "important");
-                    el.style.setProperty("overflow", "hidden", "important");
-                    el = el.parentElement;
-                }
-            }
-        };
-
-        // 策略1: MutationObserver — 仅在 DOM 变化时被动触发
-        let _nukeObserver = null;
-        const _startObserver = () => {
-            const root = node.element || node.dom;
-            if (!root || _nukeObserver) return;
-            _nukeObserver = new MutationObserver((mutations) => {
-                if (mutations.some(m => m.addedNodes.length > 0)) _nukeHidden();
-            });
-            _nukeObserver.observe(root, { childList: true, subtree: true });
-        };
-        // 延迟启动 observer（等待 DOM 就绪）
-        let _obsTries = 0;
-        const _tryObs = () => {
-            const root = node.element || node.dom;
-            if (root) { _startObserver(); _nukeHidden(); return; }
-            if (++_obsTries < 20) setTimeout(_tryObs, 150);
-        };
-        requestAnimationFrame(_tryObs);
-
-        // 注：原"策略2 rAF 帧同步兜底"已移除——computeLayoutSize 归零 +
-        // MutationObserver 已完整覆盖隐藏需求，常驻 rAF 循环在多节点场景
-        // 下白耗 CPU（每节点一个循环），对低配设备不友好。
-
-        // 节点销毁时清理
-        node._nukeObserver = _nukeObserver;
-        const _origOnRemoved = (() => {
-            const f = node.onRemoved;
-            return typeof f === 'function' ? f : null;
-        })();
-        node.onRemoved = function () {
-            // nuke 清理
-            if (node._nukeObserver) { node._nukeObserver.disconnect(); node._nukeObserver = null; }
-            if (node._osHiddenObserver) { node._osHiddenObserver.disconnect(); node._osHiddenObserver = null; }
-            if (node._osWidthObserver) { node._osWidthObserver.disconnect(); node._osWidthObserver = null; }
-            // 通用清理
-            node._osWrap = null;
-            if (_origOnRemoved) _origOnRemoved.call(this);
-        };
-        // 首帧立即执行
-        requestAnimationFrame(() => { requestAnimationFrame(_nukeHidden); });
-    }
 
     // ── 动态对齐：测量 wrap 右边缘与节点右边界的实际差值，精确设置 margin ──
     const _calibrate = () => {
@@ -1978,12 +1995,7 @@ function buildUI(node) {
         }
         return true;
     };
-    let _calTries = 0;
-    const _tryCal = () => {
-        if (_calibrate() || ++_calTries >= 10) return;
-        requestAnimationFrame(_tryCal);
-    };
-    requestAnimationFrame(_tryCal);
+    retryUntil(_calibrate, { maxTries: 10 });
 
     const _origOnResize = node.onResize;
     node.onResize = function(size) {
@@ -2028,14 +2040,7 @@ function buildUI(node) {
     node.onConfigure = function(info) {
         _origOnConfigure?.apply(this, arguments);
         // 强制更新 active_value tooltip（旧 workflow 可能携带旧值）
-        const _avW2 = this._osHiddenWidgets?.["active_value"];
-        if (_avW2) {
-            // 注释说明：内部缓存键 — 自动同步滑条值，用于触发工作流重执行，勿手动修改
-            const newTip = "内部缓存键，自动同步滑条值";
-            _avW2.tooltip = newTip;
-            const el2 = _avW2.element || _avW2.dom;
-            if (el2) { el2.title = newTip; const inr = el2.querySelector("input,textarea,[title]"); if (inr) inr.title = newTip; }
-        }
+        _forceActiveValueTooltip(this);
         // 从 _osHiddenWidgets 读取（proxy widget 已被 _origOnConfigure 写回 workflow 值）
         const ccW = this._osHiddenWidgets?.["channel_count"];
         if (ccW) this._osChannelCount = Math.max(1, Math.min(getMaxChannels(), parseInt(ccW.value) || 1));
@@ -2043,10 +2048,22 @@ function buildUI(node) {
             const cw = this._osHiddenWidgets?.[`ch${i + 1}_cfg`];
             if (cw) this._osConfigs[i] = Object.assign(defaultCfg(i + 1), parseCfg(cw.value));
         }
+        // 恢复精简显示三项标志（持久化在 properties）→ 应用
+        const p = this.properties || {};
+        this._osHideTitle = !!p.osHideTitle;
+        this._osHideBadge = !!p.osHideBadge;
+        this._osHidePortLabel = !!p.osHidePortLabel;
         rebuildUI(this);
         syncOutputPorts(this); // 兜底：确保端口数与 channel_count 匹配
         syncActiveValue(this); // 恢复 active_value
-        setTimeout(() => updateOutputLabel(this), 80);
+        if (this._osHideTitle || this._osHideBadge || this._osHidePortLabel) {
+            applyNodeDisplay(this, syncOutputPorts, updateOutputLabel);
+        }
+        node._osTimers = node._osTimers || [];
+        node._osTimers.push(setTimeout(() => {
+            if (!this || this.is_removed || !this.graph) return;
+            updateOutputLabel(this);
+        }, 80));
     };
 
     // ── 清理（已合并到上方 nuke 清理块中，此处不再重复覆写）──────────────
@@ -2068,11 +2085,12 @@ app.registerExtension({
             min: 1,
             max: 6,
             step: 1,
-            tooltip: '重新添加节点后生效',
-            // 双保险：任何路径写入超限值都立即钳回
+            tooltip: '立即对画布上所有万能滑条生效',
+            // 双保险：超限值立即钳回；其余变更实时同步到所有节点
             onChange: (v) => {
                 const n = parseInt(v);
-                if (n > 6) { try { app.ui.settings.setSettingValue(SETTING_MAX_CH, 6); } catch (e) {} }
+                if (n > 6) { try { app.ui.settings.setSettingValue(SETTING_MAX_CH, 6); } catch (e) { console.warn('[OmniSlider] clamp setting failed', e); } return; }
+                applyMaxChannelsToAllNodes();
             },
         },
     ],
@@ -2081,13 +2099,59 @@ app.registerExtension({
         try {
             const v = parseInt(app.ui?.settings?.getSettingValue?.(SETTING_MAX_CH));
             if (v > 6) app.ui.settings.setSettingValue(SETTING_MAX_CH, 6);
-        } catch (e) {}
-        if (!document.getElementById("wosai-os-slider-css") && !document.querySelector('link[href*="os-slider.css"]')) {
-            const link = document.createElement("link");
-            link.id = "wosai-os-slider-css";
-            link.rel = "stylesheet";
-            link.href = "/extensions/WOSAI-ComfyUI/css/os-slider.css";
-            document.head.appendChild(link);
+        } catch (e) { /* 设置尚未注册时静默忽略 */ }
+        // 动态加载拆分的 CSS 文件（Panel / Hide 共用 os-slider- 前缀，检查唯一 ID 避免冗余）
+        const _loadCSS = (id, href) => {
+            if (!document.getElementById(id)) {
+                const link = document.createElement("link");
+                link.id = id;
+                link.rel = "stylesheet";
+                link.href = href;
+                document.head.appendChild(link);
+            }
+        };
+        _loadCSS("wosai-os-slider-css", "/extensions/WOSAI-ComfyUI/css/os-slider.css");
+        _loadCSS("wosai-os-slider-panel-css", "/extensions/WOSAI-ComfyUI/css/os-slider-panel.css");
+        _loadCSS("wosai-os-slider-hide-css", "/extensions/WOSAI-ComfyUI/css/os-slider-hide.css");
+
+        // ═══ 精简模式的画布隐藏（标题/角标）已统一由 node-color.js 的 drawNodeShape ═══
+        //   wrapper 处理（读取 node._osHideTitle / _osHideBadge），此处不再单独 hook，
+        //   彻底避免与 node-color 双钩子互相覆盖导致的反复失效。
+    },
+
+    // 扩展卸载：恢复所有 OmniSlider 节点的显示状态（画布钩子由 node-color 负责还原）
+    async remove() {
+        // 恢复所有 OmniSlider 节点的标题显示 + 颜色
+        const graph = app.graph;
+        if (graph?._nodes || graph?.nodes) {
+            const nodes = graph._nodes || graph.nodes;
+            for (const node of nodes) {
+                if (node?.type === "WOSAI_OmniSlider") {
+                    node._osHideTitle = false;
+                    node._osHideBadge = false;
+                    node._osHidePortLabel = false;
+                    // 恢复颜色
+                    if (node._osOrigColor !== undefined) {
+                        node.color = node._osOrigColor;
+                        node.bgcolor = node._osOrigBgColor;
+                        delete node._osOrigColor;
+                        delete node._osOrigBgColor;
+                    }
+                    // 恢复 title_mode
+                    if (node._osOrigTitleMode !== undefined) {
+                        node.title_mode = node._osOrigTitleMode;
+                        delete node._osOrigTitleMode;
+                    }
+                    // 恢复角标
+                    if (node._osOrigBadges !== undefined) {
+                        node.badges = node._osOrigBadges;
+                        delete node._osOrigBadges;
+                    }
+                    // 恢复端口标签
+                    try { updateOutputLabel(node); } catch (_) { /* 节点可能已部分销毁，尽力而为 */ }
+                }
+            }
+            app.graph?.setDirtyCanvas(true, true);
         }
     },
 

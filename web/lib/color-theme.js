@@ -53,6 +53,7 @@ export function classifyNode(node) {
 
 // ── 内置主题（独立设计的色值）──────────────────────────────
 // group: 'solid' 纯色（写 color/bgcolor）| 'grad' 渐变（写 _gradient，暗端自动衍生）
+// 六套纯色风格 + 六套渐变风格
 const SOFT_COLORS = {
     input:  '#587E9C', guide:  '#7B6FA8', sample: '#A8824E',
     output: '#5E9A72', decode: '#69A089', encode: '#5E8B84',
@@ -108,19 +109,19 @@ const DUSK_COLORS = {
 
 export const THEME_STYLES = {
     // ── 纯色 Solid ──
-    'wosai-soft':       { label: '柔和', group: 'solid', kind: 'solid', colors: SOFT_COLORS },
-    'wosai-contrast':   { label: '鲜明', group: 'solid', kind: 'solid', colors: VIVID_COLORS },
-    'wosai-dark':       { label: '暗调', group: 'solid', kind: 'solid', colors: DARK_COLORS },
-    'wosai-muted':      { label: '粉黛', group: 'solid', kind: 'solid', colors: MUTED_COLORS },
-    'wosai-forest':     { label: '森系', group: 'solid', kind: 'solid', colors: FOREST_COLORS },
-    'wosai-ocean':      { label: '海雾', group: 'solid', kind: 'solid', colors: OCEAN_COLORS },
+    'wosai-soft':       { label: '柔和',     desc: '莫兰迪低饱和，默认推荐',   group: 'solid', kind: 'solid', colors: SOFT_COLORS },
+    'wosai-contrast':   { label: '鲜明',     desc: '高对比度，适合演示/录屏',  group: 'solid', kind: 'solid', colors: VIVID_COLORS },
+    'wosai-dark':       { label: '暗调',     desc: '极暗底色，长时间工作护眼', group: 'solid', kind: 'solid', colors: DARK_COLORS },
+    'wosai-muted':      { label: '粉黛',     desc: '莫兰迪灰调，低饱和高级感', group: 'solid', kind: 'solid', colors: MUTED_COLORS },
+    'wosai-forest':     { label: '森系',     desc: '大地绿棕，自然护眼',       group: 'solid', kind: 'solid', colors: FOREST_COLORS },
+    'wosai-ocean':      { label: '海雾',     desc: '冷调蓝灰，海洋色系',       group: 'solid', kind: 'solid', colors: OCEAN_COLORS },
     // ── 渐变 Gradient ──
-    'wosai-grad-soft':  { label: '流岚', group: 'grad', kind: 'grad', dir: '↓', colors: SOFT_COLORS },
-    'wosai-grad-vivid': { label: '幻彩', group: 'grad', kind: 'grad', dir: '↓', colors: VIVID_COLORS },
-    'wosai-grad-deep':  { label: '深邃', group: 'grad', kind: 'grad', dir: '↘', colors: DEEP_COLORS },
-    'wosai-grad-dusk':  { label: '暮山', group: 'grad', kind: 'grad', dir: '↘', colors: DUSK_COLORS },
-    'wosai-grad-wave':  { label: '碧波', group: 'grad', kind: 'grad', dir: '→', colors: OCEAN_COLORS },
-    'wosai-grad-grove': { label: '翠谷', group: 'grad', kind: 'grad', dir: '↓', colors: FOREST_COLORS },
+    'wosai-grad-soft':  { label: '流岚',     desc: '柔和渐变，节点顶部到尾部', group: 'grad',   kind: 'grad', dir: '↓', colors: SOFT_COLORS },
+    'wosai-grad-vivid': { label: '幻彩',     desc: '鲜明渐变，视觉冲击力强',   group: 'grad',   kind: 'grad', dir: '↓', colors: VIVID_COLORS },
+    'wosai-grad-deep':  { label: '深邃',     desc: '深浓斜向渐变',             group: 'grad',   kind: 'grad', dir: '↘', colors: DEEP_COLORS },
+    'wosai-grad-dusk':  { label: '暮山',     desc: '黄昏紫橙暖调渐变',         group: 'grad',   kind: 'grad', dir: '↘', colors: DUSK_COLORS },
+    'wosai-grad-wave':  { label: '碧波',     desc: '海洋蓝灰水平渐变',         group: 'grad',   kind: 'grad', dir: '→', colors: OCEAN_COLORS },
+    'wosai-grad-grove': { label: '翠谷',     desc: '森系大地渐变',             group: 'grad',   kind: 'grad', dir: '↓', colors: FOREST_COLORS },
 };
 
 const LS_SELECTED = 'wosai-nodecolor-theme';

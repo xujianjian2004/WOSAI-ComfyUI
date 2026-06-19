@@ -10,6 +10,7 @@ import {
     getSelectedStyleId, setSelectedStyleId,
 } from "./lib/color-theme.js";
 import { openNodeColorPicker, refreshAllVisuals } from "./node-color.js";
+import { showTip, hideTip } from "./lib/tooltip.js";
 import {
     glassT as barT, getGlassTheme as getBarTheme, getGlassMode as getBarMode,
     cycleGlassMode, onGlassChange, GLASS_MODE_DEFS,
@@ -24,6 +25,9 @@ let _holdActive = false;  // Hold 模式：` 按住中
 let _hoverItem = null;    // 当前悬停的工具条条目（Hold 松开时执行）
 let _keyDownHandler = null, _keyUpHandler = null;
 let _launcher_skin = null; // 悬浮球内芯换肤回调（深浅切换时调用）
+let _offGlassChange = null;   // onGlassChange 退订函数（remove 时清理）
+let _canvasReady = false;
+let _launcherTimer = null;
 
 // ── ComfyUI 原生 Settings ────────────────────────────────
 const SETTING_LAUNCHER = 'WOSAI.ColorBar.ShowLauncher';
@@ -104,30 +108,7 @@ function flash(el, msg) {
     setTimeout(() => tip.remove(), 1200);
 }
 
-// ── 自定义悬停提示：在元素上方居中显示（替代原生 title）──
-let _tipEl = null;
-function showTip(el, text) {
-    if (!text) return;
-    const T = barT();
-    if (!_tipEl) {
-        _tipEl = document.createElement('div');
-        document.body.appendChild(_tipEl);
-    }
-    // 每次显示时按当前主题刷新样式（支持深浅即时切换）
-    _tipEl.style.cssText = `position:fixed;padding:4px 10px;background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};color:${T.text};font-size:12px;border-radius:6px;z-index:100003;pointer-events:none;white-space:nowrap;transform:translateX(-50%);border:${T.border}`;
-    _tipEl.textContent = text;
-    _tipEl.style.display = 'block';
-    const r = el.getBoundingClientRect();
-    let x = r.left + r.width / 2;
-    _tipEl.style.left = x + 'px';
-    _tipEl.style.top = (r.top - 30) + 'px';
-    // 视口钳制：顶部放不下移到下方，左右越界拉回
-    const tr = _tipEl.getBoundingClientRect();
-    x = Math.max(tr.width / 2 + 6, Math.min(x, window.innerWidth - tr.width / 2 - 6));
-    _tipEl.style.left = x + 'px';
-    if (tr.top < 4) _tipEl.style.top = (r.bottom + 8) + 'px';
-}
-function hideTip() { if (_tipEl) _tipEl.style.display = 'none'; }
+// 悬停提示改用共享 lib/tooltip.js（showTip / hideTip 顶部已导入）
 
 function closeThemeMenu() {
     if (_themeMenu) { _themeMenu.remove(); _themeMenu = null; }
@@ -148,20 +129,23 @@ function closeBar() {
 function toggleBar() { _bar ? closeBar() : openBar(); }
 
 // ── 线性图标（Tabler/Lucide 风格，MIT/ISC 同风格自绘，stroke=currentColor 随主题变色）──
-const _icon = (inner, size = 24) =>
-    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
-// 多彩版：轮廓随主题（currentColor），关键元素显式上色
+// 默认放大到 27（原 24）；描边 1.6（原 2）更纤细
+const _icon = (inner, size = 27) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+// 统一单色线性：全部图标轮廓 + 填充点均随主题色 currentColor(=--ws-text)，不再内嵌多彩，
+//   消除「每个图标各用各色」的杂乱感；强调色仅在 hover/激活态体现（mkItem 的 brightness/scale）。
 const ICONS = {
-    picker: _icon('<path stroke="#DD6F4A" d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/>'),
-    refresh: _icon('<path stroke="#1D9E75" d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path stroke="#378ADD" d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>'),
-    dice: _icon('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="#E24B4A" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="#EF9F27" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="#1D9E75" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="#378ADD" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="#7F77DD" stroke="none"/>'),
-    eraser: _icon('<path stroke="#D4537E" d="M19 20H8.5l-4.2-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4L13 18"/><path d="M18 13.3L11.7 7"/>'),
-    palette: _icon('<path d="M12 21a9 9 0 1 1 0-18c5 0 9 3.6 9 8 0 1.1-.5 2.1-1.3 2.8-.8.8-2 1.2-3.2 1.2h-2.5a2 2 0 0 0-1 3.75A1.3 1.3 0 0 1 12 21z"/><circle cx="8.5" cy="10.5" r="1.2" fill="#E24B4A" stroke="none"/><circle cx="12" cy="7.5" r="1.2" fill="#EF9F27" stroke="none"/><circle cx="15.5" cy="10.5" r="1.2" fill="#378ADD" stroke="none"/>'),
-    rainbow: _icon('<path stroke="#E24B4A" d="M22 17a10 10 0 0 0-20 0"/><path stroke="#1D9E75" d="M18 17a6 6 0 0 0-12 0"/><path stroke="#378ADD" d="M14 17a2 2 0 0 0-4 0"/>'),
-    switchV: _icon('<path stroke="#DD6F4A" d="M3 8l4-4 4 4"/><path stroke="#DD6F4A" d="M7 4v9"/><path stroke="#378ADD" d="M13 16l4 4 4-4"/><path stroke="#378ADD" d="M17 10v10"/>'),
-    switchH: _icon('<path stroke="#DD6F4A" d="M16 3l4 4-4 4"/><path stroke="#DD6F4A" d="M10 7h10"/><path stroke="#378ADD" d="M8 13l-4 4 4 4"/><path stroke="#378ADD" d="M4 17h10"/>'),
-    sun: _icon('<circle stroke="#EF9F27" cx="12" cy="12" r="4"/><path stroke="#EF9F27" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),
-    moon: _icon('<path stroke="#7F77DD" d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>'),
+    picker: _icon('<path d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/>'),
+    // 「换一组预设」单独保留双色（绿/蓝），作为整套单色图标里的视觉焦点；放大到 32（含中心组号数字）
+    refresh: _icon('<path stroke="#1D9E75" d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path stroke="#378ADD" d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>', 32),
+    dice: _icon('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/>'),
+    eraser: _icon('<path d="M19 20H8.5l-4.2-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5 5a1 1 0 0 1 0 1.4L13 18"/><path d="M18 13.3L11.7 7"/>'),
+    palette: _icon('<path d="M12 21a9 9 0 1 1 0-18c5 0 9 3.6 9 8 0 1.1-.5 2.1-1.3 2.8-.8.8-2 1.2-3.2 1.2h-2.5a2 2 0 0 0-1 3.75A1.3 1.3 0 0 1 12 21z"/><circle cx="8.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10.5" r="1.2" fill="currentColor" stroke="none"/>'),
+    rainbow: _icon('<path d="M22 17a10 10 0 0 0-20 0"/><path d="M18 17a6 6 0 0 0-12 0"/><path d="M14 17a2 2 0 0 0-4 0"/>'),
+    switchV: _icon('<path d="M3 8l4-4 4 4"/><path d="M7 4v9"/><path d="M13 16l4 4 4-4"/><path d="M17 10v10"/>'),
+    switchH: _icon('<path d="M16 3l4 4-4 4"/><path d="M10 7h10"/><path d="M8 13l-4 4 4 4"/><path d="M4 17h10"/>'),
+    sun: _icon('<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>'),
+    moon: _icon('<path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>'),
     // 自动（半填充对比圆：跟随画布亮度）
     auto: _icon('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
 };
@@ -171,17 +155,32 @@ function mkItem(visualEl, label, tip) {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;user-select:none;flex-shrink:0';
     wrap.appendChild(visualEl);
+    let lblEl = null;
     if (label) {
-        const lbl = document.createElement('div');
-        lbl.textContent = label;
-        lbl.style.cssText = `font-size:12px;line-height:1;color:${barT().text};white-space:nowrap;letter-spacing:.5px`;
-        wrap.appendChild(lbl);
+        lblEl = document.createElement('div');
+        lblEl.textContent = label;
+        lblEl.style.cssText = `font-size:12px;line-height:1;color:${barT().text};white-space:nowrap;letter-spacing:.5px;transition:color .15s`;
+        wrap.appendChild(lblEl);
     }
     wrap.onmousedown = e => e.preventDefault();
     // 悬停提示用自定义 tooltip（条目上方居中），不用原生 title；_tip 可被外部更新
     wrap._tip = tip || '';
-    wrap.onmouseenter = () => { visualEl.style.filter = 'brightness(1.4)'; visualEl.style.transform = 'scale(1.1)'; _hoverItem = wrap; if (wrap._tip) showTip(wrap, wrap._tip); };
-    wrap.onmouseleave = () => { visualEl.style.filter = ''; visualEl.style.transform = ''; if (_hoverItem === wrap) _hoverItem = null; hideTip(); };
+    // 图标类条目(含 svg)：悬停点亮品牌橙(方案 A)，文字同步变橙；色块(chip)保持原 brightness 效果
+    const _isIcon = () => !!visualEl.querySelector && !!visualEl.querySelector('svg');
+    wrap.onmouseenter = () => {
+        visualEl.style.transform = 'scale(1.1)';
+        if (_isIcon()) {
+            visualEl.dataset.baseColor = visualEl.style.color; visualEl.style.color = barT().iconAccent;
+            if (lblEl) lblEl.style.color = barT().iconAccent;
+        }
+        else visualEl.style.filter = 'brightness(1.4)';
+        _hoverItem = wrap; if (wrap._tip) showTip(wrap, wrap._tip);
+    };
+    wrap.onmouseleave = () => {
+        visualEl.style.transform = ''; visualEl.style.filter = '';
+        if (_isIcon()) { visualEl.style.color = visualEl.dataset.baseColor || barT().iconColor; if (lblEl) lblEl.style.color = barT().text; }
+        if (_hoverItem === wrap) _hoverItem = null; hideTip();
+    };
     return wrap;
 }
 
@@ -190,7 +189,7 @@ function mkBtn(iconSvg, tip, label) {
     const T = barT();
     const b = document.createElement('div');
     b.innerHTML = iconSvg;
-    b.style.cssText = `width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${T.btnBg};color:${T.text};transition:filter .15s,transform .12s;pointer-events:none`;
+    b.style.cssText = `width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:${T.btnBg};color:${T.iconColor};transition:color .15s,filter .15s,transform .12s;pointer-events:none`;
     return mkItem(b, label, tip);
 }
 
@@ -221,6 +220,14 @@ function paintSelected(hex, anchorEl) {
 }
 
 // ── 主题子菜单 ────────────────────────────────────────────
+function randomHueAvoidRed() {
+    // 生成随机色相，自动避开红色范围（0°~30° 和 330°~360°）
+    const safeRanges = [[30, 330]];  // 从 30° 到 330° 的安全区间
+    const range = safeRanges[0];
+    const h = range[0] + Math.floor(Math.random() * (range[1] - range[0]));
+    return { h, s: 60 + Math.floor(Math.random() * 31), v: 45 + Math.floor(Math.random() * 36) };
+}
+
 function openThemeMenu(anchorBtn) {
     if (_themeMenu) { closeThemeMenu(); return; }
     const T = barT();
@@ -277,12 +284,50 @@ function openThemeMenu(anchorBtn) {
         return row;
     };
 
+    // ── 标题行：居中标题「按节点类型快速上色」+ 右侧 🎲 随机按钮（自动避开红色）──
+    const titleRow = document.createElement('div');
+    titleRow.style.cssText = `display:flex;align-items:center;justify-content:space-between;padding:0 0 4px;`;
+    // 左侧占位，使标题居中
+    const leftSpacer = document.createElement('span');
+    leftSpacer.style.cssText = 'width:28px;flex-shrink:0';
+    const titleText = document.createElement('span');
+    titleText.textContent = '按节点类型快速上色';
+    titleText.style.cssText = `font-size:13px;color:${T.text};font-weight:600;letter-spacing:.3px;text-align:center;flex:1`;
+    const randBtn = document.createElement('span');
+    randBtn.textContent = '🎲';
+    randBtn.style.cssText = `width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:16px;cursor:pointer;flex-shrink:0;transition:background var(--ws-transition, .15s),transform .12s;user-select:none;line-height:1`;
+    // 即时提示（替代原生 title，无 ~0.5s 延迟）
+    randBtn.onmouseenter = () => { randBtn.style.background = T.rowHover; randBtn.style.transform = 'scale(1.15)'; showTip(randBtn, '随机配色'); };
+    randBtn.onmouseleave = () => { randBtn.style.background = 'transparent'; randBtn.style.transform = ''; hideTip(); };
+    randBtn.onclick = () => {
+        const selN = selectedNodes();
+        const selG = selectedGroups();
+        let targets = [];
+        if (selN.length || selG.length) {
+            const nodeSet = new Set(selN);
+            selG.forEach(g => {
+                try { g.recomputeInsideNodes?.(); } catch (e) {}
+                (g._nodes || g.nodes || []).forEach(n => nodeSet.add(n));
+            });
+            targets = [...nodeSet];
+            selG.forEach(g => { const rc = randomHueAvoidRed(); g.color = hsv2hex(rc.h, rc.s, rc.v); });
+        } else {
+            targets = app.graph?._nodes || [];
+        }
+        targets.forEach(n => { const rc = randomHueAvoidRed(); applySolidHex([n], hsv2hex(rc.h, rc.s, rc.v)); });
+        refreshAllVisuals();
+        flash(randBtn, targets.length ? `随机色已应用（避开红色）` : '画布上还没有节点');
+    };
+    titleRow.appendChild(leftSpacer);
+    titleRow.appendChild(titleText);
+    titleRow.appendChild(randBtn);
+    menu.appendChild(titleRow);
+
     // 两类分组渲染：纯色 / 渐变
-    // 竖版：每组纵向列表；横版：每组 6 项横排，配色窗与工具条同为横版形态
     const horizontal = getOrient() !== 'v';
     [{ key: 'solid', label: '纯色 Solid' }, { key: 'grad', label: '渐变 Gradient' }].forEach((grp, gi) => {
         const head = document.createElement('div');
-        head.style.cssText = `display:flex;align-items:center;gap:10px;padding:${gi ? '10px' : '6px'} 0 4px;`;
+        head.style.cssText = `display:flex;align-items:center;gap:10px;padding:${gi ? '10px' : '4px'} 0 4px;`;
         const lineL = document.createElement('span');
         lineL.style.cssText = `flex:1;height:1px;background:linear-gradient(90deg,transparent,${T.divider})`;
         const txt = document.createElement('span');
@@ -401,7 +446,7 @@ function openBar() {
     const bar = document.createElement('div');
     bar.setAttribute('data-wosai-panel', '');
     bar.setAttribute('data-theme', getBarTheme());
-    bar.style.cssText = `position:fixed;z-index:100001;display:flex;flex-direction:${orient === 'v' ? 'column' : 'row'};align-items:center;gap:${orient === 'v' ? '10px' : '8px'};padding:${orient === 'v' ? '10px 10px' : '8px 14px'};border-radius:26px;background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:${T.border};box-shadow:${T.shadow};opacity:0;transform:scale(.92);transition:opacity .18s ease,transform .18s ease;max-height:${window.innerHeight - 20}px;overflow:auto`;
+    bar.style.cssText = `position:fixed;z-index:100001;display:flex;flex-direction:${orient === 'v' ? 'column' : 'row'};align-items:center;gap:${orient === 'v' ? '10px' : '8px'};padding:${orient === 'v' ? '10px 10px' : '8px 14px'};border-radius:999px;background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:${T.border};box-shadow:${T.shadow};opacity:0;transform:scale(.92);transition:opacity .18s ease,transform .18s ease;max-height:${window.innerHeight - 20}px;overflow:auto`;
     bar.onpointerdown = e => e.stopPropagation();
 
     // ── 预设色：4 组 × 6 色，「换组」按钮循环切换（记忆当前组）──
@@ -444,12 +489,22 @@ function openBar() {
 
     // 换一组预设色
     const swapBtn = mkBtn(ICONS.refresh, '换一组预设', '');
+    // 在刷新图标中心叠加「当前第几组」数字（1-based，共 PRESET_GROUPS.length 组）
+    const swapIcon = swapBtn.firstChild;            // mkBtn 的 38px 圆底
+    swapIcon.style.position = 'relative';
+    const groupNum = document.createElement('div');
+    groupNum.style.cssText = 'position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;font-weight:400;line-height:1;color:currentColor;pointer-events:none;text-shadow:0 0 2px rgba(0,0,0,.6)';
+    swapIcon.appendChild(groupNum);
+    const updateGroupNum = () => { groupNum.textContent = String(presetGroupIdx + 1); };
+    updateGroupNum();
+    swapBtn._tip = `当前组：${PRESET_GROUPS[presetGroupIdx].name}配色`;
     swapBtn.onclick = () => {
         presetGroupIdx = (presetGroupIdx + 1) % PRESET_GROUPS.length;
         try { localStorage.setItem(LS_PRESET_GROUP, String(presetGroupIdx)); } catch (e) {}
         renderPresetChips();
-        swapBtn._tip = `换一组预设色（当前：${PRESET_GROUPS[presetGroupIdx].name}）`;
-        flash(swapBtn, `已切换：${PRESET_GROUPS[presetGroupIdx].name}`);
+        updateGroupNum();
+        swapBtn._tip = `当前组：${PRESET_GROUPS[presetGroupIdx].name}配色`;
+        flash(swapBtn, `当前组：${PRESET_GROUPS[presetGroupIdx].name}配色`);
     };
     bar.appendChild(swapBtn);
 
@@ -514,7 +569,7 @@ function openBar() {
     themeBtn.onclick = () => openThemeMenu(themeBtn);
 
     // 高级（完整调色板）
-    const moreBtn = mkBtn(ICONS.rainbow, '高级配色（完整调色板）', '高级');
+    const moreBtn = mkBtn(ICONS.rainbow, '高级配色 NodeColor', '高级');
     moreBtn.onclick = () => {
         let nodes = selectedNodes();
         const groups = selectedGroups();
@@ -542,7 +597,7 @@ function openBar() {
     };
 
     // 随机（Alt = 各节点不同随机色）
-    const randBtn = mkBtn(ICONS.dice, 'Alt+点击：多节点随机配色', '随机');
+    const randBtn = mkBtn(ICONS.dice, 'Alt + 点击：多节点 / 分组随机配色', '随机');
     randBtn.onclick = (e) => {
         const nodes = selectedNodes();
         const groups = selectedGroups();
@@ -679,8 +734,6 @@ function createLauncher() {
 
 // ── 悬浮球延迟出场：等画布完全载入（工作流配置完成 + 浏览器空闲）──
 // 插件多时画布载入慢，悬浮球过早出现会干扰用户
-let _canvasReady = false;
-let _launcherTimer = null;
 function showLauncherWhenReady(extraDelay = 800) {
     if (_canvasReady) return;          // 只走一次
     _canvasReady = true;
@@ -762,7 +815,7 @@ app.registerExtension({
         initStore();
 
         // 玻璃主题变更（本面板或其他 WOSAI 面板切换）→ 球芯换肤 + 工具条重建
-        onGlassChange(() => {
+        _offGlassChange = onGlassChange(() => {
             if (_launcher_skin) _launcher_skin();
             if (_bar) { closeBar(); setTimeout(openBar, 170); }
         });
@@ -795,6 +848,8 @@ app.registerExtension({
         if (_resizeHandler) { window.removeEventListener('resize', _resizeHandler); _resizeHandler = null; }
         if (_keyDownHandler) { window.removeEventListener('keydown', _keyDownHandler, true); _keyDownHandler = null; }
         if (_keyUpHandler) { window.removeEventListener('keyup', _keyUpHandler, true); _keyUpHandler = null; }
+        if (_offGlassChange) { _offGlassChange(); _offGlassChange = null; }
+        if (_launcherTimer) { clearTimeout(_launcherTimer); _launcherTimer = null; }
     },
 
     commands: [{

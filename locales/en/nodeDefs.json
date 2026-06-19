@@ -1,0 +1,34 @@
+{
+    "WOSAI_OmniSlider": {
+        "display_name": "OmniSlider",
+        "description": "Multi-channel slider control, supports float/int/fill style"
+    },
+    "WOSAI_SizeSelect": {
+        "display_name": "SizeSelect",
+        "description": "Preset/custom dual-mode resolution selector, auto 8x alignment",
+        "inputs": {
+            "Manual_Mode":      { "name": "Mode",            "tooltip": "off=preset mode on=custom mode" },
+            "scale_method":     { "name": "Scale Method",    "tooltip": "Center Crop=crop to target ratio / Proportional=scale by multiplier" },
+            "scale_multiplier": { "name": "Scale Multiplier","tooltip": "Effective in proportional mode, based on original dimensions" },
+            "Resolution":       { "name": "Resolution",      "tooltip": "Select preset resolution tier" },
+            "Aspect_Ratio":     { "name": "Aspect Ratio",    "tooltip": "Select aspect ratio" },
+            "Custom_Width":     { "name": "Custom Width",    "tooltip": "Custom width (custom mode only)" },
+            "Custom_Height":    { "name": "Custom Height",   "tooltip": "Custom height (custom mode only)" },
+            "image":            { "name": "image",           "tooltip": "Input image (optional, will be resized to target)" },
+            "mask":             { "name": "mask",            "tooltip": "Input mask (optional, will be resized with image)" },
+            "latent":           { "name": "latent",          "tooltip": "Input latent (optional, will be resized to target)" },
+            "vae":              { "name": "vae",             "tooltip": "VAE model (optional, image will be encoded to latent via VAE)" }
+        },
+        "outputs": {
+            "0": { "name": "image" },
+            "1": { "name": "mask" },
+            "2": { "name": "latent" },
+            "3": { "name": "width" },
+            "4": { "name": "height" }
+        }
+    },
+    "WOSAI_CanvasNote": {
+        "display_name": "CanvasNote",
+        "description": "Editable canvas annotation node, supports Markdown/gradient/presets"
+    }
+}

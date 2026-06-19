@@ -1,4 +1,4 @@
-# WOSAI-ComfyUI v1.0 — 运行时依赖
+# WOSAI-ComfyUI v1.1 — 运行时依赖
 # ─────────────────────────────────
 # 本插件无第三方运行时依赖。
 # 仅使用 Python 标准库（math、importlib 模块），

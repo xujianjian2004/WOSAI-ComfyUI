@@ -1,9 +1,9 @@
-﻿"""WOSAI OmniSlider — 万能滑条节点"""
+"""WOSAI OmniSlider — 万能滑条节点"""
 
 import json
 from wosai_core.config import CATEGORY_PREFIX, default_omni_config as default_config
 
-MAX_CHANNELS = 10
+MAX_CHANNELS = 6
 
 
 class _TS(str):
@@ -18,13 +18,13 @@ class _TS(str):
 class WOSAI_OmniSlider:
 
     CATEGORY = CATEGORY_PREFIX + "工具"
-    # 10 路输出通过 _TS 绕过 V1 静态类型校验，实际类型由 execute() 内各通道
+    # 6 路输出通过 _TS 绕过 V1 静态类型校验，实际类型由 execute() 内各通道
     # cfg.type 决定（INT 通道返回 int 等值浮点，FLOAT 通道返回原始浮点）
     RETURN_TYPES = (
-        _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"),
-        _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"),
+        _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"),
+        _TS("FLOAT"), _TS("FLOAT"), _TS("FLOAT"),
     )
-    RETURN_NAMES = ("C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10")
+    RETURN_NAMES = ("C1", "C2", "C3", "C4", "C5", "C6")
     FUNCTION = "execute"
     OUTPUT_NODE = False
 
@@ -36,7 +36,7 @@ class WOSAI_OmniSlider:
         for i in range(1, MAX_CHANNELS + 1):
             hidden[f"ch{i}_cfg"] = (
                 "STRING",
-                # 标签默认留空：前端滑条显示占位符“双击设置滑条”（与 omni-slider.js::defaultCfg 对齐）；
+                # 标签默认留空：前端滑条显示占位符“右键此处设置滑条”（与 omni-slider.js::defaultCfg 对齐）；
                 # 输出端口名由 RETURN_NAMES 兜底为 CN
                 {"default": json.dumps(default_config("")), "multiline": False},
             )

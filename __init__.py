@@ -1,5 +1,9 @@
-﻿from pathlib import Path
+"""WOSAI-ComfyUI: Professional visualization toolkit for ComfyUI nodes."""
+from pathlib import Path
 from .wosai_core.registry import Registry
+
+__version__ = "1.1"
+__author__ = "穿山阅海"
 
 WEB_DIRECTORY = "./web"
 NODE_CLASS_MAPPINGS = {}

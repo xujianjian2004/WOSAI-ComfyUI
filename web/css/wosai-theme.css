@@ -6,12 +6,7 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ═══ 统一字体栈 ═══ */
-:root {
-  --ws-font-family: "PingFang SC", "Microsoft YaHei", system-ui,
-    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --ws-font-mono: "Cascadia Code", "JetBrains Mono", "Consolas",
-    "SF Mono", monospace;
-}
+/* --ws-font-family / --ws-font-mono 已定义于 wosai-variables.css，此处不再重复 */
 
 /* ═══ Canvas Note 全局修正 ═══ */
 .wosai-node-note textarea {
@@ -50,6 +45,40 @@
   flex-direction: column;
   gap: var(--ws-gap);
   user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ── 视觉签名：左边笔触 + 顶角橙光 ── */
+.wosai-panel::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 2px; height: 100%;
+  background: var(--ws-brand-edge);
+  border-radius: 0 1px 1px 0;
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.wosai-panel::after {
+  content: '';
+  position: absolute;
+  left: 0; top: 0;
+  width: 200px; height: 150px;
+  background: var(--ws-brand-glow);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* 浅色主题下调暗笔触/光晕 */
+[data-theme="light"] .wosai-panel::before {
+  opacity: 0.45;
+}
+
+[data-theme="light"] .wosai-panel::after {
+  opacity: 0.6;
 }
 
 /* ── 面板独立主题切换 ── */

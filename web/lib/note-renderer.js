@@ -1,5 +1,5 @@
 // ========== CONSTANTS (inlined for standalone renderer) ==========
-import { getUIFont, hexToRGBA } from "./shared-utils.js";
+import { getUIFont, hexToRGBA, SYNTAX_COLORS } from "./shared-utils.js";
 
 const INLINE_RE = /(\*\*\*(.+?)\*\*\*)|(\*\*(.+?)\*\*)|(\*(.+?)\*)|~~(.+?)~~|==(.+?)==|\^(.+?)\^|~(.+?)~|`([^`]+)`|\[([^\]]*)\]\(([^)]+)\)|(https?:\/\/[^\s]+)|(www\.[^\s]+)/g;
 const isChinese     = (c) => /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(c);
@@ -73,6 +73,13 @@ function parseSpanStyle(str) {
     }
     return result;
 }
+// 颜色规范化：仅对「裸 16 进制(3/6 位)」补 #；命名色(blue)、rgb()/rgba()、已带 # 的原样保留。
+// 修复：早期统一 `'#'+c` 会把 "blue" 变成非法的 "#blue" → ctx.fillStyle 失败 → 退回白色。
+function normColor(c) {
+    c = (c || "").trim();
+    if (/^[0-9a-fA-F]{3}$/.test(c) || /^[0-9a-fA-F]{6}$/.test(c)) return "#" + c;
+    return c;
+}
 function extractAttr(attrStr, name) {
     const re = new RegExp('\\b' + name + '\\s*=\\s*([\\\'"])', 'i');
     const m = attrStr.match(re);
@@ -110,14 +117,14 @@ function applyTagAttrs(tagName, attrStr, baseAttrs) {
     if (sp['font-weight']) { a.bold = sp['font-weight'] === 'bold' || sp['font-weight'] === '700'; if (!a.bold) a._spanWeight = sp['font-weight']; }
     if (sp['font-size']) { const m = sp['font-size'].match(/^(\d+(?:\.\d+)?)/); if (m) a._spanSize = parseFloat(m[1]); }
     if (sp['font-family']) a._spanFamily = sp['font-family'];
-    if (sp['color']) { let c = sp['color'].trim(); if (!c.startsWith('#')) c = '#' + c; a._spanColor = c; }
+    if (sp['color']) a._spanColor = normColor(sp['color']);
     if (sp['text-align']) a.textAlign = sp['text-align'];
     if (sp['text-decoration'] === 'underline') a.underline = true;
     if (sp['text-decoration'] === 'line-through') a.strike = true;
     if (sp['font-style'] === 'italic') a.italic = true;
     if (sp['line-height']) { const l = parseFloat(sp['line-height']); if (l) a._lineHeight = l; }
     if (tagName === 'font') {
-        const fc = extractAttr(attrStr, 'color'); if (fc) { let c = fc.trim(); if (!c.startsWith('#')) c = '#' + c; a._spanColor = c; }
+        const fc = extractAttr(attrStr, 'color'); if (fc) a._spanColor = normColor(fc);
         const fs = extractAttr(attrStr, 'size'); if (fs) { const n = parseInt(fs); if (n) a._spanSize = n * 4 + 12; }
         const ff = extractAttr(attrStr, 'face'); if (ff) a._spanFamily = ff;
     }
@@ -263,7 +270,7 @@ function parseInline(raw, baseAttrs) {
                             if (styleProps['font-weight']) { spanAttrs.bold = styleProps['font-weight'] === 'bold' || styleProps['font-weight'] === '700'; if (!spanAttrs.bold) spanAttrs._spanWeight = styleProps['font-weight']; }
                             if (styleProps['font-size']) { const m = styleProps['font-size'].match(/^(\d+(?:\.\d+)?)/); if (m) spanAttrs._spanSize = parseFloat(m[1]); }
                             if (styleProps['font-family']) spanAttrs._spanFamily = styleProps['font-family'];
-                            if (styleProps['color']) { let c = styleProps['color'].trim(); if (!c.startsWith('#')) c = '#' + c; spanAttrs._spanColor = c; }
+                            if (styleProps['color']) spanAttrs._spanColor = normColor(styleProps['color']);
                             tokens.push(...parseInline(innerRaw, spanAttrs));
                             last = closeIdx + closeTag.length; i = last; matched = true;
                         }
@@ -531,7 +538,7 @@ function drawTable(ctx, table, x, y, availW, fontSize, uiFont, fontColor) {
             for (const tok of cellToks) {
                 const f = tok.bold ? `bold ${fontSize}px ${uiFont}` : tok.italic ? `italic ${fontSize}px ${uiFont}` : tok.code ? `${fontSize}px "Consolas","Courier New",monospace` : `${fontSize}px ${uiFont}`;
                 ctx.font = f; const cw2 = ctx.measureText(tok.ch).width;
-                ctx.fillStyle = tok.link ? "#4a9eff" : fontColor; ctx.fillText(tok.ch, tx, rowY + rowHeight / 2);
+                ctx.fillStyle = tok.link ? SYNTAX_COLORS.link : fontColor; ctx.fillText(tok.ch, tx, rowY + rowHeight / 2);
                 if (tok.strike) { ctx.beginPath(); ctx.moveTo(tx, rowY + rowHeight / 2 + fontSize * 0.05); ctx.lineTo(tx + cw2, rowY + rowHeight / 2 + fontSize * 0.05); ctx.strokeStyle = fontColor; ctx.lineWidth = 1; ctx.stroke(); }
                 tx += cw2;
             }
@@ -573,16 +580,32 @@ export function drawNodeText(ctx, node, scrollbarW = 0) {
     const text = p.text.replace(/\\n/g,"\n").replace(/\r\n/g,"\n").replace(/\r/g,"\n");
     const fontSize = p.fontSize || 24, uiFont = getUIFont();
     ctx.font = `${fontSize}px ${uiFont}`;
-    const blocks = parseTextBlocks(text), maxW = node.size[0] - 2 * p.padding - scrollbarW;
+    const maxW = node.size[0] - 2 * p.padding - scrollbarW;
+    // 排版缓存：解析(parseTextBlocks)+分词(buildTokenList)+换行(wrapChars) 很重，
+    //   拖动时每秒数十次全量重排会卡顿/闪烁。按 文本/字号/行距/宽度/字重/字体 缓存
+    //   blocks 与各块换行结果，内容/尺寸不变即复用，每帧只剩绘制(measure+fill)。
+    const ntKey = text + '|' + fontSize + '|' + (p.lineHeight||1.4) + '|' + p.padding + '|' + node.size[0] + '|' + (p.fontWeight||'') + '|' + scrollbarW + '|' + uiFont;
+    let _nt = node._ntCache;
+    if (!_nt || _nt.key !== ntKey) {
+        const bl = parseTextBlocks(text);
+        _nt = node._ntCache = { key: ntKey, blocks: bl, lines: bl.map(b => b.type === 'table' ? null : wrapChars(ctx, buildTokenList(b.text), maxW, fontSize, uiFont)) };
+    }
+    const blocks = _nt.blocks, blockLines = _nt.lines;
     const lineH = fontSize * (p.lineHeight || 1.4); ctx.textBaseline = "top";
     let curY = p.padding;
-    for (const block of blocks) {
+    // 视口裁剪：仅溢出滚动时(scrollbarW>0)启用。可视范围(内容坐标)=[_scrollY, _scrollY+h]，
+    //   留一行余量。屏幕外的纯文本行只累加高度、跳过 measure/fill/linkAreas；含图片的行
+    //   不裁剪，避免图片高度未知导致后续行垂直错位。大文档拖动时绘制量大幅下降。
+    const _cull = scrollbarW > 0, _vTop = (node._scrollY || 0) - lineH, _vBot = (node._scrollY || 0) + node.size[1] + lineH;
+    for (let _bi = 0; _bi < blocks.length; _bi++) {
+        const block = blocks[_bi];
         if (block.type === 'table') { curY += lineH * 0.3; curY = drawTable(ctx, block, p.padding, curY, maxW, fontSize, uiFont, p.fontColor); curY += lineH * 0.3; continue; }
-        const tokens = buildTokenList(block.text), lines = wrapChars(ctx, tokens, maxW, fontSize, uiFont);
+        const lines = blockLines[_bi];
         for (let li = 0; li < lines.length; li++) {
             const row = lines[li];
             if (!row.length) { const nextRow = lines[li + 1]; curY += nextRow && nextRow[0] && (nextRow[0].isList || nextRow[0].isOrderedList) ? lineH * 0.15 : lineH; continue; }
             const rh = getLineH(row, fontSize, p.lineHeight);
+            if (_cull && (curY + rh < _vTop || curY > _vBot) && !row.some(t => t.image)) { curY += rh; continue; }
             for (const tok of row) {
                 if (tok._gk === undefined) {
                     const font = tokFont(tok, fontSize, p.fontWeight, uiFont);
@@ -612,8 +635,8 @@ export function drawNodeText(ctx, node, scrollbarW = 0) {
                 if ((tok.isList || tok.isOrderedList) && tok.isListMarker && (tok.nestLevel || 0) > 0 && x === p.padding) { x += (tok.nestLevel || 0) * gfs * 1.2; }
                 if (tok.isCodeBlock) {
                     const codeFont = `${gfs}px "Consolas","Courier New",monospace`; ctx.font = codeFont; const cw2 = ctx.measureText(g.text).width;
-                    ctx.fillStyle = "rgba(0,0,0,0.30)"; ctx.fillRect(p.padding, curY - 1, node.size[0] - 2 * p.padding, gfs + 4);
-                    ctx.fillStyle = "#b5e0c8"; ctx.fillText(g.text, x, curY); x += cw2; continue;
+                    ctx.fillStyle = SYNTAX_COLORS.codeBlockBg; ctx.fillRect(p.padding, curY - 1, node.size[0] - 2 * p.padding, gfs + 4);
+                    ctx.fillStyle = SYNTAX_COLORS.codeBlock; ctx.fillText(g.text, x, curY); x += cw2; continue;
                 }
                 if (tok.image) {
                     const imgEntry = loadImage(tok.url), availableW = node.size[0] - 2 * p.padding, availableH = node.size[1] - curY - p.padding;
@@ -631,20 +654,20 @@ export function drawNodeText(ctx, node, scrollbarW = 0) {
                         let drawX = p.textAlign === "left" ? p.padding : p.textAlign === "right" ? node.size[0] - p.padding - drawW : (node.size[0] - drawW) / 2;
                         ctx.drawImage(imgEntry.img, drawX, curY, drawW, drawH); node.linkAreas.push({ x: drawX, y: curY, width: drawW, height: drawH, url: tok.url });
                         rowImgH = Math.max(rowImgH, drawH + 4); x += drawW; continue;
-                    } else if (imgEntry.error) { ctx.fillStyle = "#9f7aea"; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = "#9f7aea"; ctx.lineWidth = 1; ctx.stroke(); x += gw; continue; }
-                    else { ctx.fillStyle = "#9f7aea"; ctx.fillText(g.text, x, curY); x += gw; continue; }
-                } else if (tok.link) { node.linkAreas.push({ x, y: curY, width: gw, height: rh, url: tok.url }); ctx.fillStyle = "#4a9eff"; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = "#4a9eff"; ctx.lineWidth = 1; ctx.stroke(); x += gw; continue; }
+                    } else if (imgEntry.error) { ctx.fillStyle = SYNTAX_COLORS.fail; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = SYNTAX_COLORS.fail; ctx.lineWidth = 1; ctx.stroke(); x += gw; continue; }
+                    else { ctx.fillStyle = SYNTAX_COLORS.fail; ctx.fillText(g.text, x, curY); x += gw; continue; }
+                } else if (tok.link) { node.linkAreas.push({ x, y: curY, width: gw, height: rh, url: tok.url }); ctx.fillStyle = SYNTAX_COLORS.link; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = SYNTAX_COLORS.link; ctx.lineWidth = 1; ctx.stroke(); x += gw; continue; }
                 else if (tok.isTaskList && tok.isListMarker) {
                     const boxSize = Math.round(gfs * 0.75), boxX = x, boxY = curY + (rh - boxSize) / 2;
                     ctx.save(); ctx.strokeStyle = hexToRGBA(p.fontColor, 0.7); ctx.lineWidth = Math.max(1, boxSize * 0.1); ctx.beginPath(); ctx.roundRect(boxX, boxY, boxSize, boxSize, boxSize * 0.2); ctx.stroke();
-                    if (tok.isChecked) { ctx.fillStyle = "#4ade80"; ctx.beginPath(); ctx.roundRect(boxX, boxY, boxSize, boxSize, boxSize * 0.2); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(1.5, boxSize * 0.12); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(boxX + boxSize * 0.2, boxY + boxSize * 0.5); ctx.lineTo(boxX + boxSize * 0.42, boxY + boxSize * 0.72); ctx.lineTo(boxX + boxSize * 0.8, boxY + boxSize * 0.28); ctx.stroke(); }
+                    if (tok.isChecked) { ctx.fillStyle = SYNTAX_COLORS.complete; ctx.beginPath(); ctx.roundRect(boxX, boxY, boxSize, boxSize, boxSize * 0.2); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(1.5, boxSize * 0.12); ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.beginPath(); ctx.moveTo(boxX + boxSize * 0.2, boxY + boxSize * 0.5); ctx.lineTo(boxX + boxSize * 0.42, boxY + boxSize * 0.72); ctx.lineTo(boxX + boxSize * 0.8, boxY + boxSize * 0.28); ctx.stroke(); }
                     ctx.restore(); x += boxSize + gfs * 0.3; continue;
                 } else if (tok.code) {
                     const codeFont = `${gfs}px "Consolas","Courier New",monospace`; ctx.font = codeFont; const cw = ctx.measureText(g.text).width, pad2 = 3;
-                    ctx.fillStyle = "rgba(0,0,0,0.25)"; ctx.fillRect(x - pad2, curY - 1, cw + pad2*2, gfs + 4); ctx.fillStyle = "#e8c86a"; ctx.fillText(g.text, x, curY); x += cw; continue;
+                    ctx.fillStyle = SYNTAX_COLORS.codeBg; ctx.fillRect(x - pad2, curY - 1, cw + pad2*2, gfs + 4); ctx.fillStyle = SYNTAX_COLORS.code; ctx.fillText(g.text, x, curY); x += cw; continue;
                 } else if (tok.underline) { ctx.fillStyle = p.fontColor; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = p.fontColor; ctx.lineWidth = Math.max(1, gfs * 0.06); ctx.stroke(); x += gw; continue; }
                 else if (tok.isAbbr) { ctx.fillStyle = p.fontColor; ctx.fillText(g.text, x, curY); ctx.beginPath(); ctx.moveTo(x, curY + gfs + 1); ctx.lineTo(x + gw, curY + gfs + 1); ctx.strokeStyle = hexToRGBA(p.fontColor, 0.45); ctx.lineWidth = Math.max(1, gfs * 0.06); ctx.setLineDash([2, 3]); ctx.stroke(); ctx.setLineDash([]); x += gw; continue; }
-                else if (tok.mark) { const pad2 = 2; ctx.fillStyle = 'rgba(255, 220, 0, 0.35)'; ctx.fillRect(x - pad2, curY, gw + pad2 * 2, gfs * 1.15); ctx.fillStyle = '#ffe066'; ctx.fillText(g.text, x, curY); x += gw; continue; }
+                else if (tok.mark) { const pad2 = 2; ctx.fillStyle = SYNTAX_COLORS.markBg; ctx.fillRect(x - pad2, curY, gw + pad2 * 2, gfs * 1.15); ctx.fillStyle = SYNTAX_COLORS.mark; ctx.fillText(g.text, x, curY); x += gw; continue; }
                 else if (tok.sup) { const supFs = Math.round(gfs * 0.65); ctx.font = `${supFs}px ${uiFont}`; const supW = ctx.measureText(g.text).width; ctx.fillStyle = p.fontColor; ctx.fillText(g.text, x, curY); x += supW; continue; }
                 else if (tok.sub) { const subFs = Math.round(gfs * 0.65); ctx.font = `${subFs}px ${uiFont}`; const subW = ctx.measureText(g.text).width; ctx.fillStyle = p.fontColor; ctx.fillText(g.text, x, curY + gfs * 0.35); x += subW; continue; }
                 else if (tok._spanColor) { ctx.fillStyle = tok._spanColor; ctx.fillText(g.text, x, curY); if (tok.strike) { ctx.beginPath(); ctx.moveTo(x, curY + gfs * 0.55); ctx.lineTo(x + gw, curY + gfs * 0.55); ctx.strokeStyle = tok._spanColor; ctx.lineWidth = Math.max(1, gfs * 0.06); ctx.stroke(); } }

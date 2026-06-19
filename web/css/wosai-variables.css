@@ -17,15 +17,24 @@
   --ws-accent-active:     #C86442;
   --ws-accent-dim:        rgba(221, 111, 74, 0.15);
 
+  /* ── 语义色 ── */
+  --ws-danger:            #EF4444;
+
+  /* ── 统一字体栈（非主题变量，全局有效） ── */
+  --ws-font-family: "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ws-font-display: "STSong", "Songti SC", "Noto Serif CJK SC", "PingFang SC", serif;
+  --ws-font-mono: "Cascadia Code", "JetBrains Mono", "Consolas", "SF Mono", monospace;
+
   /* ── 背景层级 (由浅入深: bg > surface > s2 > s3) ── */
-  --ws-bg:                #17181B;
-  --ws-surface:           #262729;
-  --ws-surface-2:         #1c1d20;
-  --ws-surface-3:         #131417;
-  --ws-surface-2-rgb:     28, 29, 32;
+  /* 暖黑基调：从 #17181B 向暖偏移 2°，避开 GitHub-dark 禁区 */
+  --ws-bg:                #1C1A18;
+  --ws-surface:           #252724;
+  --ws-surface-2:         #1A1A18;
+  --ws-surface-3:         #121110;
+  --ws-surface-2-rgb:     26, 26, 24;
   /* 提亮层（按钮分层底色，比面板底逐层提亮） */
-  --ws-surface-raised:    #2c2c2e;
-  --ws-surface-raised-2:  #333336;
+  --ws-surface-raised:    #2b2b29;
+  --ws-surface-raised-2:  #333330;
 
   /* ── 边框 ── */
   --ws-border:            #383B44;
@@ -37,6 +46,7 @@
   --ws-text:              #E4E4E7;
   --ws-text-secondary:    #A3A3A3;
   --ws-text-muted:        #7A7A7A;
+  --ws-icon:              #AEBFD0;   /* 工具图标静止态：软蓝灰（比纯灰耐看，悬停转 --ws-accent） */
   --ws-text-on-accent:    #FFFFFF;
   --ws-text-placeholder:  #5A5A5A;
 
@@ -49,7 +59,7 @@
 
   /* ── 圆角尺规 ── */
   --ws-radius-sm:         4px;
-  --ws-radius:            6px;
+  --ws-radius:            8px;
   --ws-radius-md:         8px;
   --ws-radius-lg:         12px;
   --ws-radius-xl:         16px;
@@ -69,12 +79,25 @@
 
   /* ── 字号尺规 ── */
   --ws-text-3xs:          9px;
-  --ws-text-2xs:          10px;
-  --ws-text-xs:           10px;
+  --ws-text-xs:           10px;   /* --ws-text-2xs 已合并至此（二者同值），消除语义重复 */
   --ws-text-sm:           11px;
   --ws-text-base:         12px;
   --ws-text-md:           13px;
   --ws-text-lg:           14px;
+  --ws-text-xl:           16px;   /* 面板标题 */
+  --ws-text-2xl:          18px;   /* 区块标题 */
+  --ws-text-3xl:          22px;   /* 页面标题 */
+
+  /* ── 语法高亮色（note-renderer.js 同步使用，深色主题专用） ── */
+  --ws-syntax-link:       #4A9EFF;
+  --ws-syntax-code:       #E8C86A;
+  --ws-syntax-code-bg:    rgba(0, 0, 0, 0.25);
+  --ws-syntax-code-block: #B5E0C8;
+  --ws-syntax-code-block-bg: rgba(0, 0, 0, 0.30);
+  --ws-syntax-mark:       #FFE066;
+  --ws-syntax-mark-bg:    rgba(255, 220, 0, 0.35);
+  --ws-syntax-fail:       #9F7AEA;
+  --ws-syntax-complete:   #4ADE80;
 
   /* ── 动效 ── */
   --ws-transition-fast:   100ms ease-out;
@@ -109,6 +132,13 @@
 
   /* ── 焦点环 ── */
   --ws-focus-ring:        0 0 0 2px var(--ws-accent);
+
+  /* ── 视觉签名（品牌识别） ── */
+  --ws-brand-edge:        linear-gradient(to bottom, var(--ws-accent), transparent 60%);  /* 左边笔触 */
+  --ws-brand-glow:        radial-gradient(ellipse at 0% 0%, rgba(221, 111, 74, 0.04) 0%, transparent 70%);  /* 顶角橙光 */
+
+  /* ── text-2xs 兼容别名（同值 text-xs 10px，向后兼容旧引用） ── */
+  --ws-text-2xs:          var(--ws-text-xs);
 
   /* ── 禁态 ── */
   --ws-disabled-opacity:  0.4;
@@ -153,6 +183,7 @@
   --ws-text-secondary:    #4A3A30;
   --ws-text-muted:        #8A7A70;
   --ws-text-placeholder:  #AAA098;
+  --ws-icon:              #5E6B7A;   /* 浅色主题：较深软蓝灰，保证对比 */
 
   /* ── 语义色背景 ── */
   --ws-success-bg:        rgba(67, 160, 71, 0.08);
@@ -178,6 +209,17 @@
 
   /* ── 滚动条 ── */
   --ws-scrollbar-thumb:   #C0B8AE;
+
+  /* ── 语法高亮色（浅色主题） ── */
+  --ws-syntax-link:       #2563EB;
+  --ws-syntax-code:       #8B6914;
+  --ws-syntax-code-bg:    rgba(0, 0, 0, 0.06);
+  --ws-syntax-code-block: #2D6A4F;
+  --ws-syntax-code-block-bg: rgba(0, 0, 0, 0.06);
+  --ws-syntax-mark:       #A07800;
+  --ws-syntax-mark-bg:    rgba(255, 220, 0, 0.25);
+  --ws-syntax-fail:       #7C3AED;
+  --ws-syntax-complete:   #16A34A;
 }
 
 /* ═══ 可访问性: prefers-reduced-motion ═══ */

@@ -36,6 +36,20 @@ export function hexToRGBA(hex, alpha) {
     return `rgba(${r},${g},${b},${Math.max(0,Math.min(1,+alpha||0))})`;
 }
 
+// ── 语法高亮色（Canvas note 渲染用，与 wosai-variables.css --ws-syntax-* 同步）──
+// 修改时需同步更新 wosai-variables.css 深/浅主题对应的令牌值。
+export const SYNTAX_COLORS = {
+    link:       '#4A9EFF',
+    code:       '#E8C86A',
+    codeBg:     'rgba(0, 0, 0, 0.25)',
+    codeBlock:  '#B5E0C8',
+    codeBlockBg:'rgba(0, 0, 0, 0.30)',
+    mark:       '#FFE066',
+    markBg:     'rgba(255, 220, 0, 0.35)',
+    fail:       '#9F7AEA',
+    complete:   '#4ADE80',
+};
+
 // ── 共享线性图标（Tabler/Lucide 风格自绘，多彩版）──────────
 // 默认 stroke=currentColor 随容器变色；多彩元素在 path 上显式指定颜色
 export const wsIcon = (inner, size = 16) =>
@@ -49,13 +63,26 @@ export const WS_ICONS = {
     // 图钉：未固定（描边随主题）/ 已固定（品牌橙）
     pin: wsIcon('<path d="M12 17v5"/><path d="M9 10.8V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5.8l2.3 2.9a1 1 0 0 1-.8 1.6H7.5a1 1 0 0 1-.8-1.6L9 10.8z"/>'),
     pinned: wsIcon('<path stroke="#DD6F4A" d="M12 17v5"/><path stroke="#DD6F4A" fill="rgba(221,111,74,.25)" d="M9 10.8V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v5.8l2.3 2.9a1 1 0 0 1-.8 1.6H7.5a1 1 0 0 1-.8-1.6L9 10.8z"/>'),
-    // 吸管（采样线橙色）
-    pipette: wsIcon('<path stroke="#DD6F4A" d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/>'),
-    // 骰子（五点多彩）
-    dice: wsIcon('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="#E24B4A" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="#EF9F27" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="#1D9E75" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="#378ADD" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="#7F77DD" stroke="none"/>'),
+    // 吸管（统一单色，随容器色 currentColor；放大到 22，与骰子视觉平衡）
+    pipette: wsIcon('<path d="M11 7l6 6"/><path d="M4 16L15.7 4.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4L8 20H4v-4z"/>', 22),
+    // 骰子（统一单色，五点随容器色；放大到 20）
+    dice: wsIcon('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/>', 20),
     // 主题自动模式（半填充对比圆）
     auto: wsIcon('<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/>'),
     // 锁：闭合（橙红警示+淡填充）/ 开口（随主题色）
     lock: wsIcon('<rect stroke="#DD6F4A" fill="rgba(221,111,74,.22)" x="5" y="11" width="14" height="9" rx="2"/><path stroke="#DD6F4A" d="M8 11V7a4 4 0 0 1 8 0v4"/><circle cx="12" cy="15.5" r="1" fill="#DD6F4A" stroke="none"/>'),
     lockOpen: wsIcon('<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0"/><circle cx="12" cy="15.5" r="1" fill="currentColor" stroke="none"/>'),
 };
+
+// ── 重试工具：函数返回 truthy 时停止，否则按策略重试 ──────────────────────
+// 首次尝试始终走 requestAnimationFrame（下一帧），后续重试按 delay 或 rAF。
+// 消除 omni-slider.js 等文件中 4+ 处重复的"计数器 + setTimeout/rAF"模板。
+export function retryUntil(fn, { maxTries = 20, delay = 0 } = {}) {
+    let tries = 0;
+    const step = () => {
+        if (fn() || ++tries >= maxTries) return;
+        if (delay > 0) setTimeout(step, delay);
+        else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+}
