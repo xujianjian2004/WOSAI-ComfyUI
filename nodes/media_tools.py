@@ -231,6 +231,8 @@ class WOSAI_GetWidget:
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
+        # 返回 NaN 使 ComfyUI 在每次执行时都重新计算本节点：
+        # 其输出随所连接目标节点的控件动态变化，不应被缓存复用。
         return float("nan")
 
     @staticmethod

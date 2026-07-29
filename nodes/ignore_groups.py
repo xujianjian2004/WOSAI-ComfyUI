@@ -3,7 +3,7 @@ import logging
 from wosai_core.config import CATEGORY_PREFIX
 
 logger = logging.getLogger(__name__)
-logger.info("[WOSAI] 忽略编组 IgnoreGroups 已加载")
+logger.debug("[WOSAI] 忽略编组 IgnoreGroups 已加载")
 
 
 class WOSAI_IgnoreGroups:

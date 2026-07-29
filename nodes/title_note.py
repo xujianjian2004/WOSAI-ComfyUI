@@ -6,7 +6,7 @@ import logging
 from wosai_core.config import CATEGORY_PREFIX
 
 logger = logging.getLogger(__name__)
-logger.info("[WOSAI] 标题注释 TitleNote 存根已加载")
+logger.debug("[WOSAI] 标题注释 TitleNote 存根已加载")
 
 
 class WOSAI_TitleNote:

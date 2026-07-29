@@ -2,7 +2,8 @@
 from pathlib import Path
 from .wosai_core.registry import Registry
 
-__version__: str = "2.0.0"
+from .wosai_core.config import VERSION
+__version__: str = VERSION  # 单一版本源：wosai_core/config.py::VERSION
 __author__: str = "穿山阅海"
 
 WEB_DIRECTORY: str = "./web"

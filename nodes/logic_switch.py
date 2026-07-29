@@ -8,7 +8,7 @@ import logging
 from wosai_core.config import CATEGORY_PREFIX
 
 logger = logging.getLogger(__name__)
-logger.info("[WOSAI] LogicSwitch 已加载")
+logger.debug("[WOSAI] LogicSwitch 已加载")
 
 
 # Helper class and instance from ComfyUI-LogicUtils/autonode.py
