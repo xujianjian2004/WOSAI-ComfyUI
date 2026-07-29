@@ -1,0 +1,146 @@
+{
+  "last_node_id": 6,
+  "last_link_id": 1,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "WOSAI_CommonColor",
+      "pos": [80, 100],
+      "size": [360, 220],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "color", "type": "INT", "links": [1] },
+        { "name": "hex", "type": "STRING", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": ["自定义", "#DD6F4A"]
+    },
+    {
+      "id": 2,
+      "type": "EmptyImage",
+      "pos": [520, 100],
+      "size": [270, 130],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        { "name": "width", "type": "INT", "widget": { "name": "width" }, "link": null },
+        { "name": "height", "type": "INT", "widget": { "name": "height" }, "link": null },
+        { "name": "batch_size", "type": "INT", "widget": { "name": "batch_size" }, "link": null },
+        { "name": "color", "type": "INT", "widget": { "name": "color" }, "link": 1 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "Node name for S&R": "EmptyImage"
+      },
+      "widgets_values": [512, 512, 1, 14511946]
+    },
+    {
+      "id": 3,
+      "type": "WOSAI_OmniSlider",
+      "pos": [80, 400],
+      "size": [360, 190],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        { "name": "active_value", "type": "FLOAT", "widget": { "name": "active_value" }, "link": null }
+      ],
+      "outputs": [
+        { "name": "VALUE", "type": "*", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": [
+        0.5,
+        "{\"label\":\"\",\"type\":\"FLOAT\",\"min\":0,\"max\":1,\"step\":0.01,\"value\":0.5,\"color\":\"#DD6F4A\",\"scale\":0.5,\"style\":\"float\",\"scale_float\":0.5,\"scale_fill\":0.5,\"trackBg\":\"#2A2A2E\",\"trackColor\":\"\",\"thumbColor\":\"\",\"textColor\":\"#E4E4E7\",\"trackHeight\":4}"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "WOSAI_SizeSelect",
+      "pos": [520, 340],
+      "size": [360, 300],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        { "name": "image", "type": "IMAGE", "links": null },
+        { "name": "mask", "type": "MASK", "links": null },
+        { "name": "latent", "type": "LATENT", "links": null },
+        { "name": "width", "type": "INT", "links": null },
+        { "name": "height", "type": "INT", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": ["off", "Crop", 1, "HD 720P", "16:9", 256, 2048]
+    },
+    {
+      "id": 5,
+      "type": "WOSAI_TitleNote",
+      "pos": [80, 700],
+      "size": [800, 120],
+      "flags": { "allow_interaction": true },
+      "order": 4,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "WOSAI Classic / Nodes 2.0 兼容性回归",
+        "fontSize": 36,
+        "fontColor": "#FFFFFF",
+        "backgroundColor": "#2B5BA1",
+        "backgroundAlpha": 0,
+        "borderRadius": 32,
+        "padding": 20,
+        "lineHeight": 1.4,
+        "letterSpacing": 0,
+        "textAlign": "center",
+        "rainbowEnabled": false,
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "color": "transparent",
+      "bgcolor": "transparent"
+    },
+    {
+      "id": 6,
+      "type": "WOSAI_IgnoreGroups",
+      "pos": [920, 100],
+      "size": [380, 420],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [1, 1, 0, 2, 3, "INT"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "wosaiCompatibilityWorkflow": true
+  },
+  "version": 0.4
+}

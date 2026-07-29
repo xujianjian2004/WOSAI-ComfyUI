@@ -17,10 +17,21 @@ Thumbs.db
 
 # Runtime data
 presets/
+# Keep the shipped color preset tracked even though the directory is ignored,
+# otherwise the release package (MANIFEST.in) would silently drop it.
+!presets/
+!presets/color_presets.json
 
 # Node.js
 node_modules/
+.playwright-report/
+.playwright-results/
 web/node_modules/
+.wosai-release-*/
+.runtime-host-test/
+
+# AI 重构工具临时快照 (codex / vscode check 副产物，如 xxx.js._chk.mjs)
+**/*._chk.mjs
 
 # Distribution / packaging
 *.egg-info/

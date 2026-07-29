@@ -1,0 +1,424 @@
+/* ══ WOSAI 节点对齐面板 ══ 走 --ws-* 令牌，[data-theme="light"] 自动浅色 */
+.wosai-al-panel {
+  position: fixed;
+  display: none;
+  z-index: var(--ws-z-panel);
+  width: var(--ws-lt-panel-width);
+  box-sizing: border-box;
+  padding: var(--ws-panel-padding-md);
+  background: var(--ws-surface);
+  border: var(--ws-border-width) solid var(--ws-border);
+  border-radius: var(--ws-lt-panel-radius);          /* 外=内+填充：按钮 8 + 内边距 16 = 24 */
+  box-shadow: var(--ws-shadow-panel);
+  color: var(--ws-text);
+  font-family: var(--ws-font-family);
+  font-size: var(--ws-text-md);
+  user-select: none;
+}
+.wosai-al-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--ws-text-xl);
+  font-weight: 500;
+  margin-bottom: var(--ws-lt-head-margin-bottom);
+}
+.wosai-al-x {
+  display: inline-flex;
+  cursor: pointer;
+  color: var(--ws-text-secondary);
+  transition: color .15s, transform .12s;
+}
+.wosai-al-x:hover { color: var(--ws-accent); transform: scale(1.12); }
+
+/* 九宫格快捷层：八个方向分别对齐到对应锚点，中心同时完成水平与垂直居中。 */
+.wosai-al-quick { margin-bottom: var(--ws-gap); }
+.wosai-al-quick-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--ws-gap);
+  margin-bottom: var(--ws-gap-sm);
+}
+.wosai-al-quick-head strong { font-size: var(--ws-text-md); font-weight: 500; }
+.wosai-al-quick-head span { font-size: var(--ws-text-sm); color: var(--ws-text-muted); }
+.wosai-al-tian {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1.4fr 1fr;
+  height: var(--ws-lt-quick-grid-height);
+  gap: var(--ws-border-width-thin);
+  overflow: hidden;
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  background: var(--ws-border);
+}
+.wosai-al-tian-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: background .15s, color .15s, transform .12s;
+}
+.wosai-al-tian-btn svg { width:var(--ws-lt-quick-icon-size); height:var(--ws-lt-quick-icon-size); }
+.wosai-al-tian-btn:hover { background: var(--ws-accent-dim); color: var(--ws-accent); }
+.wosai-al-tian-btn[data-inline-tip]::after {
+  content: attr(data-inline-tip);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ws-gap-xs);
+  box-sizing: border-box;
+  color: inherit;
+  font-family: var(--ws-font-family);
+  font-size: var(--ws-text-sm);
+  line-height: 1.1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .1s ease;
+}
+.wosai-al-tian-btn[data-inline-tip]:hover > * { opacity: 0; }
+.wosai-al-tian-btn[data-inline-tip]:hover::after { opacity: 1; }
+.wosai-al-center-action[data-inline-tip]::after {
+  content: attr(data-inline-tip);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  font-family: var(--ws-font-family);
+  font-size: var(--ws-text-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .1s ease;
+}
+.wosai-al-center-action[data-inline-tip]:hover > * { opacity: 0; }
+.wosai-al-center-action[data-inline-tip]:hover::after { opacity: 1; }
+.wosai-al-tian-btn:active { transform: scale(.96); }
+.wosai-al-tian-btn.cell-left { grid-column: 1; grid-row: 1 / 4; }
+.wosai-al-center-stack.cell-center { grid-column: 2; grid-row: 1 / 4; }
+.wosai-al-tian-btn.cell-right { grid-column: 3; grid-row: 1 / 4; }
+.wosai-al-center-stack {
+  display: grid;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+  background: var(--ws-surface-2);
+}
+.wosai-al-center-action {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: var(--ws-border-width-thin) solid var(--ws-border);
+  /* Keep the overflow action visually actionable even before hover. */
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.wosai-al-center-action:last-child { border-bottom: 0; }
+.wosai-al-center-action:hover { background: var(--ws-accent-dim); color: var(--ws-accent); }
+.wosai-al-quick-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--ws-gap-sm);
+  margin-top: var(--ws-gap-sm);
+}
+.wosai-al-quick-controls--pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ws-gap-xs);
+}
+.wosai-al-quick-controls--pair .wosai-al-quick-control {
+  padding: 0 var(--ws-gap-xs);
+  font-size: var(--ws-text-sm);
+}
+.wosai-al-quick-controls--pair .wosai-al-quick-control > span:last-child {
+  overflow: visible;
+  text-overflow: clip;
+}
+.wosai-al-quick-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ws-gap-sm);
+  min-height: var(--ws-lt-btn-height);
+  box-sizing: border-box;
+  padding: 0 var(--ws-lt-btn-padding-x);
+  min-width: 0;
+  overflow: hidden;
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-2);
+  color: var(--ws-text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s, transform .12s;
+}
+.wosai-al-quick-control > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wosai-al-quick-control:hover { border-color: var(--ws-accent); color: var(--ws-accent); transform: translateY(var(--ws-lift-hover)); }
+.wosai-al-quick-control:active { transform: none; }
+.wosai-al-quick.is-disabled .wosai-al-tian,
+.wosai-al-quick.is-disabled .wosai-al-quick-controls { opacity: .45; }
+.wosai-al-quick.is-disabled button { cursor: not-allowed; }
+.wosai-al-quick-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ws-gap);
+  margin: var(--ws-gap-lg) 0;
+  padding-top: 0;
+  border-top: 0;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-base);
+}
+.wosai-al-quick-status span:last-child {
+  padding: var(--ws-gap-xs) var(--ws-gap-lg);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+}
+.wosai-al-advanced-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ws-gap-sm);
+  width: 100%;
+  min-height: var(--ws-lt-btn-height);
+  box-sizing: border-box;
+  padding: 0 var(--ws-lt-btn-padding-x);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.wosai-al-advanced-toggle:hover,
+.wosai-al-advanced-toggle.is-open { border-color: var(--ws-accent); color: var(--ws-accent); background: var(--ws-accent-dim); }
+.wosai-al-advanced-toggle:focus-visible { outline: var(--ws-border-width-thin) solid var(--ws-accent); outline-offset: var(--ws-gap-xs); }
+.wosai-al-advanced-toggle span:first-child { display: flex; }
+.wosai-al-advanced-toggle svg { width: var(--ws-lt-quick-icon-size); height: var(--ws-lt-quick-icon-size); }
+.wosai-al-advanced[hidden] { display: none; }
+
+.wosai-al-sec {
+  font-size: var(--ws-text-md);
+  color: var(--ws-text-secondary);
+  margin: var(--ws-lt-sec-margin);
+}
+.wosai-al-sec--stretch {
+  font-size: var(--ws-text-sm);
+  text-align: center;
+}
+.wosai-al-grid { display: grid; gap: var(--ws-gap-sm); min-width: 0; margin-bottom: var(--ws-lt-grid-margin-bottom); }
+.wosai-al-grid.g3 { grid-template-columns: repeat(3, 1fr); }
+.wosai-al-grid.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.wosai-al-grid.g2 .wosai-al-btn {
+  justify-content: center;
+  gap: var(--ws-gap-xs);
+  height: auto;
+  min-height: var(--ws-lt-btn-height);
+  padding: var(--ws-gap-sm) var(--ws-gap-md);
+  font-size: var(--ws-text-sm);
+  line-height: 1.2;
+  white-space: normal;
+}
+.wosai-al-grid.g2 .wosai-al-ic { width: var(--ws-lt-quick-icon-size); }
+.wosai-al-grid.g2 .wosai-al-lb {
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.wosai-al-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;   /* 左对齐：图标/文字各成一条竖线（上下行对齐）*/
+  gap: var(--ws-gap);
+  height: var(--ws-lt-btn-height);
+  padding: 0 var(--ws-lt-btn-padding-x);
+  border-radius: var(--ws-radius);          /* 面板内按钮，作为外圆角(24)的内圆角基准 */
+  background: var(--ws-surface-2);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  color: var(--ws-text);
+  font-size: var(--ws-text-md);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  transition: border-color .15s, color .15s, background .15s, transform .12s;
+}
+.wosai-al-btn:hover { border-color: var(--ws-accent); transform: translateY(var(--ws-lift-hover)); } /* 保留 1px：微交互动画位移 */
+.wosai-al-btn:active { transform: none; }
+.wosai-al-ic {
+  display: inline-flex;
+  justify-content: center;
+  width: var(--ws-lt-icon-slot-width);          /* 固定图标槽：文字起点对齐成竖线 */
+  flex-shrink: 0;
+  color: var(--ws-icon);
+  transition: color .15s;
+}
+.wosai-al-btn:hover .wosai-al-ic { color: var(--ws-accent); }      /* A+B：悬停点亮品牌橙 */
+.wosai-al-btn:hover .wosai-al-lb { color: var(--ws-accent); }
+.wosai-al-lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
+
+.wosai-al-foot {
+  font-size: var(--ws-text-base);
+  color: var(--ws-text-muted);
+  text-align: center;
+  margin-top: var(--ws-lt-foot-margin-top);
+}
+
+/* ── 节点工具栏扩展按钮激活态（自动连点 / 摇断 / 重建）── */
+.wosai-node-tool-active > div:first-child {
+  background: var(--ws-accent) !important;
+  color: var(--ws-text-on-accent) !important;
+}
+.wosai-node-tool-active > div:nth-child(2) {
+  color: var(--ws-accent);
+}
+
+/* 节点工具栏内图标统一为 17px，与「固定/绕过/禁用…」的 ALIGN_ICONS 一致。
+   功能类 SVG 源文件为 24px（width/height/viewBox=24，stroke-width=2），
+   这里强制按节点操作图标尺寸同步，避免 5 个功能图标偏大。
+   仅作用于 node tab 容器（data-ws-module="node"），不波及配色/对齐等其它 HUD。 */
+[data-ws-module="node"] svg {
+  width: var(--ws-lt-node-icon-size) !important;
+  height: var(--ws-lt-node-icon-size) !important;
+  stroke-width: var(--ws-hk-icon-stroke) !important;
+}
+
+/* ── 节点检索 搜索框 ── */
+.wosai-sb {
+  position: fixed;
+  display: none;
+  left: 50%;
+  top: var(--ws-lt-search-top);
+  transform: translateX(-50%);
+  z-index: var(--ws-z-panel);
+  width: var(--ws-lt-search-width);
+  max-width: 92vw;
+  box-sizing: border-box;
+  padding: var(--ws-gap-lg);
+  background: var(--ws-surface);
+  border: var(--ws-border-width) solid var(--ws-border);
+  border-radius: var(--ws-lt-search-radius);          /* 外=内+填充：输入框 8 + 内边距 12 = 20 */
+  box-shadow: var(--ws-shadow-panel);
+  color: var(--ws-text);
+  font-family: var(--ws-font-family);
+  user-select: none;
+}
+.wosai-sb-row { display: flex; gap: var(--ws-gap); align-items: center; }
+.wosai-sb-in {
+  flex: 1;
+  height: var(--ws-lt-search-input-height);
+  box-sizing: border-box;
+  padding: 0 var(--ws-gap-md);
+  background: var(--ws-surface-2);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  color: var(--ws-text);
+  font-size: var(--ws-text-md);
+  font-family: inherit;
+  outline: none;
+}
+.wosai-sb-in:focus { border-color: var(--ws-accent); }
+.wosai-sb-seg { display: flex; gap: var(--ws-lt-seg-gap); padding: var(--ws-lt-seg-padding); border-radius: var(--ws-radius); background: var(--ws-surface-2); flex-shrink: 0; }
+.wosai-sb-m {
+  padding: var(--ws-lt-seg-btn-padding);
+  border: none;
+  border-radius: var(--ws-lt-seg-btn-radius);          /* 外=内+填充：5 + 分段内边距 3 = 8(分段外圆角) */
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-base);
+  font-family: inherit;
+  cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.wosai-sb-m:hover:not(.on) { color: var(--ws-accent); }
+.wosai-sb-m.on { background: var(--ws-accent); color: var(--ws-text-on-accent); }
+.wosai-sb-m--mode {
+  min-width: var(--ws-btn-h-xs);
+  padding-inline: var(--ws-gap-sm);
+  font-family: var(--ws-font-mono);
+  font-weight: 700;
+  line-height: 1;
+}
+.wosai-sr-list { margin-top: var(--ws-gap); max-height: var(--ws-lt-list-max-height); overflow-y: auto; overscroll-behavior: contain; }
+.wosai-sr-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ws-gap);
+  padding: var(--ws-lt-item-padding);
+  border-radius: var(--ws-radius);          /* 与搜索框对齐：8 + 框内边距 12 = 20(搜索框外圆角) */
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.wosai-sr-item:hover { background: var(--ws-surface-2); }
+.wosai-sr-item.sel { background: var(--ws-accent-dim); box-shadow: inset 0 0 0 var(--ws-border-width-thin) var(--ws-accent); }
+.wosai-sr-t { font-weight: 500; color: var(--ws-text); overflow: hidden; text-overflow: ellipsis; }
+.wosai-sr-ty { font-size: var(--ws-text-base); color: var(--ws-text-secondary); overflow: hidden; text-overflow: ellipsis; }
+.wosai-sr-id { margin-left: auto; font-size: var(--ws-text-sm); color: var(--ws-text-muted); flex-shrink: 0; }
+.wosai-sr-empty { padding: var(--ws-gap-lg); text-align: center; color: var(--ws-text-muted); font-style: italic; }
+
+/* ── 可访问性：减弱动态效果 ── */
+@media (prefers-reduced-motion: reduce) {
+  .wosai-al-x,
+  .wosai-al-btn,
+  .wosai-al-ic,
+  .wosai-al-lb,
+  .wosai-sb-m,
+  .wosai-al-toast {
+    transition: none !important;
+    animation: none !important;
+  }
+  .wosai-al-x:hover,
+  .wosai-al-btn:hover,
+  .wosai-al-btn:active {
+    transform: none !important;
+  }
+}
+
+/* Toast */
+.wosai-al-toast {
+  position: fixed;
+  left: 50%;
+  top: var(--ws-lt-toast-top);
+  transform: translateX(-50%);
+  z-index: var(--ws-z-toast);
+  padding: var(--ws-gap-sm) var(--ws-panel-padding-md);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  color: var(--ws-text);
+  font-size: var(--ws-text-md);
+  box-shadow: var(--ws-shadow-sm);
+  pointer-events: none;
+  white-space: nowrap;
+  width: fit-content;
+  max-width: 80vw;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}

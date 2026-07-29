@@ -1,0 +1,10 @@
+{
+    "indicatorTitle": "Saved Text",
+    "panelTitle": "Saved Text",
+    "emptyTip": "No saved text yet",
+    "saveBtn": "Save Current Text",
+    "useBtn": "Use",
+    "renameBtn": "Rename",
+    "deleteBtn": "Delete",
+    "renamePlaceholder": "Enter name"
+}

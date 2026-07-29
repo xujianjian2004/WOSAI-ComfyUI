@@ -1,0 +1,354 @@
+/* ══════════════════════════════════════════════════════════════════════
+   os-size.css — SizeSelect 尺寸选择节点样式
+   WOSAI ComfyUI v1.0 | 设计令牌见 wosai-variables.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+.ss-wrap {
+  padding: var(--ws-gap-sm);
+  font-family: "Inter", var(--ws-font-family);
+  user-select: none;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;   /* 弹性列占满节点高，供版权钉底 */
+  display: flex;
+  flex-direction: column;
+  contain: layout style;
+  position: relative;
+  color: var(--ws-text);
+}
+.ss-content {
+  flex: 0 1 auto;
+  overflow: visible;
+  min-height: 0;
+  max-width: 100%;
+}
+.ss-hidden {
+  display: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ── 4按钮控制行（预设｜自定义｜等比缩放｜中心裁剪） ── */
+.ss-control-row {
+  display: flex;
+  gap: var(--ws-ss-control-gap);
+  margin-bottom: var(--ws-gap);
+}
+
+.ss-control-btn {
+  flex: 1;
+  padding: var(--ws-ss-control-padding);
+  border-radius: var(--ws-radius);
+  border: var(--ws-border-width) solid var(--ws-border);
+  background: var(--ws-surface-raised);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-ss-button-font-size);
+  font-weight: 500;
+  letter-spacing: .03em;
+  cursor: pointer;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: var(--ws-transition);
+}
+.ss-control-btn:hover:not(.active) {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  opacity: .7;
+}
+.ss-control-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+.ss-control-btn:active { filter: brightness(.85); transition: none; }
+.ss-dimmed { opacity: 0.4; pointer-events: none; }
+
+/* ── Resolution grid ── */
+.ss-res-grid {
+  display: flex;
+  gap: var(--ws-ss-control-gap);
+  margin-top: 0;
+  margin-bottom: var(--ws-gap);
+}
+.ss-res-btn {
+  flex: 1;
+  position: relative;
+  padding: var(--ws-ss-resolution-padding);
+  border-radius: var(--ws-radius);
+  border: var(--ws-border-width) solid var(--ws-border);
+  background: var(--ws-surface-raised);   /* 提亮一层，与面板底区分 */
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-ss-button-font-size);
+  font-weight: 500;
+  letter-spacing: .02em;
+  cursor: pointer;
+  text-align: center;
+  white-space: normal;
+  line-height: 1.2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ws-ss-resolution-min-height);
+  transition: var(--ws-transition);
+}
+.ss-res-btn:hover:not(.active) {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  opacity: .7;
+}
+.ss-res-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+.ss-res-btn:active { filter: brightness(.85); transition: none; }
+
+/* ── Aspect ratio grid ── */
+.ss-ar-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--ws-ss-grid-row-gap) var(--ws-ss-control-gap);
+  margin-top: 0;
+  margin-bottom: var(--ws-gap);
+}
+.ss-ar-btn {
+  display: flex;
+  flex-direction: column;   /* 上图标下数字 */
+  align-items: center;
+  justify-content: center;
+  gap: var(--ws-gap-2xs);
+  padding: var(--ws-ss-resolution-padding);
+  border-radius: var(--ws-radius);
+  border: var(--ws-border-width) solid var(--ws-border);
+  background: var(--ws-surface-raised-2);   /* 再提亮一层 */
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  min-width: 0;
+  min-height: var(--ws-ss-aspect-min-height);
+  overflow: hidden;
+  transition: var(--ws-transition);
+}
+.ss-ar-btn .ar-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  width: var(--ws-icon-size);
+  height: var(--ws-icon-size);
+}
+/* 防御性加固：第三方插件的全局 svg/rect 泛选择器（如 svg{width:100%}、rect{stroke:...}）
+   会污染图标尺寸与颜色，此处用 !important 锁死 */
+.ss-wrap .ss-ar-btn .ar-icon svg {
+  display: block;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+.ss-wrap .ss-ar-btn .ar-icon svg rect {
+  fill: none !important;
+  stroke: var(--ws-text-secondary) !important;
+  stroke-width: var(--ws-border-width-thin) !important;   /* 细线版，与独立版一致 */
+}
+.ss-wrap .ss-ar-btn:hover:not(.active) .ar-icon svg rect,
+.ss-wrap .ss-ar-btn.active .ar-icon svg rect {
+  stroke: var(--ws-text-on-accent) !important;
+}
+.ss-ar-btn .ar-ratio {
+  font-size: var(--ws-ss-button-font-size);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: .02em;
+  white-space: normal;
+  text-align: center;
+  color: inherit;
+}
+.ss-ar-btn:hover:not(.active) {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  opacity: .7;
+}
+.ss-ar-btn.active {
+  background: var(--ws-accent);
+  border-color: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+.ss-ar-btn:active { filter: brightness(.85); transition: none; }
+
+/* ── Preview cell (preset mode, standalone row below grid) ── */
+/* ── Flash animations ── */
+.ss-preview.flash { animation: ss-flash-border .8s ease-in-out; }
+.ss-preview.flash .ss-preview-val { animation: ss-flash-text .8s ease-in-out; }
+
+@keyframes ss-flash-border {
+  0%, 100% { box-shadow: var(--ws-os-ring-default); }
+  50%      { box-shadow: var(--ws-os-shadow-active); }
+}
+@keyframes ss-flash-text {
+  0%, 100% { transform: scale(1); color: var(--ws-text); }
+  50% { transform: scale(1.15); color: var(--ws-accent); }
+}
+
+/* ── Swap button（一体式药丸，同缩放倍数轨道）── */
+.ss-swap-btn {
+  width: 100%;
+  height: var(--ws-ss-pill-height);
+  margin-top: calc(var(--ws-gap) + var(--ws-ss-swap-margin-offset));
+  margin-bottom: var(--ws-gap);
+  padding: 0;
+  border: none;
+  border-radius: var(--ws-ss-pill-radius);
+  box-shadow: var(--ws-os-ring-default);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: .05em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--ws-transition);
+}
+.ss-swap-btn:hover {
+  background: var(--ws-accent);
+  box-shadow: var(--ws-os-input-focus-ring);
+  color: var(--ws-text-on-accent);
+}
+.ss-swap-btn:active { filter: brightness(.85); transition: none; }
+
+/* ── Preview bar（一体式药丸，同缩放倍数轨道）── */
+.ss-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ws-ss-control-gap);
+  height: var(--ws-ss-pill-height);
+  margin-top: calc(var(--ws-gap) + var(--ws-ss-preview-margin-offset));
+  padding: var(--ws-ss-preview-padding);
+  background: var(--ws-surface-2);
+  border: none;
+  border-radius: var(--ws-ss-pill-radius);
+  box-shadow: var(--ws-os-ring-default);
+  color: var(--ws-text);
+  box-sizing: border-box;
+}
+.ss-preview-lbl {
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-secondary);
+  white-space: nowrap;
+}
+.ss-preview-val {
+  font-size: var(--ws-text-sm);
+  font-weight: 500;
+  color: var(--ws-accent);
+  letter-spacing: .02em;
+  white-space: nowrap;
+}
+
+.ss-scale-slider-row {
+  display: flex;
+  align-items: center;
+  height: var(--ws-ss-pill-height);
+  border-radius: var(--ws-ss-pill-radius);
+  box-shadow: var(--ws-os-ring-default);
+  overflow: hidden;
+  margin-top: var(--ws-gap);
+  margin-bottom: 0;
+}
+.ss-scale-slider-row:hover {
+  box-shadow: var(--ws-os-shadow-active);
+}
+.ss-scale-slider-row.ss-disabled {
+  opacity: .4;
+  filter: saturate(0);
+  cursor: not-allowed;
+}
+
+.ss-scale-track {
+  flex: 1;
+  height: var(--ws-ss-pill-height);
+  border-radius: var(--ws-ss-pill-radius);
+  background: var(--ws-surface-2);
+  position: relative;
+  cursor: ew-resize;
+  display: flex;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+/* Fill bar */
+.ss-scale-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 0;
+  border-radius: var(--ws-ss-pill-radius) 0 0 var(--ws-ss-pill-radius);
+  background: var(--ws-accent);
+  pointer-events: none;
+}
+
+/* Label —— 嵌入轨道居中 */
+.ss-scale-label {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-size: var(--ws-text-sm);
+  font-weight: 500;
+  color: var(--ws-text);
+  white-space: nowrap;
+  letter-spacing: .03em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* ── Copyright ── */
+.ss-copyright {
+  margin-top: var(--ws-gap);
+  /* 负 margin 在 Nodes 2.0 容器中会溢出右边框，改为收敛布局 */
+  margin-left: 0;
+  margin-right: 0;
+  padding: var(--ws-ss-copyright-padding);
+  text-align: center;
+  flex-shrink: 0;
+  font-size: var(--ws-text-xs);
+  color: var(--ws-text-muted);
+  letter-spacing: var(--ws-ss-copyright-spacing);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+/* 自定义模式：版权钉底 —— margin-top:auto 吃掉剩余空间，预览条↔版权 ≥12px，
+   版权↔节点底固定 12px（6px margin + 6px wrap padding），不随高度计算偏差失衡 */
+.ss-mode-manual .ss-copyright {
+  margin-top: auto;
+  padding-top: var(--ws-ss-manual-copyright-padding-top);
+  margin-bottom: var(--ws-gap-sm);
+}
+
+/* ── Accessibility ── */
+@media (prefers-reduced-motion: reduce) {
+  .ss-preview.flash,
+  .ss-preview.flash .ss-preview-val {
+    animation: none !important;
+  }
+}

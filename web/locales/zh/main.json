@@ -1,0 +1,27 @@
+{
+    "settingsCategories": {
+        "WOSAI Custom": "WOSAI 自定义",
+        "Run Highlight": "运行高亮",
+        "Color Assistant": "配色助手",
+        "About WOSAI": "关于 WOSAI",
+        "Canvas Layout": "画布整理",
+        "OmniSlider": "万能滑条",
+        "Highlight Border": "高亮框",
+        "Breathing on Mouse Move": "鼠标触发呼吸",
+        "Auto Breathing": "自动呼吸",
+        "Breathing Period": "呼吸周期",
+        "Breathing Strength": "呼吸强度",
+        "Breathing Size": "呼吸大小",
+        "Breathing Brightness": "呼吸亮度",
+        "Glow Color": "发光颜色",
+        "Runtime Display": "时间显示",
+        "Time Color": "时间颜色",
+        "Time Background Opacity": "时间背景透明度",
+        "Time Shadow Opacity": "时间阴影透明度",
+        "Show Floating Ball": "显示悬浮球",
+        "Hold Mode": "Hold 模式",
+        "Copyright": "版权",
+        "Alignment Guides": "实时参考线",
+        "Max Slider Count": "滑条总数上限"
+    }
+}

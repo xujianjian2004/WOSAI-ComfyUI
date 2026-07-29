@@ -1,0 +1,344 @@
+/* ══════════════════════════════════════════════════════════════════════
+   os-slider.css — OmniSlider 节点样式
+   WOSAI ComfyUI v1.0 | 设计令牌见 wosai-variables.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* === OmniSlider widget container === */
+.os-wrap {
+  position: relative;
+  padding: 0 0 var(--ws-os-wrap-padding-bottom);
+  font-family: var(--ws-font-family);
+  user-select: none;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: max(var(--ws-gap-md), calc(var(--ws-os-scale-base) * var(--os-scale, 1)));
+  color: var(--ws-text);
+  border-bottom: none;
+  --os-scale: 1;
+}
+
+.os-ch-add,
+.os-ch-sub {
+  width: var(--ws-os-btn-col-w);
+  height: calc(var(--ws-os-btn-col-w) * var(--os-scale, 1));
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font-size: max(calc(var(--ws-text-xs) * var(--os-scale, 1)), var(--ws-os-min-font));
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 10;
+  transition: color var(--ws-transition);
+  -webkit-font-smoothing: antialiased;
+}
+.os-ch-add:hover { color: var(--ws-accent); }
+.os-ch-add:active { color: var(--ws-accent-hover); }
+.os-ch-sub:hover { color: var(--ws-danger); }
+.os-ch-sub:active { color: var(--ws-danger); }
+
+/* +/- button custom tooltip */
+.os-ch-add[data-tooltip]:hover::after,
+.os-ctrl-btn[data-tooltip]:hover::after,
+.os-ch-sub[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + var(--ws-gap));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--ws-os-tooltip-padding);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-os-tooltip-bg);
+  color: var(--ws-text);
+  font-size: var(--ws-text-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: var(--ws-z-tooltip);
+  font-weight: 400;
+  line-height: var(--ws-os-tooltip-line-height);
+}
+
+/* === Slider row === */
+.os-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Fill style row: button column uses margin-top to align with track center */
+.os-slider-row[data-style="fill"] .os-btn-col {
+  align-self: center;
+  margin-top: calc(var(--ws-os-fill-btn-col-offset) * var(--os-scale, 1) + var(--ws-gap-md));
+}
+
+/* Button column (fixed width, ensures all track ends align) */
+.os-btn-col {
+  flex-shrink: 0;
+  width: var(--ws-os-btn-col-w);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 底部控制行：单组 − / + */
+.os-ctrl-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--ws-os-ctrl-row-gap);
+  margin-top: var(--ws-gap-2xs);
+}
+.os-ctrl-btn {
+  width: var(--ws-icon-btn-size);
+  height: var(--ws-btn-h-xs);
+  padding: 0;
+  border: none;
+  border-radius: var(--ws-radius);
+  background: transparent;
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-os-ctrl-btn-font-size);
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: color var(--ws-transition), background var(--ws-transition);
+}
+.os-ctrl-btn:hover { color: var(--ws-accent); background: var(--ws-surface-2); }
+
+/* Track wrapper — carries activation ring (box-shadow unaffected by clip-path) */
+.os-track-wrap {
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--ws-slider-track-radius);
+  transition: box-shadow var(--ws-transition);
+  box-shadow: var(--ws-os-ring-default);
+}
+.os-track-wrap:hover:not(.active) {
+  box-shadow: var(--ws-os-shadow-active);
+}
+.os-track-wrap.active {
+  box-shadow: var(--ws-os-ring-active);
+}
+.os-track-wrap.dim { opacity: var(--ws-os-dim-opacity); }
+
+/* Fill slider mode: no outer ring, styling handled internally */
+.os-track-wrap[data-style="fill"] { box-shadow: none !important; }
+
+
+
+/* ── Fill slider in-node UI layout ── */
+/* HUB 栏等浮动 DOM 可能遮挡滑条；提升 z-index 确保拖拽事件可穿透到达 */
+.os-fill-slot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--ws-gap-2xs) * var(--os-scale, 1));
+  cursor: ew-resize;
+  position: relative;
+  z-index: var(--ws-z-popover);
+}
+
+/* Text row: label + value horizontally, centered */
+.os-fill-text {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: calc(var(--ws-gap) * var(--os-scale, 1));
+  pointer-events: none;
+  padding: 0;
+  margin-top: calc(var(--ws-os-fill-text-lift) * var(--os-scale, 1));
+}
+.os-fill-text-label {
+  font-size: max(calc(var(--ws-text-lg) * var(--os-scale, 1)), var(--ws-os-fill-label-min-font));
+  font-weight: 400;
+  color: var(--ws-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.os-fill-text-val {
+  font-size: max(calc(var(--ws-text-xl) * var(--os-scale, 1)), var(--ws-os-fill-val-min-font));
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Thin rail container: overflow:visible ensures thumb isn't clipped */
+.os-fill-rail-wrap {
+  position: relative;
+  height: calc(var(--ws-os-fill-rail-h) * var(--os-scale, 1));
+  margin-right: 0;
+  margin-left: 0;
+}
+
+/* Thin rail itself */
+.os-fill-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--ws-slider-track-radius);
+  overflow: hidden;
+}
+
+/* Fill progress */
+.os-fill-rf {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--ws-slider-track-radius) 0 0 var(--ws-slider-track-radius);
+  pointer-events: none;
+}
+.os-fill-rf[data-full="1"] { border-radius: var(--ws-slider-track-radius); }
+
+/* Thumb sphere: absolutely positioned on rail-wrap, not affected by rail overflow */
+.os-fill-thumb-el {
+  position: absolute;
+  top: 50%;
+  width: calc(var(--ws-os-fill-thumb-base) * var(--os-scale, 1));
+  height: calc(var(--ws-os-fill-thumb-base) * var(--os-scale, 1));
+  border-radius: var(--ws-radius-full);
+  border: var(--ws-os-thumb-border);
+  box-shadow: var(--ws-os-shadow-thumb);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition: none;
+  z-index: 3;
+}
+
+/* Hidden widget global rules — absolute thrown out of viewport, zero layout + zero interaction */
+.wosai-hidden-widget,
+.wosai-hidden-widget * {
+  position: absolute !important;
+  left: var(--ws-os-hidden-offset) !important;
+  top: var(--ws-os-hidden-offset) !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Footer buttons */
+.os-footer { display: flex; gap: var(--ws-gap); margin-top: 0; }
+.os-btn {
+  flex: 1;
+  padding: var(--ws-os-footer-btn-padding);
+  border-radius: var(--ws-radius-md);
+  border: none;
+  font-size: var(--ws-text-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ws-transition);
+}
+.os-btn-cancel {
+  background: var(--ws-glass-bg);
+  color: var(--ws-text-secondary);
+  border: var(--ws-glass-border);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
+}
+.os-btn-cancel:hover {
+  background: var(--ws-accent-dim);
+  color: var(--ws-accent);
+  box-shadow: var(--ws-os-shadow-focus);
+}
+
+.os-btn-cancel:active {
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.os-btn-ok { background: var(--ws-accent); color: var(--ws-text-on-accent); border: none; }
+.os-btn-ok:hover { filter: brightness(1.22); box-shadow: var(--ws-os-shadow-ok-hover); }
+.os-btn-ok:active { filter: brightness(.82); box-shadow: none; }
+.os-cr {
+  text-align: center;
+  font-size: var(--ws-text-2xs);
+  color: var(--ws-text-muted);
+  letter-spacing: var(--ws-letter-spacing-wide);
+  white-space: nowrap;
+  padding-top: var(--ws-gap-sm);
+}
+
+/* === Drag feedback === */
+.os-fill-rail:active {
+  filter: brightness(1.08);
+}
+.os-track-wrap.dragging {
+  box-shadow: var(--ws-os-shadow-dragging);
+  transition: box-shadow var(--ws-transition-slow);
+}
+
+/* === Accessibility: reduced motion === */
+@media (prefers-reduced-motion: reduce) {
+  .os-track-wrap,
+  .os-track-wrap:active,
+  .os-track-wrap.dragging,
+  .os-fill-thumb-el,
+  .os-ch-thumb {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* === Touch device optimization === */
+@media (pointer: coarse) {
+  .os-track-wrap {
+    min-height: var(--ws-os-touch-track-min-h);
+    padding: var(--ws-gap) 0;
+  }
+  .os-btn-col {
+    width: var(--ws-icon-btn-size);
+  }
+  .os-ctrl-btn {
+    width: var(--ws-os-touch-ctrl-btn-w);
+    height: var(--ws-os-touch-ctrl-btn-h);
+    font-size: var(--ws-os-touch-ctrl-btn-font);
+  }
+  .os-fill-thumb-el {
+    width: var(--ws-os-touch-thumb-size);
+    height: var(--ws-os-touch-thumb-size);
+  }
+}
+
+/* === 定格点位标记 === */
+.os-snap-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.os-snap-dot {
+  position: absolute;
+  top: 50%;
+  border-radius: var(--ws-radius-full);
+  transform: translate(-50%, -50%);
+  transition: background 0.15s, width 0.15s, height 0.15s;
+}
+

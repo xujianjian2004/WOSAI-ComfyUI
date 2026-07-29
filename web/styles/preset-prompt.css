@@ -1,0 +1,331 @@
+.wosai-pp {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  align-content: start;
+  gap: var(--ws-pp-gap);
+  overflow: hidden;
+  padding: var(--ws-pp-padding);
+  color: var(--ws-text);
+  font-family: var(--ws-font-family);
+}
+
+.wosai-pp__hint {
+  min-width: 0;
+  flex: 1 1 var(--ws-pp-hint-min-width);
+  overflow: hidden;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__actions > button {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wosai-pp__settings {
+  min-height: var(--ws-pp-settings-min-height);
+  padding: var(--ws-pp-settings-padding);
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-xs);
+  white-space: nowrap;
+}
+
+.wosai-pp__settings:hover,
+.wosai-pp__settings:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp__mode {
+  min-height: var(--ws-pp-settings-min-height);
+  padding: var(--ws-pp-settings-padding);
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-xs);
+  white-space: nowrap;
+}
+
+.wosai-pp__mode:hover,
+.wosai-pp__mode:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp__mode.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-pp-clear-menu {
+  position: fixed;
+  z-index: var(--ws-z-panel);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: var(--ws-pp-clear-menu-min-width);
+  gap: var(--ws-gap-2xs);
+  padding: var(--ws-gap-2xs);
+  border: var(--ws-border-width) solid var(--ws-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-surface);
+  box-shadow: var(--ws-shadow-panel);
+}
+
+.wosai-pp-clear-menu__button {
+  min-height: var(--ws-pp-tab-min-height);
+  padding: var(--ws-pp-tab-padding);
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-sm);
+  text-align: center;
+  transition: background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast);
+  white-space: nowrap;
+}
+
+.wosai-pp-clear-menu__button:hover,
+.wosai-pp-clear-menu__button:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-clear-menu__button:active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-pp__tabs {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ws-gap-2xs);
+  min-height: var(--ws-pp-pager-size);
+  align-self: start;
+}
+
+.wosai-pp__pager[hidden] {
+  display: none;
+}
+
+.wosai-pp__pager-button {
+  display: grid;
+  width: var(--ws-pp-pager-size);
+  height: var(--ws-pp-pager-size);
+  place-items: center;
+  padding: 0;
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-sm);
+  line-height: 1;
+}
+
+.wosai-pp__pager-button:hover:not(:disabled),
+.wosai-pp__pager-button:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp__pager-button:disabled {
+  cursor: default;
+  opacity: var(--ws-disabled-opacity);
+}
+
+.wosai-pp__pager-label {
+  min-width: var(--ws-pp-pager-label-width);
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-2xs);
+  text-align: center;
+}
+
+.wosai-pp__tab {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ws-pp-tab-min-height);
+  overflow: hidden;
+  padding: var(--ws-pp-tab-padding);
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-tag-off-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-sm);
+  text-align: center;
+  text-overflow: ellipsis;
+  transition: background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast);
+  white-space: nowrap;
+}
+
+.wosai-pp__tab:hover,
+.wosai-pp__tab:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp__tab.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}
+
+.wosai-pp__tab.is-editing {
+  padding: var(--ws-gap-2xs);
+  cursor: text;
+}
+
+.wosai-pp__tab-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: calc(var(--ws-pp-tab-min-height) - var(--ws-gap-xs));
+  padding: var(--ws-gap-2xs) var(--ws-gap-xs);
+  border: var(--ws-border-width) dashed var(--ws-accent);
+  border-radius: var(--ws-radius-xs);
+  background: var(--ws-surface-2);
+  color: var(--ws-text);
+  font: inherit;
+  text-align: center;
+  outline: none;
+}
+
+[data-testid^="node-body-"].wosai-pp-node-body textarea {
+  min-height: var(--ws-pp-prompt-min-height) !important;
+  height: var(--ws-pp-prompt-min-height) !important;
+  max-height: none !important;
+}
+
+[data-testid^="node-body-"].wosai-pp-node-body {
+  padding-bottom: 0 !important;
+}
+
+[data-testid^="node-body-"].wosai-pp-node-body > .wosai-pp__host-brand-footer {
+  display: none !important;
+}
+
+.wosai-pp-editor {
+  position: fixed;
+  z-index: var(--ws-z-panel);
+  display: grid;
+  width: var(--ws-pp-editor-width);
+  max-height: var(--ws-pp-editor-max-height);
+  gap: var(--ws-pp-editor-gap);
+  padding: var(--ws-pp-editor-padding);
+  border: var(--ws-border-width) solid var(--ws-border);
+  border-radius: var(--ws-radius-md);
+  background: var(--ws-surface);
+  box-shadow: var(--ws-shadow-panel);
+  color: var(--ws-text);
+  font-family: var(--ws-font-family);
+}
+
+.wosai-pp-editor__title {
+  margin: 0;
+  font-size: var(--ws-text-md);
+}
+
+.wosai-pp-editor__title-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ws-gap-2xs);
+}
+
+.wosai-pp-editor__hint {
+  margin: 0;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+}
+
+.wosai-pp-editor__count-grid {
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp-editor__count-button {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  aspect-ratio: 1;
+  place-items: center;
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.wosai-pp-editor__count-button:hover,
+.wosai-pp-editor__count-button:focus-visible {
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-editor__count-button.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}

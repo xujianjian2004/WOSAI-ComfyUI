@@ -1,14 +1,16 @@
-VERSION = "1.0"
-AUTHOR = "穿山阅海"
-EMAIL = "xujianjian2004@126.com"
-STUDIO = "WOSAI STUDIO"
-LICENSE = "MIT"
-REPO_URL = "https://github.com/xujianjian2004/WOSAI-ComfyUI"
+"""WOSAI 全局配置：版本号 / 品牌 / 分类前缀 / 默认滑条参数。"""
+
+VERSION: str = "2.0"
+AUTHOR: str = "穿山阅海"
+EMAIL: str = "xujianjian2004@126.com"
+STUDIO: str = "WOSAI STUDIO"
+LICENSE: str = "MIT"
+REPO_URL: str = "https://github.com/xujianjian2004/WOSAI-ComfyUI"
 
 # 节点分类前缀（含品牌 emoji）
-CATEGORY_PREFIX = "🟠 WOSAI Studio / "
-BRAND_COLOR = "#DD6F4A"
-DOM_PREFIX = "wosai"
+CATEGORY_PREFIX: str = "🟠 WOSAI Studio / "
+BRAND_COLOR: str = "#DD6F4A"
+DOM_PREFIX: str = "wosai"
 
 # 万能滑条默认通道配置（V1/V3 共享）
 def default_omni_config(name: str = "Channel") -> dict:
@@ -28,4 +30,5 @@ def default_omni_config(name: str = "Channel") -> dict:
         "trackColor": "",
         "thumbColor": "",
         "textColor": "#E4E4E7",
+        "trackHeight": 4,
     }

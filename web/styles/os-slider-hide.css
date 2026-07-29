@@ -1,0 +1,144 @@
+/* ══════════════════════════════════════════════════════════════════════
+   os-slider-hide.css — OmniSlider 隐藏模式开关（面板/角标/端口）
+   从 os-slider.css 拆分，设计令牌见 wosai-variables.css
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* === Node display toggles (隐藏标题 / 隐藏角标) === */
+.os-display-section {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--ws-os-display-section-gap);
+  padding: var(--ws-os-row-padding-y);
+  background: transparent;
+  border-radius: var(--ws-radius-md);
+}
+.os-display-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ws-gap-sm);
+  padding: var(--ws-os-display-row-padding-y);
+  border-radius: var(--ws-radius-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+.os-display-row-label {
+  display: flex;
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  user-select: none;
+}
+.os-display-row-label svg {
+  width: var(--ws-os-icon-size);
+  height: var(--ws-os-icon-size);
+  color: var(--ws-text-secondary);
+  flex-shrink: 0;
+}
+
+/* Settings group container */
+.os-group {
+  background: transparent;
+  border-radius: var(--ws-radius-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ws-os-display-section-gap);
+  box-sizing: border-box;
+}
+.os-panel > .os-group { margin-bottom: 0; }
+.os-panel .os-group .os-display-row {
+  background: transparent;
+  border-radius: 0;
+  padding: var(--ws-os-display-row-padding-y);
+}
+.os-group .os-num-group {
+  background: transparent;
+  border: none;
+  border-radius: var(--ws-radius-md);
+  padding: var(--ws-os-row-padding-y);
+}
+.os-group .os-row-label { margin: var(--ws-gap-2xs) 0 0; padding-left: 0; }
+.os-group-top .os-seg { background: transparent; padding: 0; }
+
+/* Channel tabs: circular buttons with pointer at bottom */
+.os-group-top .os-seg.os-seg-tabs {
+  display: flex;
+  justify-content: flex-start;
+  gap: var(--ws-os-tabs-gap);
+  margin-bottom: var(--ws-gap-md);
+  background: transparent;
+  padding: 0;
+}
+.os-group-top .os-seg-tabs .os-seg-btn {
+  position: relative;
+  flex: none;
+  width: var(--ws-icon-btn-size);
+  height: var(--ws-icon-btn-size);
+  padding: 0;
+  border-radius: var(--ws-radius-full);
+  font-size: var(--ws-text-sm);
+  font-weight: 600;
+}
+.os-group-top .os-seg-tabs .os-seg-btn.on::after {
+  content: "";
+  position: absolute;
+  top: calc(100% - var(--ws-os-tab-arrow-offset));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: var(--ws-os-tab-arrow-size) solid transparent;
+  border-right: var(--ws-os-tab-arrow-size) solid transparent;
+  border-top: var(--ws-os-tab-arrow-size) solid var(--ws-accent);
+}
+
+/* Segmented control compact variant */
+.os-panel .os-seg.os-seg-compact { flex: 0 0 auto; width: auto; gap: var(--ws-gap-md); padding: 0; }   /* 去掉分段内边距，使整数/端口按钮右缘贴面板右缘，与数字框/应用按钮对齐 */
+.os-panel .os-seg.os-seg-compact .os-seg-btn {
+  flex: 0 0 auto;
+  padding: var(--ws-os-seg-btn-padding-sm);
+  font-size: var(--ws-text-sm);
+}
+.os-panel .os-seg.os-seg-hide { gap: var(--ws-gap); }
+.os-panel .os-seg.os-seg-hide .os-seg-btn { padding: var(--ws-os-seg-btn-padding-sm); font-size: var(--ws-text-sm); }   /* 与浮点/整数(os-seg-compact)完全同尺寸 */
+
+/* iOS-style toggle switch */
+.os-toggle {
+  position: relative;
+  width: var(--ws-os-toggle-w);
+  height: var(--ws-os-toggle-h);
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-surface-3);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--ws-transition), border-color var(--ws-transition);
+  -webkit-appearance: none;
+  appearance: none;
+  outline: none;
+}
+.os-toggle:focus-visible { box-shadow: var(--ws-focus-ring); }
+.os-toggle::after {
+  content: "";
+  position: absolute;
+  top: var(--ws-os-toggle-knob-pad);
+  left: var(--ws-os-toggle-knob-pad);
+  width: var(--ws-os-toggle-knob-size);
+  height: var(--ws-os-toggle-knob-size);
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-text-secondary);
+  transition: transform var(--ws-transition), background var(--ws-transition);
+  pointer-events: none;
+}
+.os-toggle.on { background: var(--ws-accent); border-color: var(--ws-accent); }
+.os-toggle.on::after { transform: translateX(var(--ws-os-toggle-translate)); background: var(--ws-text-on-accent); }
+.os-toggle:hover:not(.on) { background: var(--ws-border); }
+.os-toggle.on:hover { filter: brightness(1.1); }
+.os-toggle:active::after { transform: scale(var(--ws-os-toggle-active-scale)); }
+.os-toggle.on:active::after { transform: translateX(var(--ws-os-toggle-translate)) scale(0.92); }

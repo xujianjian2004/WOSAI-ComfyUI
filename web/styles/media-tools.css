@@ -1,0 +1,315 @@
+.wosai-points-editor,
+.wosai-image-compare {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--ws-gap-sm);
+  color: var(--ws-text);
+  font: 500 var(--ws-text-sm)/1.2 var(--ws-font-family);
+}
+
+.wosai-points-toolbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: 0 0 var(--ws-media-toolbar-height);
+  gap: var(--ws-gap-xs);
+  margin-bottom: var(--ws-gap-sm);
+}
+
+.wosai-points-toolbar button {
+  min-width: 0;
+  height: var(--ws-media-toolbar-height);
+  overflow: hidden;
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  padding: 0 var(--ws-gap-xs);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--ws-transition),
+    background var(--ws-transition),
+    color var(--ws-transition);
+}
+
+.wosai-points-toolbar button:hover,
+.wosai-points-toolbar button.is-active {
+  border-color: var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.wosai-points-toolbar button.is-active {
+  background: var(--ws-accent-dim);
+}
+
+.wosai-points-stage {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  width: 100%;
+  aspect-ratio: var(--wosai-points-ratio, 16 / 9);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius-lg);
+  background: var(--ws-surface-3);
+}
+
+.wosai-points-stage img,
+.wosai-points-stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.wosai-points-stage img {
+  object-fit: contain;
+}
+
+.wosai-points-stage img:not([src]) {
+  display: none;
+}
+
+.wosai-points-stage canvas {
+  cursor: crosshair;
+}
+
+.wosai-points-stage.is-empty canvas {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.wosai-media-empty {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: var(--ws-gap-xl);
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-sm);
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+}
+
+.wosai-media-empty[hidden] {
+  display: none;
+}
+
+.wosai-points-frames {
+  display: flex;
+  flex: 0 0 var(--ws-media-frame-row-height);
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  margin-top: var(--ws-gap-sm);
+}
+
+.wosai-points-frames[hidden] {
+  display: none;
+}
+
+.wosai-points-frames input {
+  flex: 1;
+  accent-color: var(--ws-accent);
+}
+
+.wosai-image-compare-stage {
+  position: relative;
+  flex: 0 0 var(--ws-media-preview-min-height);
+  overflow: hidden;
+  width: 100%;
+  height: var(--ws-media-preview-min-height);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius-lg);
+  background: var(--ws-surface-3);
+}
+
+.wosai-image-compare-stage > img,
+.wosai-image-compare-top,
+.wosai-image-compare-top img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity var(--ws-transition);
+}
+
+.wosai-image-compare-stage img:not([src]) {
+  display: none;
+}
+
+.wosai-image-compare-top {
+  overflow: hidden;
+}
+
+.wosai-image-compare-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--ws-border-width);
+  background: var(--ws-accent);
+  box-shadow: var(--ws-shadow-sm);
+  pointer-events: none;
+}
+
+.wosai-image-compare-stage.is-swapping > img,
+.wosai-image-compare-stage.is-swapping .wosai-image-compare-top {
+  opacity: 0.35;
+}
+
+.wosai-image-compare-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto var(--ws-media-slider-row-height);
+  flex: 0 0 var(--ws-media-slider-row-height);
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  min-width: 0;
+  height: var(--ws-media-slider-row-height);
+  margin-top: var(--ws-gap-sm);
+}
+
+.wosai-image-compare-label {
+  min-width: 1ch;
+  color: var(--ws-text-secondary);
+  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
+  text-align: center;
+}
+
+.wosai-image-compare-swap {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--ws-media-slider-row-height);
+  height: var(--ws-media-slider-row-height);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  padding: 0;
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  transition:
+    border-color var(--ws-transition),
+    background var(--ws-transition),
+    color var(--ws-transition);
+}
+
+.wosai-image-compare-swap svg {
+  width: var(--ws-media-action-icon-size);
+  height: var(--ws-media-action-icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wosai-image-compare-swap:hover:not(:disabled),
+.wosai-image-compare-swap.is-active {
+  border-color: var(--ws-accent);
+  color: var(--ws-accent);
+}
+
+.wosai-image-compare-swap.is-active {
+  background: var(--ws-accent-dim);
+}
+
+.wosai-image-compare-swap:focus-visible {
+  outline: none;
+  box-shadow: var(--ws-input-focus-ring);
+}
+
+.wosai-image-compare-swap:disabled {
+  opacity: var(--ws-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.wosai-media-range {
+  flex: 0 0 var(--ws-media-slider-row-height);
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--ws-media-slider-row-height);
+  margin: var(--ws-gap-sm) 0 0;
+  accent-color: var(--ws-accent);
+}
+
+.wosai-image-compare-range {
+  min-width: 0;
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wosai-image-compare-stage > img,
+  .wosai-image-compare-top {
+    transition: none;
+  }
+}
+
+.wosai-get-widget {
+  display: grid;
+  grid-template-rows: auto auto;
+  gap: var(--ws-gap-sm);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--ws-gap-sm);
+  color: var(--ws-text);
+  font: 500 var(--ws-text-sm)/1.2 var(--ws-font-family);
+}
+
+.wosai-get-widget select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--ws-selector-button-height);
+  border: var(--ws-border-width-thin) solid var(--ws-input-border);
+  border-radius: var(--ws-radius);
+  padding-inline: var(--ws-gap-sm);
+  background: var(--ws-input-bg);
+  color: var(--ws-input-text);
+  font: 500 var(--ws-text-base)/1.2 var(--ws-font-family);
+}
+
+.wosai-get-widget select:focus-visible {
+  outline: none;
+  border-color: var(--ws-accent);
+  box-shadow: var(--ws-input-focus-ring);
+}
+
+.wosai-get-widget-toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--ws-gap-sm);
+}
+
+.wosai-get-widget-toggle {
+  min-width: 0;
+  min-height: var(--ws-selector-button-height);
+  overflow: hidden;
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wosai-get-widget-toggle:hover {
+  border-color: var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.wosai-get-widget-toggle.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent-dim);
+  color: var(--ws-text);
+}

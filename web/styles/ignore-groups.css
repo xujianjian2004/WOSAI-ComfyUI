@@ -1,0 +1,318 @@
+/* ══════════════════════════════════════════════════════════════════════
+   ignore-groups.css — IgnoreGroups 节点样式
+   使用 WOSAI 设计令牌（--ws-*）与本节点局部变量（--wosai-ig-accent）
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 实例级强调色：JS 在根节点设置以下变量，未设置时回退到这里的默认值。
+   --wosai-ig-accent 驱动 active 标签 / on 徽章底 / toggle 开启底；
+   --wosai-ig-on / --wosai-ig-off / --wosai-ig-off-bg 驱动标签与数字圆圈。 */
+.wosai-ig {
+  --wosai-ig-accent: var(--ws-accent);
+  --wosai-ig-on: var(--ws-accent-hover);
+  --wosai-ig-off: var(--ws-ig-off);
+  --wosai-ig-off-bg: var(--ws-ig-off-bg);
+
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+  user-select: none;
+  pointer-events: auto;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: var(--ws-gap-xs);
+  font-family: var(--ws-font-family);
+  color: var(--ws-text);
+  /* 抑制 Nodes2.0 / 高分屏下 DOM Widget 非整数 transform 导致的文字发虚 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* 缩放内层包裹：整体 transform:scale(s) 实现 1–3 倍放大，node.size 同步增长。
+   will-change 由 JS 在缩放 >1× 时动态开启，1× 时关闭，避免不必要的合成层导致文字发虚。 */
+.wosai-ig-content {
+  position: relative;
+  box-sizing: border-box;
+  transform-origin: top left;
+  will-change: auto;
+}
+
+/* Tab 胶囊栏 */
+.wosai-ig-tabs {
+  display: flex;
+  gap: var(--ws-gap-sm);
+  width: calc(100% - var(--ws-gap-md) - var(--ws-gap-md));
+  box-sizing: border-box;
+  margin: 0 var(--ws-gap-md) var(--ws-gap);
+  padding: 0 var(--ws-gap-sm) 0 0;
+}
+
+.wosai-ig-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: var(--ws-gap-xs) var(--ws-gap-2xs);
+  font-size: var(--ws-text-base);
+  font-weight: 500;
+  color: var(--ws-text-secondary);
+  background: var(--ws-tag-on-bg);
+  border: var(--ws-border-width-thin) solid var(--ws-tag-on-border);
+  border-radius: var(--ws-radius);
+  cursor: pointer;
+  text-align: center;
+  transition: all var(--ws-transition);
+  font-family: inherit;
+  line-height: 1;
+  height: var(--ws-ig-tab-h);
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-ig-tab:hover {
+  color: var(--ws-text);
+  background: var(--ws-surface-3);
+  border-color: var(--ws-border);
+}
+
+.wosai-ig-tab.active {
+  color: var(--ws-text-on-accent);
+  background: var(--wosai-ig-accent);
+  border-color: var(--wosai-ig-accent);
+}
+
+.wosai-ig-empty {
+  color: var(--ws-text-muted);
+  text-align: center;
+  padding: var(--ws-gap-lg) var(--ws-gap-lg);
+  font-size: var(--ws-text-md);
+}
+
+.wosai-ig-list {
+  display: grid;
+  gap: var(--ws-gap);
+  margin: 0 var(--ws-gap-md);
+  box-sizing: border-box;
+}
+
+/* 列表项卡片 */
+.wosai-ig-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--ws-ig-row-h);
+  min-width: 0;
+  padding: 0 var(--ws-gap-sm) 0 var(--ws-gap-sm);
+  background: var(--ws-tag-on-bg);
+  border: var(--ws-border-width-thin) solid var(--ws-tag-on-border);
+  border-radius: var(--ws-radius-xl);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: border-color var(--ws-transition), background var(--ws-transition);
+  pointer-events: auto;
+}
+
+.wosai-ig-row.off {
+  background: var(--ws-tag-off-bg);
+  border-color: var(--ws-tag-off-border);
+}
+
+.wosai-ig-row.off:hover {
+  background: var(--ws-tag-off-hover-bg);
+  border-color: var(--ws-tag-off-hover-border);
+}
+
+.wosai-ig-row.off .wosai-ig-label {
+  color: var(--wosai-ig-off);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.wosai-ig-row:hover {
+  border-color: var(--ws-border);
+  background: var(--ws-surface-3);
+}
+
+.wosai-ig-row:not(.off) .wosai-ig-label {
+  color: var(--wosai-ig-on);
+  font-weight: 600;
+}
+
+.wosai-ig-label {
+  font-weight: 500;
+  font-size: var(--ws-text-md);
+  flex: 1;
+  letter-spacing: var(--ws-letter-spacing-wide);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: var(--ws-gap-md);
+  transition: opacity var(--ws-transition);
+  color: var(--ws-tag-on-text);
+}
+
+/* 列表项左侧顺序序号徽章（代表当前可见列表中的序号） */
+.wosai-ig-badge {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  min-width: var(--ws-ig-badge-size);
+  height: var(--ws-ig-badge-size);
+  padding: 0 var(--ws-gap-2xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ws-radius-pill);
+  font-size: var(--ws-ig-badge-font-size);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--ws-text-muted);
+  background: var(--ws-surface-2);
+  margin-right: var(--ws-gap-md);
+  transition: background var(--ws-transition), color var(--ws-transition);
+}
+
+/* 未忽略（开关 OFF）：半透明橙底 + 半透明橙字，颜色统一跟随主题色/默认配色 */
+.wosai-ig-row.off .wosai-ig-badge {
+  background: var(--wosai-ig-off-bg);
+  color: var(--wosai-ig-off);
+}
+
+/* 已忽略（开关 ON）：徽章随强调色高亮，与标签/开关呼应 */
+.wosai-ig-row:not(.off) .wosai-ig-badge {
+  background: var(--wosai-ig-accent);
+  color: var(--ws-text-on-accent);
+}
+
+/* Toggle 滑动开关（短胶囊 + 圆形滑块） */
+.wosai-ig-toggle {
+  width: var(--ws-ig-toggle-w);
+  height: var(--ws-ig-toggle-h);
+  border-radius: var(--ws-radius-pill);
+  background: var(--ws-toggle-off-bg);
+  position: relative;
+  flex-shrink: 0;
+  transition: background var(--ws-transition-slow);
+  cursor: pointer;
+  user-select: none;
+}
+
+.wosai-ig-knob {
+  width: var(--ws-ig-knob-size);
+  height: var(--ws-ig-knob-size);
+  border-radius: var(--ws-radius-full);
+  background: var(--ws-toggle-knob-off);
+  position: absolute;
+  top: var(--ws-ig-knob-pad);
+  left: var(--ws-ig-knob-off-l);
+  transition: left var(--ws-transition-slow), background var(--ws-transition-slow);
+  box-shadow: var(--ws-shadow-toggle-knob);
+}
+
+.wosai-ig-toggle.on {
+  background: var(--wosai-ig-accent);
+}
+
+.wosai-ig-toggle.on .wosai-ig-knob {
+  left: var(--ws-ig-knob-on-l);
+  background: var(--ws-toggle-knob-on);
+}
+
+/* 行末定位按钮：幽灵图标，hover 显主色 */
+.wosai-ig-locate {
+  flex-shrink: 0;
+  width: var(--ws-ig-badge-size);
+  height: var(--ws-ig-badge-size);
+  margin-left: var(--ws-gap-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ws-radius);
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  transition: background var(--ws-transition), color var(--ws-transition);
+}
+
+.wosai-ig-locate:hover {
+  background: var(--ws-surface-3);
+  color: var(--ws-accent);
+}
+
+.wosai-ig-locate svg {
+  display: block;
+}
+
+/* 原地重命名输入框：占据标签位置，主色描边 */
+.wosai-ig-rename {
+  flex: 1;
+  min-width: 0;
+  margin-right: var(--ws-gap-md);
+  padding: var(--ws-gap-2xs) var(--ws-gap-xs);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: var(--ws-text-md);
+  letter-spacing: var(--ws-letter-spacing-wide);
+  color: var(--ws-text);
+  background: var(--ws-surface-2);
+  border: var(--ws-border-width-thin) solid var(--ws-accent);
+  border-radius: var(--ws-radius);
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* 设置面板底部操作按钮：重置（幽灵）/ 确认（主色） */
+.wosai-ig-actions {
+  display: flex;
+  gap: var(--ws-gap);
+  margin-top: var(--ws-gap-lg);
+}
+
+.wosai-ig-action-btn {
+  flex: 1;
+  padding: var(--ws-ig-seg-btn-padding-y) var(--ws-ig-seg-btn-padding-x);
+  font-family: inherit;
+  font-size: var(--ws-text-sm);
+  line-height: 1.3;
+  border-radius: var(--ws-radius);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  background: transparent;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--ws-transition), color var(--ws-transition), border-color var(--ws-transition);
+}
+
+.wosai-ig-action-btn:hover {
+  background: var(--ws-surface-3);
+  color: var(--ws-text);
+  border-color: var(--ws-border);
+}
+
+.wosai-ig-action-btn.primary {
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  border-color: var(--ws-accent);
+  font-weight: 500;
+}
+
+.wosai-ig-action-btn.primary:hover {
+  background: var(--ws-accent-hover);
+  border-color: var(--ws-accent-hover);
+  color: var(--ws-text-on-accent);
+}
+
+/* ── 可访问性：减弱动态效果 ── */
+@media (prefers-reduced-motion: reduce) {
+  .wosai-ig-tab,
+  .wosai-ig-row,
+  .wosai-ig-toggle,
+  .wosai-ig-knob,
+  .wosai-ig-label {
+    transition: none !important;
+    animation: none !important;
+  }
+}

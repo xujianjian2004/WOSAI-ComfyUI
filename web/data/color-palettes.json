@@ -1,0 +1,119 @@
+{
+  "solidPresets": [
+    { "key": "red", "e": "Red", "h": "#C0392B", "b": "#7B241C" },
+    { "key": "brown", "e": "Brown", "h": "#A0522D", "b": "#5D2E1A" },
+    { "key": "orange", "e": "Orange", "h": "#D35400", "b": "#873600" },
+    { "key": "gold", "e": "Gold", "h": "#D4AC0D", "b": "#7D6608" },
+    { "key": "green", "e": "Green", "h": "#1E8449", "b": "#145A32" },
+    { "key": "teal", "e": "Teal", "h": "#117A65", "b": "#0E6655" },
+    { "key": "darkBlue", "e": "Dark Blue", "h": "#1A5276", "b": "#0E344C" },
+    { "key": "blue", "e": "Blue", "h": "#2471A3", "b": "#154360" },
+    { "key": "purple", "e": "Purple", "h": "#6C3483", "b": "#4A235A" },
+    { "key": "pink", "e": "Pink", "h": "#E91E63", "b": "#880E4F" },
+    { "key": "gray", "e": "Gray", "h": "#4A4A4A", "b": "#1c1c1c" },
+    { "key": "charcoal", "e": "Charcoal", "h": "#2C3E50", "b": "#1A252F" },
+    { "key": "mistyBlue", "e": "Misty Blue", "h": "#7BAFD4", "b": "#4A7A9E" },
+    { "key": "purpleGray", "e": "Purple Gray", "h": "#9A8CB8", "b": "#6B5E8A" },
+    { "key": "sandGold", "e": "Sand Gold", "h": "#C4A96A", "b": "#8A7545" },
+    { "key": "grayGreen", "e": "Gray Green", "h": "#7AA38C", "b": "#4D6E5C" },
+    { "key": "cyanGray", "e": "Cyan Gray", "h": "#7AAFB0", "b": "#4D7A7B" },
+    { "key": "blueGray", "e": "Blue Gray", "h": "#7A8EA3", "b": "#4D5E6E" },
+    { "key": "royalBlue", "e": "Royal Blue", "h": "#3366CC", "b": "#1E3D7A" },
+    { "key": "brightPurple", "e": "Bright Purple", "h": "#9933CC", "b": "#5C1E7A" },
+    { "key": "orangeYellow", "e": "Orange Yellow", "h": "#E8A820", "b": "#9A7010" },
+    { "key": "emerald", "e": "Emerald", "h": "#1AB86A", "b": "#0E6E3C" },
+    { "key": "cyanBlue", "e": "Cyan Blue", "h": "#2299CC", "b": "#145C7A" },
+    { "key": "lemonYellow", "e": "Lemon Yellow", "h": "#D4CC20", "b": "#8A8410" }
+  ],
+  "grayPresets": [
+    { "key": "gray95", "e": "G95", "h": "#F2F2F2", "b": "#A6A6A6" },
+    { "key": "gray85", "e": "G85", "h": "#D9D9D9", "b": "#8C8C8C" },
+    { "key": "gray75", "e": "G75", "h": "#BFBFBF", "b": "#737373" },
+    { "key": "gray65", "e": "G65", "h": "#A6A6A6", "b": "#595959" },
+    { "key": "gray55", "e": "G55", "h": "#8C8C8C", "b": "#404040" },
+    { "key": "gray48", "e": "G48", "h": "#7A7A7A", "b": "#363636" },
+    { "key": "gray40", "e": "G40", "h": "#666666", "b": "#2B2B2B" },
+    { "key": "gray33", "e": "G33", "h": "#545454", "b": "#232323" },
+    { "key": "gray26", "e": "G26", "h": "#424242", "b": "#1C1C1C" },
+    { "key": "gray20", "e": "G20", "h": "#333333", "b": "#161616" },
+    { "key": "gray14", "e": "G14", "h": "#242424", "b": "#101010" },
+    { "key": "gray8", "e": "G8", "h": "#141414", "b": "#0A0A0A" }
+  ],
+  "gradPresets": [
+    { "key": "sunset", "e": "Sunset", "s": [{ "h": 0, "s": 78, "v": 83 }, { "h": 15, "s": 88, "v": 45 }] },
+    { "key": "coral", "e": "Coral", "s": [{ "h": 8, "s": 60, "v": 62 }, { "h": 356, "s": 55, "v": 32 }] },
+    { "key": "turquoise", "e": "Turquoise", "s": [{ "h": 175, "s": 52, "v": 55 }, { "h": 182, "s": 56, "v": 28 }] },
+    { "key": "forest", "e": "Forest", "s": [{ "h": 120, "s": 68, "v": 70 }, { "h": 145, "s": 78, "v": 28 }] },
+    { "key": "ocean", "e": "Ocean", "s": [{ "h": 175, "s": 72, "v": 72 }, { "h": 195, "s": 82, "v": 28 }] },
+    { "key": "sky", "e": "Sky", "s": [{ "h": 210, "s": 78, "v": 78 }, { "h": 228, "s": 84, "v": 32 }] },
+    { "key": "lavender", "e": "Lavender", "s": [{ "h": 255, "s": 68, "v": 74 }, { "h": 275, "s": 76, "v": 28 }] },
+    { "key": "pinkGrad", "e": "Pink", "s": [{ "h": 315, "s": 64, "v": 72 }, { "h": 335, "s": 78, "v": 28 }] },
+    { "key": "neon", "e": "Neon", "s": [{ "h": 280, "s": 78, "v": 82 }, { "h": 320, "s": 86, "v": 38 }] },
+    { "key": "indigo", "e": "Indigo", "s": [{ "h": 232, "s": 58, "v": 54 }, { "h": 242, "s": 60, "v": 28 }] },
+    { "key": "mono", "e": "Mono", "s": [{ "h": 0, "s": 0, "v": 52 }, { "h": 0, "s": 0, "v": 18 }] },
+    { "key": "slate", "e": "Slate", "s": [{ "h": 215, "s": 28, "v": 48 }, { "h": 222, "s": 38, "v": 18 }] }
+  ],
+  "themes": {
+    "soft": {
+      "input": "#4A9DDE", "guide": "#7253E6", "sample": "#E6A245",
+      "output": "#4DDD7D", "decode": "#51E1A5", "encode": "#4ED4BF",
+      "model": "#A154E1", "prompt": "#5365E6", "image": "#4BC0E3",
+      "video": "#E1B246", "audio": "#A4D552", "tool": "#569DCC"
+    },
+    "vivid": {
+      "input": "#136BEC", "guide": "#911BF1", "sample": "#F59A0A",
+      "output": "#11DD6C", "decode": "#0BD1E9", "encode": "#139BF2",
+      "model": "#551AEF", "prompt": "#0BD9A2", "image": "#0DDDD1",
+      "video": "#EDC30C", "audio": "#9AE913", "tool": "#3079DC"
+    },
+    "dark": {
+      "input": "#3E79A9", "guide": "#5A45AD", "sample": "#AB8437",
+      "output": "#3A9C5E", "decode": "#3A9C89", "encode": "#398991",
+      "model": "#7644A9", "prompt": "#4352AD", "image": "#3B8DA4",
+      "video": "#A98C38", "audio": "#75943D", "tool": "#406B8F"
+    },
+    "deep": {
+      "input": "#3A6B9C", "guide": "#6B4FA8", "sample": "#B07820",
+      "output": "#2E8B57", "decode": "#2AA198", "encode": "#3D8BA8",
+      "model": "#7A4FB8", "prompt": "#4A5FB8", "image": "#2E96B8",
+      "video": "#B89A2A", "audio": "#7FA040", "tool": "#5C6B7A"
+    },
+    "muted": {
+      "input": "#BD83B4", "guide": "#B686C8", "sample": "#D1AA79",
+      "output": "#7FC59D", "decode": "#7AC8BC", "encode": "#80C1AA",
+      "model": "#C886C8", "prompt": "#8497CD", "image": "#7BB1CD",
+      "video": "#D1B579", "audio": "#A4C886", "tool": "#89A2C4"
+    },
+    "forest": {
+      "input": "#3EA865", "guide": "#7CB33D", "sample": "#C79D32",
+      "output": "#37B36B", "decode": "#3EBE88", "encode": "#3FAB7A",
+      "model": "#99B337", "prompt": "#44B36C", "image": "#3DB3B3",
+      "video": "#C7B438", "audio": "#9EC23E", "tool": "#67A847"
+    },
+    "ocean": {
+      "input": "#4895CD", "guide": "#506CD3", "sample": "#5F82D7",
+      "output": "#3EB4CD", "decode": "#45BFD7", "encode": "#4AA7D0",
+      "model": "#5569DD", "prompt": "#4E6FD7", "image": "#3EB4DD",
+      "video": "#6383E0", "audio": "#58ACD7", "tool": "#5A96C7"
+    },
+    "dusk": {
+      "input": "#8A5E9A", "guide": "#A05EA8", "sample": "#C87838",
+      "output": "#B06048", "decode": "#985878", "encode": "#8A5E88",
+      "model": "#A0529A", "prompt": "#7A5EA8", "image": "#B0688A",
+      "video": "#C8883A", "audio": "#A87858", "tool": "#8A6E7A"
+    }
+  },
+  "nodeColorGradSlots": [
+    { "dir": "↘", "hex": ["#E8CC55", "#1C322D", "#9FD9CE"] },
+    { "dir": "↗", "hex": ["#2ECC71", "#0A1F16", "#1AA0A8"] },
+    { "dir": "↘", "hex": ["#5A4FD8", "#0A1428", "#18A8C8"] },
+    { "dir": "↘", "hex": ["#F0D87A", "#473708", "#C8941A"] },
+    { "dir": "→", "hex": ["#E8CC55", "#1C322D", "#A6DCCD"] }
+  ],
+  "colorBarPresetGroups": [
+    { "nameKey": "classic", "colors": ["orange", "gold", "green", "blue", "purple", "charcoal"] },
+    { "nameKey": "rich",   "colors": ["red", "brown", "teal", "darkBlue", "pink", "gray"] },
+    { "nameKey": "soft",   "colors": ["mistyBlue", "purpleGray", "sandGold", "grayGreen", "cyanGray", "blueGray"] },
+    { "nameKey": "bright", "colors": ["royalBlue", "brightPurple", "orangeYellow", "emerald", "cyanBlue", "lemonYellow"] }
+  ]
+}

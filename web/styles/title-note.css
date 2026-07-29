@@ -1,0 +1,203 @@
+/* TitleNote — 标题注释节点样式增强 */
+/* WOSAI-ComfyUI | 作者：穿山阅海 | COPYRIGHT © WOSAI STUDIO */
+/* 工具栏/textarea 的核心定位样式仍由 JS 内联设置，本文件集中管理视觉 token */
+
+/* ── Nodes 2.0 HTML VUE 覆盖层双击穿透修复 ─────────────────────── */
+[data-testid^="node-body-"] { cursor: default !important; }
+[data-testid^="node-header-"] { cursor: grab !important; }
+
+/* ── 编辑工具栏（复用 WOSAI 玻璃面板）────────────────────────────── */
+.titlenote-edit-toolbar.wosai-panel--glass {
+    position: absolute;
+    z-index: var(--ws-z-editor);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: var(--ws-gap-lg);
+    width: var(--ws-tn-toolbar-width);
+    padding: var(--ws-gap-md) var(--ws-gap-lg);
+    color: var(--ws-text);
+    font-family: var(--ws-font-family);
+    font-size: var(--ws-text-base);
+    box-sizing: border-box;
+    pointer-events: auto;
+    border-radius: var(--ws-radius-lg);
+    background: var(--ws-glass-bg);
+    border: var(--ws-glass-border);
+    box-shadow: var(--ws-glass-shadow);
+    backdrop-filter: var(--ws-glass-blur);
+    -webkit-backdrop-filter: var(--ws-glass-blur);
+    overflow: visible;
+}
+
+.titlenote-edit-toolbar button {
+    transition: background-color var(--ws-transition), transform var(--ws-transition-fast);
+}
+.titlenote-edit-toolbar button:hover {
+    filter: brightness(1.2);
+    transform: scale(1.05);
+}
+.titlenote-edit-toolbar button:active {
+    transform: scale(0.97);
+}
+
+/* ── 工具栏内部布局 ─────────────────────────────────────────────── */
+.titlenote-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: var(--ws-gap);
+    width: 100%;
+    padding: var(--ws-seg-pad) 0;
+}
+
+.titlenote-toolbar-row--spread {
+    justify-content: space-between;
+}
+
+.titlenote-toolbar-row--spread .titlenote-toolbar-label {
+    min-width: var(--ws-tn-label-min-width);
+}
+
+.titlenote-toolbar-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ws-gap);
+    flex: 1;
+    min-width: 0;
+}
+
+.titlenote-picker-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ws-gap-md);
+    width: var(--ws-tn-picker-width);
+    flex-shrink: 0;
+    justify-content: space-between;
+    padding: var(--ws-seg-pad) 0;
+    box-sizing: border-box;
+}
+
+.titlenote-picker-col .titlenote-sv {
+    flex: 1;
+}
+
+.titlenote-toolbar-label {
+    font-size: var(--ws-text-md);
+    color: var(--ws-text);
+    min-width: var(--ws-tn-label-min-width);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.titlenote-toolbar-value {
+    font-size: var(--ws-text-base);
+    color: var(--ws-text);
+    min-width: var(--ws-tn-value-min-width);
+    text-align: right;
+}
+
+/* ── 色块预览（复用 .wosai-swatch）──────────────────────────────── */
+.wosai-swatch.titlenote-swatch {
+    width: var(--ws-icon-btn-size);
+    height: var(--ws-icon-btn-size);
+    border-radius: var(--ws-radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    border: var(--ws-swatch-border-width) solid var(--ws-border);
+    box-sizing: border-box;
+}
+
+.wosai-swatch.titlenote-swatch.is-active {
+    box-shadow: var(--ws-focus-ring);
+}
+
+/* ── 对齐按钮（复用 .wosai-icon-btn）─────────────────────────────── */
+.wosai-icon-btn.titlenote-align-btn.is-active {
+    background: var(--ws-accent);
+    color: var(--ws-text-on-accent);
+}
+
+/* ── 常驻取色器 ─────────────────────────────────────────────────── */
+.titlenote-sv {
+    position: relative;
+    border-radius: var(--ws-radius);
+    cursor: crosshair;
+    box-sizing: border-box;
+    border: none;
+    outline: none;
+    overflow: hidden;
+}
+
+.titlenote-sv-thumb {
+    position: absolute;
+    width: var(--ws-swatch-size);
+    height: var(--ws-swatch-size);
+    border-radius: var(--ws-radius-full);
+    border: var(--ws-slider-thumb-border-width) solid var(--ws-text-on-accent);
+    box-shadow: 0 0 0 var(--ws-border-width-thin) var(--ws-surface-3);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.titlenote-hue {
+    position: relative;
+    border-radius: var(--ws-radius-sm);
+    cursor: pointer;
+    box-sizing: border-box;
+    border: none;
+    outline: none;
+    background: var(--ws-tn-hue-rainbow);
+}
+
+.titlenote-hue-thumb {
+    position: absolute;
+    top: 50%;
+    width: var(--ws-tn-hue-thumb-width);
+    border-radius: var(--ws-radius-sm);
+    background: var(--ws-text-on-accent);
+    box-shadow: 0 0 0 var(--ws-border-width-thin) var(--ws-surface-3);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+}
+
+/* ── 文本编辑区 textarea（视觉过渡动画）─────────────────────────── */
+.titlenote-textarea {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    resize: none;
+    appearance: none;
+    -webkit-appearance: none;
+    overflow: auto;
+    box-sizing: border-box;
+    pointer-events: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    padding: var(--ws-gap-2xs) 0 0 0;
+    background: transparent;
+    transition: font-size var(--ws-transition-fast),
+                background-color var(--ws-transition),
+                color var(--ws-transition);
+}
+.titlenote-textarea:focus {
+    outline: none;
+}
+
+/* ── 链接鼠标手势 ───────────────────────────────────────────────── */
+.titlenote-link-cursor [data-testid^="node-body-"] {
+    cursor: pointer !important;
+}
+
+/* ── 可访问性：减弱动态效果 ── */
+@media (prefers-reduced-motion: reduce) {
+    .titlenote-edit-toolbar button,
+    .titlenote-textarea {
+        transition: none !important;
+        animation: none !important;
+    }
+    .titlenote-edit-toolbar button:hover,
+    .titlenote-edit-toolbar button:active {
+        transform: none !important;
+    }
+}

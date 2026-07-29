@@ -1,9 +1,13 @@
+"""WOSAI-ComfyUI: Professional visualization toolkit for ComfyUI nodes."""
 from pathlib import Path
 from .wosai_core.registry import Registry
 
-WEB_DIRECTORY = "./web"
-NODE_CLASS_MAPPINGS = {}
-NODE_DISPLAY_NAME_MAPPINGS = {}
+__version__: str = "2.0.0"
+__author__: str = "穿山阅海"
+
+WEB_DIRECTORY: str = "./web"
+NODE_CLASS_MAPPINGS: dict = {}
+NODE_DISPLAY_NAME_MAPPINGS: dict = {}
 
 # ── V1 nodes: always available (baseline) ──
 _nodes_dir = Path(__file__).parent / "nodes"
@@ -19,34 +23,24 @@ try:
 except Exception as e:
     print(f"[WOSAI-ComfyUI] color presets API unavailable: {e}")
 
-# ── V3 nodes: upgrade if comfy_api is available ──
-# 注：OmniSlider 有意保留 V1（其 hidden-widget 序列化机制依赖 V1 INPUT_TYPES），
-#     原 nodes_v3/omni_slider_v3.py 因 schema 缺少 ch*_cfg 输入已删除。
+# ── SizeSelect 原图尺寸探测 API（/wosai/probe_image_size）──
+# Layer 2 兜底：前端 Layer 1 拿不到输入尺寸时调用
 try:
-    from comfy_api.latest import ComfyExtension
-
-    from .nodes.canvas_note import WOSAI_CanvasNote_V3
-    from .nodes.size_select import WOSAI_SizeSelect_V3
-
-    # Override V1 registrations with V3 versions (same node_id = backward compat)
-    NODE_CLASS_MAPPINGS["WOSAI_CanvasNote"] = WOSAI_CanvasNote_V3
-    NODE_CLASS_MAPPINGS["WOSAI_SizeSelect"] = WOSAI_SizeSelect_V3
-    NODE_DISPLAY_NAME_MAPPINGS["WOSAI_CanvasNote"] = "画布注释 CanvasNote"
-    NODE_DISPLAY_NAME_MAPPINGS["WOSAI_SizeSelect"] = "尺寸选择 SizeSelect"
-
-    _v3_node_list = [WOSAI_CanvasNote_V3, WOSAI_SizeSelect_V3]
-
-    class WOSAIExtension(ComfyExtension):
-        async def get_node_list(self) -> list:
-            return _v3_node_list
-
-    async def comfy_entrypoint():
-        return WOSAIExtension()
-
-    print("[WOSAI-ComfyUI] V3 API detected — CanvasNote & SizeSelect upgraded to V3")
-except ImportError as e:
-    print(f"[WOSAI-ComfyUI] V3 API not available — using V1 fallback for all nodes ({e})")
+    from .wosai_core.wosai_size_probe import setup_routes as _setup_size_probe
+    _setup_size_probe()
 except Exception as e:
-    print(f"[WOSAI-ComfyUI] V3 init skipped: {e}")
+    print(f"[WOSAI-ComfyUI] size probe API unavailable: {e}")
+
+# Device information API (``/wosai/device_info``).  The collector is isolated
+# so a missing optional system dependency never prevents the extension loading.
+try:
+    from .wosai_core.device_info import setup_routes as _setup_device_info
+    _setup_device_info()
+except Exception as e:
+    print(f"[WOSAI-ComfyUI] device info API unavailable: {e}")
+
+# ── CanvasNote 已迁出为独立插件（ComfyUI-Title-Memo），不再内置于 WOSAI。
+#    SizeSelect 保留 V1 / Nodes 2.0 V3 双实现；OmniSlider 仍为 V1，
+#    因其 hidden-widget 序列化依赖 V1 INPUT_TYPES。
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

@@ -1,0 +1,179 @@
+{
+  "WOSAI_OmniSlider": {
+    "display_name": "OmniSlider",
+    "category": "🟠 Tools",
+    "description": "Multi-channel slider control, supports float/int/fill style",
+    "inputs": {
+      "active_value": {
+        "name": "Active Value",
+        "tooltip": "Internal cache key, auto-syncs the slider value"
+      }
+    }
+  },
+
+  "WOSAI_TitleNote": {
+    "display_name": "TitleNote",
+    "category": "🟠 Canvas",
+    "description": "Canvas text annotation with font/color/background/border-radius styles"
+  },
+  "WOSAI_IgnoreGroups": {
+    "display_name": "IgnoreGroups",
+    "category": "🟠 Canvas",
+    "description": "Batch control node bypass/disable by selecting groups"
+  },
+  "WOSAI_SizeSelect": {
+    "display_name": "SizeSelect",
+    "category": "🟠 Image",
+    "description": "Preset/Manual dual-mode resolution picker, auto 8× alignment",
+    "inputs": {
+      "Manual_Mode":      { "name": "Manual Mode",    "tooltip": "off=preset mode  on=manual mode" },
+      "scale_method":     { "name": "Scale Method",   "tooltip": "Crop=center crop to ratio / Scale=uniform scaling by factor" },
+      "scale_multiplier": { "name": "Scale Multiplier","tooltip": "Multiplier when scale_method=Scale, relative to original size" },
+      "Resolution":       { "name": "Resolution",     "tooltip": "Choose a preset resolution" },
+      "Aspect_Ratio":     { "name": "Aspect Ratio",   "tooltip": "Choose the image aspect ratio" },
+      "Custom_Width":     { "name": "Custom Width",   "tooltip": "Custom width (manual mode only)" },
+      "Custom_Height":    { "name": "Custom Height",  "tooltip": "Custom height (manual mode only)" },
+      "image":            { "name": "image",          "tooltip": "Input image (optional, will be resized to target)" },
+      "mask":             { "name": "mask",           "tooltip": "Input mask (optional, will be resized along with image)" },
+      "latent":           { "name": "latent",         "tooltip": "Input latent (optional, will be resized to target)" },
+      "vae":              { "name": "vae",            "tooltip": "VAE model (optional, image will be encoded to latent via VAE)" }
+    },
+    "outputs": {
+      "image":  { "name": "image" },
+      "mask":   { "name": "mask" },
+      "latent": { "name": "latent" },
+      "width":  { "name": "width" },
+      "height": { "name": "height" }
+    }
+  },
+
+  "WOSAI_LogicSwitch": {
+    "display_name": "LogicSwitch",
+    "category": "🟠 Logic",
+    "description": "Switch output between true_input and false_input by boolean condition; fallback to Default_Input when condition is unconnected",
+    "inputs": {
+      "Default_Input": { "name": "Default Input", "tooltip": "Fallback when condition is unconnected: on=true_input / off=false_input" },
+      "condition":     { "name": "condition",     "tooltip": "Boolean condition; output true_input when True" },
+      "true_input":    { "name": "true_input",    "tooltip": "Output when condition is True" },
+      "false_input":   { "name": "false_input",   "tooltip": "Output when condition is False" }
+    },
+    "outputs": {
+      "output": { "name": "output" }
+    }
+  },
+  "WOSAI_Selector": {
+    "display_name": "Selector",
+    "category": "🟠 Logic",
+    "description": "Choose a labelled option and output its zero-based index",
+    "inputs": {
+      "selected_index": { "name": "Selected Index" },
+      "labels_json": { "name": "Option Data" },
+      "columns": { "name": "Columns" },
+      "settings_json": { "name": "Appearance Settings" }
+    },
+    "outputs": { "index": { "name": "index" } }
+  },
+  "WOSAI_BooleanSelector": {
+    "display_name": "Boolean Selector",
+    "category": "🟠 Logic",
+    "description": "Choose False or True with a compact two-button control",
+    "inputs": {
+      "value": { "name": "Value" },
+      "settings_json": { "name": "Appearance Settings" }
+    },
+    "outputs": { "value": { "name": "value" } }
+  },
+  "WOSAI_CommonColor": {
+    "display_name": "Common Color",
+    "category": "🟠 Tools",
+    "description": "Select a common colour preset; its swatch syncs live to the colour picker, or output a custom hexadecimal colour",
+    "inputs": {
+      "color_name": { "name": "Color Preset", "tooltip": "Choose a preset; select 自定义 to use the custom colour picker" },
+      "custom_color": { "name": "Color Preview", "tooltip": "Click the swatch to open the colour picker; enter a colour in #RRGGBB or #RGB format" }
+    },
+    "outputs": {
+      "color": { "name": "Color", "tooltip": "Integer colour value; connects directly to INT colour inputs such as Empty Image" },
+      "hex": { "name": "HEX", "tooltip": "Colour text in #RRGGBB format" }
+    }
+  },
+  "WOSAI_NumberSwitch": {
+    "display_name": "Number Switch",
+    "category": "🟠 Logic",
+    "description": "Route one of several generic inputs by zero-based index",
+    "inputs": { "select": { "name": "Select" } },
+    "outputs": { "output": { "name": "output" } }
+  },
+  "WOSAI_LazyFallback": {
+    "display_name": "Lazy Fallback",
+    "category": "🟠 Logic",
+    "description": "Return primary when present; evaluate fallback only when primary is None",
+    "inputs": {
+      "primary": { "name": "primary" },
+      "fallback": { "name": "fallback" }
+    },
+    "outputs": { "output": { "name": "output" } }
+  },
+  "WOSAI_PointsEditor": {
+    "display_name": "Points Editor",
+    "category": "🟠 Image",
+    "description": "Annotate positive points, negative points, and boxes on an image",
+    "inputs": {
+      "image": { "name": "image" },
+      "annotation_json": { "name": "Annotation Data" },
+      "preview_scale": { "name": "Preview Scale" }
+    },
+    "outputs": {
+      "positive_coords": { "name": "positive coords" },
+      "negative_coords": { "name": "negative coords" },
+      "bboxes": { "name": "boxes" },
+      "frame_index": { "name": "frame index" }
+    }
+  },
+  "WOSAI_ImageCompare": {
+    "display_name": "Image Compare",
+    "category": "🟠 Image",
+    "description": "Compare two images with an interactive split view",
+    "inputs": {
+      "image_a": { "name": "image A" },
+      "image_b": { "name": "image B" }
+    }
+  },
+  "WOSAI_GetWidget": {
+    "display_name": "Get Widget",
+    "category": "🟠 Tools",
+    "description": "Read one or all serialized widget values from a connected node",
+    "inputs": {
+      "target_output": { "name": "target output" },
+      "widget_name": { "name": "Widget Name" },
+      "include_name": { "name": "Include Name" },
+      "include_extension": { "name": "File Extension" }
+    },
+    "outputs": { "widget_value": { "name": "widget value" } }
+  },
+  "WOSAI_FirstLastFrame": {
+    "display_name": "First / Last Frame",
+    "category": "🟠 Image",
+    "description": "Extract the first and last frame from an image batch",
+    "inputs": { "image": { "name": "image" } },
+    "outputs": {
+      "first_frame": { "name": "first frame" },
+      "last_frame": { "name": "last frame" }
+    }
+  },
+  "WOSAI_PresetPromptSelector": {
+    "display_name": "Preset Manager",
+    "category": "🟠 Prompts",
+    "description": "Manage prompt presets; click a label to switch, then output one or all presets.",
+    "inputs": {
+      "active_index": { "name": "Active preset", "tooltip": "Selected prompt preset index" },
+      "presets_data": { "name": "Preset data", "tooltip": "Serialized prompt preset data managed by the tab editor" },
+      "prompt_cn": { "name": "Prompt (CN)", "tooltip": "Chinese prompt synchronized from the selected preset" },
+      "prompt_en": { "name": "Prompt (EN)", "tooltip": "English prompt synchronized from the selected preset" },
+      "batch_output": { "name": "Output mode", "tooltip": "Off outputs the selected preset; on outputs all presets" }
+    },
+    "outputs": {
+      "prompt_cn": { "name": "prompt (CN)" },
+      "prompt_en": { "name": "prompt (EN)" }
+    }
+  }
+}

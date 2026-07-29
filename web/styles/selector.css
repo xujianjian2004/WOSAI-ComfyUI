@@ -1,0 +1,207 @@
+.wosai-selector-widget {
+  --wosai-selector-columns: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--wosai-selector-columns), minmax(0, 1fr));
+  align-content: start;
+  gap: var(--wosai-selector-gap, var(--ws-gap-sm));
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: var(--wosai-selector-gap, var(--ws-gap-sm));
+  color: var(--ws-text);
+  font: 500 var(--wosai-selector-font-size, var(--ws-text-base))/1.2 var(--ws-font-family);
+}
+
+.wosai-selector-button {
+  min-width: 0;
+  height: var(--wosai-selector-button-height, var(--ws-selector-button-height));
+  min-height: var(--wosai-selector-button-height, var(--ws-selector-button-height));
+  overflow: hidden;
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color var(--ws-transition),
+    background var(--ws-transition),
+    color var(--ws-transition);
+}
+
+.wosai-selector-button:hover {
+  border-color: var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.wosai-selector-button.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+  box-shadow: var(--ws-shadow-sm);
+}
+
+.wosai-boolean-selector {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.wosai-selector-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--ws-z-modal);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: var(--ws-panel-padding-md);
+  background: var(--ws-overlay-bg);
+  overflow: auto;
+}
+
+.wosai-selector-dialog {
+  display: grid;
+  gap: var(--ws-gap-md);
+  box-sizing: border-box;
+  width: min(100%, var(--ws-selector-dialog-width));
+  min-width: 0;
+  max-width: 100%;
+  min-height: 0;
+  max-height: min(100%, var(--ws-selector-dialog-max-height));
+  overflow: auto;
+  padding: var(--ws-panel-padding);
+  border-radius: var(--ws-radius-xl);
+  color: var(--ws-text);
+}
+
+.wosai-selector-dialog h3 {
+  margin: 0;
+  font-size: var(--ws-text-xl);
+}
+
+.wosai-selector-dialog-section {
+  display: grid;
+  gap: var(--ws-gap-sm);
+  min-width: 0;
+  margin: 0;
+  padding: var(--ws-gap-md);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius-lg);
+}
+
+.wosai-selector-dialog-section legend {
+  padding: 0 var(--ws-gap-xs);
+  color: var(--ws-text);
+  font-size: var(--ws-text-base);
+  font-weight: 600;
+}
+
+.wosai-selector-range-field {
+  display: grid;
+  grid-template-columns:
+    var(--ws-selector-range-label-width)
+    minmax(0, 1fr)
+    var(--ws-selector-range-value-width);
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-sm);
+}
+
+.wosai-selector-range-field > span {
+  white-space: nowrap;
+}
+
+.wosai-selector-range-field output {
+  color: var(--ws-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.wosai-selector-range-field input[type="range"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: var(--ws-selector-range-height);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--ws-accent);
+  cursor: pointer;
+}
+
+.wosai-selector-labels-section {
+  min-height: 0;
+}
+
+.wosai-selector-labels-list {
+  display: grid;
+  gap: var(--ws-gap-sm);
+  max-height: var(--ws-selector-label-list-max-height);
+  overflow-y: auto;
+}
+
+.wosai-selector-label-editor {
+  display: grid;
+  grid-template-columns: var(--ws-selector-label-index-width) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ws-gap-sm);
+  padding: var(--ws-gap-sm);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-sm);
+}
+
+.wosai-selector-label-editor > span {
+  overflow: hidden;
+  color: var(--ws-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-selector-label-editor input[type="text"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ws-btn-h-sm);
+  border: var(--ws-border-width-thin) solid var(--ws-input-border);
+  border-radius: var(--ws-radius);
+  padding: var(--ws-input-padding);
+  background: var(--ws-input-bg);
+  color: var(--ws-input-text);
+  font: inherit;
+}
+
+.wosai-selector-label-editor input[type="text"]:focus {
+  outline: none;
+  border-color: var(--ws-accent);
+  box-shadow: var(--ws-sn-input-focus-ring);
+}
+
+.wosai-selector-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--ws-gap-sm);
+}
+
+.wosai-selector-dialog-actions button:first-child {
+  margin-right: auto;
+}
+
+.wosai-selector-dialog-actions button {
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius);
+  padding: var(--ws-gap-sm) var(--ws-gap-lg);
+  background: var(--ws-surface-2);
+  color: var(--ws-text);
+}
+
+.wosai-selector-dialog-actions button.is-primary {
+  border-color: var(--ws-accent);
+  background: var(--ws-accent);
+  color: var(--ws-text-on-accent);
+}

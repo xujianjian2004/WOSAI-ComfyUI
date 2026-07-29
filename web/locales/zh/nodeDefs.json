@@ -1,0 +1,179 @@
+{
+  "WOSAI_OmniSlider": {
+    "display_name": "万能滑条",
+    "category": "🟠 WOSAI Studio / 工具",
+    "description": "单通道万能滑条，支持浮点/整数输出",
+    "inputs": {
+      "active_value": {
+        "name": "缓存键",
+        "tooltip": "内部缓存键，自动同步滑条值"
+      }
+    }
+  },
+
+  "WOSAI_TitleNote": {
+    "display_name": "标题注释",
+    "category": "🟠 WOSAI Studio / 画布",
+    "description": "画布文字注释，支持字体/颜色/背景/圆角样式"
+  },
+  "WOSAI_IgnoreGroups": {
+    "display_name": "忽略编组",
+    "category": "🟠 WOSAI Studio / 画布",
+    "description": "通过选择分组来批量控制节点绕过/禁用"
+  },
+  "WOSAI_SizeSelect": {
+    "display_name": "尺寸选择",
+    "category": "🟠 WOSAI Studio / 图像",
+    "description": "预设/自定义双模式分辨率选择，自动8倍数对齐",
+    "inputs": {
+      "Manual_Mode":      { "name": "模式切换",   "tooltip": "off=预设模式 on=自定义模式" },
+      "scale_method":     { "name": "缩放方式",   "tooltip": "中心裁剪=按目标比例裁剪 / 等比缩放=按倍数缩放" },
+      "scale_multiplier": { "name": "缩放倍数",   "tooltip": "等比缩放模式下生效，以原始尺寸为基准" },
+      "Resolution":       { "name": "分辨率",     "tooltip": "选择预设分辨率档位" },
+      "Aspect_Ratio":     { "name": "宽高比",     "tooltip": "选择画面宽高比" },
+      "Custom_Width":     { "name": "自定义宽度", "tooltip": "自定义宽度（仅自定义模式）" },
+      "Custom_Height":    { "name": "自定义高度", "tooltip": "自定义高度（仅自定义模式）" },
+      "image":            { "name": "图像",       "tooltip": "输入图像（可选，将缩放至目标尺寸）" },
+      "mask":             { "name": "遮罩",       "tooltip": "输入遮罩（可选，将同步缩放）" },
+      "latent":           { "name": "Latent",     "tooltip": "输入 Latent（可选，将缩放至目标尺寸）" },
+      "vae":              { "name": "VAE",        "tooltip": "VAE 模型（可选，图像将通过 VAE 编码为 Latent）" }
+    },
+    "outputs": {
+      "image":  { "name": "图像" },
+      "mask":   { "name": "遮罩" },
+      "latent": { "name": "Latent" },
+      "width":  { "name": "宽度" },
+      "height": { "name": "高度" }
+    }
+  },
+
+  "WOSAI_LogicSwitch": {
+    "display_name": "逻辑开关",
+    "category": "🟠 WOSAI Studio / 逻辑",
+    "description": "按布尔条件在 true_input / false_input 之间切换输出；condition 未连接时由 Default_Input 开关决定回落到哪一路",
+    "inputs": {
+      "Default_Input": { "name": "默认输入", "tooltip": "condition 未连接时：开=true_input / 关=false_input" },
+      "condition":     { "name": "条件",     "tooltip": "布尔条件；为 True 时输出 true_input" },
+      "true_input":    { "name": "真值输入", "tooltip": "condition 为 True 时输出此路" },
+      "false_input":   { "name": "假值输入", "tooltip": "condition 为 False 时输出此路" }
+    },
+    "outputs": {
+      "output": { "name": "输出" }
+    }
+  },
+  "WOSAI_Selector": {
+    "display_name": "标签选择器",
+    "category": "🟠 WOSAI Studio / 逻辑",
+    "description": "通过标签按钮选择选项并输出从零开始的序号",
+    "inputs": {
+      "selected_index": { "name": "当前序号" },
+      "labels_json": { "name": "选项数据" },
+      "columns": { "name": "列数" },
+      "settings_json": { "name": "外观设置" }
+    },
+    "outputs": { "index": { "name": "序号" } }
+  },
+  "WOSAI_BooleanSelector": {
+    "display_name": "布尔选择器",
+    "category": "🟠 WOSAI Studio / 逻辑",
+    "description": "通过紧凑双按钮选择 False 或 True",
+    "inputs": {
+      "value": { "name": "布尔值" },
+      "settings_json": { "name": "外观设置" }
+    },
+    "outputs": { "value": { "name": "布尔值" } }
+  },
+  "WOSAI_CommonColor": {
+    "display_name": "常用颜色",
+    "category": "🟠 WOSAI Studio / 工具",
+    "description": "从常用预设中选择颜色；预设会实时同步到取色器色块，也可输出自定义的十六进制颜色值",
+    "inputs": {
+      "color_name": { "name": "颜色预设", "tooltip": "选择常用颜色预设；选择“自定义”时使用下方取色器" },
+      "custom_color": { "name": "颜色预览", "tooltip": "点击色块打开取色器；输入 #RRGGBB 或 #RGB 格式的颜色值" }
+    },
+    "outputs": {
+      "color": { "name": "颜色", "tooltip": "整数颜色值，可直接连接空图像等 INT 颜色输入" },
+      "hex": { "name": "HEX", "tooltip": "#RRGGBB 格式的颜色字符串" }
+    }
+  },
+  "WOSAI_NumberSwitch": {
+    "display_name": "编号切换",
+    "category": "🟠 WOSAI Studio / 逻辑",
+    "description": "按照从零开始的序号切换任意类型输入",
+    "inputs": { "select": { "name": "序号" } },
+    "outputs": { "output": { "name": "输出" } }
+  },
+  "WOSAI_LazyFallback": {
+    "display_name": "惰性回退",
+    "category": "🟠 WOSAI Studio / 逻辑",
+    "description": "主输入存在时直接返回；仅在主输入为空时计算回退输入",
+    "inputs": {
+      "primary": { "name": "主输入" },
+      "fallback": { "name": "回退输入" }
+    },
+    "outputs": { "output": { "name": "输出" } }
+  },
+  "WOSAI_PointsEditor": {
+    "display_name": "点框编辑器",
+    "category": "🟠 WOSAI Studio / 图像",
+    "description": "在图像上标注正向点、负向点和矩形框",
+    "inputs": {
+      "image": { "name": "图像" },
+      "annotation_json": { "name": "标注数据" },
+      "preview_scale": { "name": "预览比例" }
+    },
+    "outputs": {
+      "positive_coords": { "name": "正向坐标" },
+      "negative_coords": { "name": "负向坐标" },
+      "bboxes": { "name": "边界框" },
+      "frame_index": { "name": "帧序号" }
+    }
+  },
+  "WOSAI_ImageCompare": {
+    "display_name": "图像对比",
+    "category": "🟠 WOSAI Studio / 图像",
+    "description": "使用可拖动分割线对比两张图像",
+    "inputs": {
+      "image_a": { "name": "图像 A" },
+      "image_b": { "name": "图像 B" }
+    }
+  },
+  "WOSAI_GetWidget": {
+    "display_name": "获取控件值",
+    "category": "🟠 WOSAI Studio / 工具",
+    "description": "读取已连接目标节点的一个或全部控件值",
+    "inputs": {
+      "target_output": { "name": "目标输出" },
+      "widget_name": { "name": "控件名称" },
+      "include_name": { "name": "包含名称" },
+      "include_extension": { "name": "文件扩展名" }
+    },
+    "outputs": { "widget_value": { "name": "控件值" } }
+  },
+  "WOSAI_FirstLastFrame": {
+    "display_name": "首尾帧",
+    "category": "🟠 WOSAI Studio / 图像",
+    "description": "从图像批次中提取第一帧和最后一帧",
+    "inputs": { "image": { "name": "图像" } },
+    "outputs": {
+      "first_frame": { "name": "第一帧" },
+      "last_frame": { "name": "最后一帧" }
+    }
+  },
+  "WOSAI_PresetPromptSelector": {
+    "display_name": "预设管理",
+    "category": "🟠 WOSAI Studio / 提示词",
+    "description": "管理提示词预设；单击标签切换，可选择单条或全部输出。",
+    "inputs": {
+      "active_index": { "name": "当前预设", "tooltip": "当前选中的提示词预设序号" },
+      "presets_data": { "name": "预设数据", "tooltip": "由标签编辑器维护的序列化提示词预设数据" },
+      "prompt_cn": { "name": "中文提示词", "tooltip": "随当前预设标签自动同步的中文提示词" },
+      "prompt_en": { "name": "英文提示词", "tooltip": "随当前预设标签自动同步的英文提示词" },
+      "batch_output": { "name": "输出模式", "tooltip": "关闭时输出当前预设，开启时输出全部预设" }
+    },
+    "outputs": {
+      "prompt_cn": { "name": "中文提示词" },
+      "prompt_en": { "name": "英文提示词" }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+    "indicatorTitle": "收藏文本",
+    "panelTitle": "收藏文本",
+    "emptyTip": "暂无收藏文本",
+    "saveBtn": "收藏当前文本",
+    "useBtn": "使用",
+    "renameBtn": "重命名",
+    "deleteBtn": "删除",
+    "renamePlaceholder": "输入名称"
+}

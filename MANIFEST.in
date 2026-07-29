@@ -1,0 +1,8 @@
+include __init__.py VERSION README.md CHANGELOG.md LICENSE extension.json requirements.txt package.json I18N_GUIDELINES.md
+recursive-include nodes *.py
+recursive-include wosai_core *.py
+recursive-include web *
+recursive-include presets *.json
+recursive-include workflows *.json
+recursive-include docs *.md
+global-exclude __pycache__ *.py[cod] *.test.mjs node_modules

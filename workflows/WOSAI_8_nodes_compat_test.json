@@ -1,0 +1,258 @@
+{
+  "last_node_id": 11,
+  "last_link_id": 12,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "EmptyImage",
+      "pos": [40, 180],
+      "size": [240, 180],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        { "name": "width", "type": "INT", "link": null },
+        { "name": "height", "type": "INT", "link": null },
+        { "name": "batch_size", "type": "INT", "link": null },
+        { "name": "color", "type": "INT", "link": null }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [1, 7] }
+      ],
+      "properties": { "cnr_id": "comfy-core" },
+      "widgets_values": [512, 512, 3, 16711680]
+    },
+    {
+      "id": 2,
+      "type": "EmptyImage",
+      "pos": [40, 430],
+      "size": [240, 180],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        { "name": "width", "type": "INT", "link": null },
+        { "name": "height", "type": "INT", "link": null },
+        { "name": "batch_size", "type": "INT", "link": null },
+        { "name": "color", "type": "INT", "link": null }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [2, 8] }
+      ],
+      "properties": { "cnr_id": "comfy-core" },
+      "widgets_values": [512, 512, 3, 255]
+    },
+    {
+      "id": 3,
+      "type": "WOSAI_BooleanSelector",
+      "pos": [350, 60],
+      "size": [200, 140],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        { "name": "value", "type": "BOOLEAN", "link": null },
+        { "name": "settings_json", "type": "STRING", "link": null }
+      ],
+      "outputs": [
+        { "name": "value", "type": "BOOLEAN", "links": [3] }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": [false, "{}"]
+    },
+    {
+      "id": 4,
+      "type": "WOSAI_Selector",
+      "pos": [350, 280],
+      "size": [240, 220],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        { "name": "selected_index", "type": "INT", "link": null },
+        { "name": "labels_json", "type": "STRING", "link": null },
+        { "name": "columns", "type": "INT", "link": null },
+        { "name": "settings_json", "type": "STRING", "link": null }
+      ],
+      "outputs": [
+        { "name": "index", "type": "INT", "links": [4, 12] }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": [0, "[\"0\",\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"]", 5, "{}"]
+    },
+    {
+      "id": 5,
+      "type": "WOSAI_LazyFallback",
+      "pos": [350, 560],
+      "size": [220, 150],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        { "name": "primary", "type": "*", "link": 3 },
+        { "name": "fallback", "type": "*", "link": 4 }
+      ],
+      "outputs": [
+        { "name": "output", "type": "*", "links": [5] }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 6,
+      "type": "WOSAI_LogicSwitch",
+      "pos": [650, 300],
+      "size": [260, 180],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        { "name": "Default_Input", "type": "BOOLEAN", "link": null },
+        { "name": "condition", "type": "*", "link": 5 },
+        { "name": "true_input", "type": "*", "link": 1 },
+        { "name": "false_input", "type": "*", "link": 2 }
+      ],
+      "outputs": [
+        { "name": "output", "type": "*", "links": [6] }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": [false]
+    },
+    {
+      "id": 7,
+      "type": "WOSAI_PointsEditor",
+      "pos": [980, 220],
+      "size": [420, 420],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 6 },
+        { "name": "annotation_json", "type": "STRING", "link": null },
+        { "name": "preview_scale", "type": "FLOAT", "link": null }
+      ],
+      "outputs": [
+        { "name": "positive_coords", "type": "STRING", "links": null },
+        { "name": "negative_coords", "type": "STRING", "links": null },
+        { "name": "bboxes", "type": "STRING", "links": null },
+        { "name": "frame_index", "type": "INT", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": ["", 0.75]
+    },
+    {
+      "id": 8,
+      "type": "WOSAI_FirstLastFrame",
+      "pos": [650, 700],
+      "size": [260, 160],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        { "name": "image", "type": "IMAGE", "link": 9 }
+      ],
+      "outputs": [
+        { "name": "first_frame", "type": "IMAGE", "links": [10] },
+        { "name": "last_frame", "type": "IMAGE", "links": [11] }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 9,
+      "type": "WOSAI_ImageCompare",
+      "pos": [980, 700],
+      "size": [420, 380],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        { "name": "image_a", "type": "IMAGE", "link": 10 },
+        { "name": "image_b", "type": "IMAGE", "link": 11 }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 10,
+      "type": "WOSAI_GetWidget",
+      "pos": [650, 60],
+      "size": [300, 180],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        { "name": "target_output", "type": "*", "link": 12 },
+        { "name": "widget_name", "type": "STRING", "link": null },
+        { "name": "include_name", "type": "BOOLEAN", "link": null },
+        { "name": "include_extension", "type": "BOOLEAN", "link": null }
+      ],
+      "outputs": [
+        { "name": "widget_value", "type": "STRING", "links": null }
+      ],
+      "properties": {
+        "cnr_id": "custom-nodes/WOSAI-ComfyUI",
+        "ver": "2.0"
+      },
+      "widgets_values": ["", true, true]
+    },
+    {
+      "id": 11,
+      "type": "ImageBatch",
+      "pos": [350, 760],
+      "size": [260, 120],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        { "name": "image1", "type": "IMAGE", "link": 7 },
+        { "name": "image2", "type": "IMAGE", "link": 8 }
+      ],
+      "outputs": [
+        { "name": "IMAGE", "type": "IMAGE", "links": [9] }
+      ],
+      "properties": { "cnr_id": "comfy-core" },
+      "widgets_values": []
+    }
+  ],
+  "links": [
+    [1, 1, 0, 6, 2, "IMAGE"],
+    [2, 2, 0, 6, 3, "IMAGE"],
+    [3, 3, 0, 5, 0, "BOOLEAN"],
+    [4, 4, 0, 5, 1, "INT"],
+    [5, 5, 0, 6, 1, "*"],
+    [6, 6, 0, 7, 0, "IMAGE"],
+    [7, 1, 0, 11, 0, "IMAGE"],
+    [8, 2, 0, 11, 1, "IMAGE"],
+    [9, 11, 0, 8, 0, "IMAGE"],
+    [10, 8, 0, 9, 0, "IMAGE"],
+    [11, 8, 1, 9, 1, "IMAGE"],
+    [12, 4, 0, 10, 0, "INT"]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

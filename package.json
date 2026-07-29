@@ -1,0 +1,41 @@
+{
+  "name": "wosai-comfyui",
+  "version": "2.0.0",
+  "description": "WOSAI ComfyUI custom nodes frontend",
+  "author": "穿山阅海",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test web/shared/*.test.mjs",
+    "test:js": "node --test web/shared/*.test.mjs",
+    "test:python": "python -m unittest discover -s tests -p \"test_*.py\"",
+    "test:ui": "playwright test --config playwright.config.mjs",
+    "test:all": "npm run test:python && npm run test:js && npm run test:ui",
+    "test:watch": "node --test --watch web/shared/*.test.mjs",
+    "test:comfy": "node scripts/comfyui-smoke-test.mjs",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:version": "node scripts/check-version.mjs",
+    "check:data": "node scripts/check-shared-data.mjs",
+    "check:integrity": "node scripts/check-project-integrity.mjs",
+    "check:performance": "node scripts/check-frontend-performance.mjs",
+    "benchmark:frontend": "node scripts/benchmark-frontend.mjs",
+    "check:release": "node scripts/check-release.mjs",
+    "build:release": "python scripts/build_release.py",
+    "verify:release": "python scripts/verify_release.py",
+    "release:package": "npm run build:release && npm run verify:release",
+    "release:check": "npm run quality && npm run test:comfy && npm run test:ui && npm run release:package",
+    "quality": "npm run lint:js && npm run lint && npm test && npm run check:i18n && npm run check:version && npm run check:data && npm run check:integrity && npm run check:performance && npm run benchmark:frontend && npm run check:release",
+    "lint": "node scripts/lint-wosai-css.cjs --summary",
+    "lint:js": "eslint web scripts",
+    "lint:full": "node scripts/lint-wosai-css.cjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.62.0",
+    "eslint": "^10.0.1",
+    "globals": "^17.7.0"
+  }
+}

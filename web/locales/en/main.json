@@ -1,0 +1,27 @@
+{
+    "settingsCategories": {
+        "WOSAI Custom": "WOSAI Custom",
+        "Run Highlight": "Run Highlight",
+        "Color Assistant": "Color Assistant",
+        "About WOSAI": "About WOSAI",
+        "Canvas Layout": "Canvas Layout",
+        "OmniSlider": "OmniSlider",
+        "Highlight Border": "Highlight Border",
+        "Breathing on Mouse Move": "Breathing",
+        "Auto Breathing": "Auto Breathing",
+        "Breathing Period": "Breathing Period",
+        "Breathing Strength": "Breathing Strength",
+        "Breathing Size": "Breathing Size",
+        "Breathing Brightness": "Breathing Brightness",
+        "Glow Color": "Glow Color",
+        "Runtime Display": "Runtime Display",
+        "Time Color": "Time Color",
+        "Time Background Opacity": "Time BG Opacity",
+        "Time Shadow Opacity": "Time Shadow Opacity",
+        "Show Floating Ball": "Show Floating Ball",
+        "Hold Mode": "Hold Mode",
+        "Copyright": "About WOSAI",
+        "Alignment Guides": "Alignment Guides",
+        "Max Slider Count": "Max Sliders"
+    }
+}
