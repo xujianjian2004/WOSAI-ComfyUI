@@ -43,7 +43,7 @@ function getDefaultPresetDefinition(index) {
 }
 
 function ensureStyle() {
-  const href = new URL("./styles/preset-prompt.css?v=11", import.meta.url).href;
+  const href = new URL("./styles/preset-prompt.css?v=12", import.meta.url).href;
   const existing = document.getElementById(STYLE_ID);
   if (existing) {
     if (existing.href !== href) existing.href = href;
@@ -283,19 +283,14 @@ function scheduleNodeLayout(node, count, root) {
       node.size?.[0] ?? computedWidth,
       getWOSAIVarNum("--ws-pp-node-min-width", 0),
     );
-    // Content-driven height: prefer measured DOM over computeSize(), which may
-    // under-report in Nodes 2.0 (Vue layout vs LiteGraph widget sum mismatch).
-    // Include prompt widget heights explicitly since they live outside root.
+    // Content-driven height: use measured DOM as primary source (Nodes 2.0
+    // Vue layout often under-reports via computeSize()).  Fall back to
+    // computeSize() when DOM measurement is unavailable.  A small safety floor
+    // prevents degenerate empty states.
     const promptAreaHeight = PROMPT_WIDGET_NAMES.length * getWOSAIVarNum("--ws-pp-prompt-min-height", 0);
     const contentHeight = node._wosaiPresetWidgetHeight + promptAreaHeight;
-    // Upper-bound to what ComfyUI thinks (prevents overflow); small safety floor
-    // prevents degenerate empty states. The old --ws-pp-node-height (380 px) hard
-    // floor caused persistent bottom whitespace when content was shorter.
     const safetyFloor = getWOSAIVarNum("--ws-pp-widget-base-height", 0) * 4;
-    const height = Math.max(
-      Math.min(contentHeight, computedHeight),
-      safetyFloor,
-    );
+    const height = Math.max(contentHeight, computedHeight, safetyFloor);
     if (node.size?.[0] !== width || node.size?.[1] !== height) {
       node._wosaiPresetApplyingSize = true;
       try {
