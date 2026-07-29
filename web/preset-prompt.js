@@ -5,6 +5,7 @@ import { addSizedDOMWidget } from "./shared/dom-widget.js";
 import { injectTextFavoriteIndicator } from "./save-text.js";
 import { parsePresetImport, serializePresetExport } from "./shared/preset-transfer-engine.js";
 import { quickToast } from "./shared/toast.js";
+import { ghostWidget, hideEl, hideWidgetRow, injectGlobalHideCSS } from "./shared/nodes2-hide.js";
 
 const NODE_TYPE = "WOSAI_PresetPromptSelector";
 const PATCH_KEY = "__wosaiPresetPromptPatched";
@@ -126,13 +127,18 @@ function applyNativeOutputPortShape(node) {
   node.setDirtyCanvas?.(true, true);
 }
 
-function hideNativeWidget(widget) {
+function hideNativeWidget(widget, node) {
   if (!widget) return;
-  widget.hidden = true;
-  widget.computeSize = () => [0, -4];
-  widget.getHeight = () => 0;
-  const element = widget.element ?? widget.dom;
-  element?.style?.setProperty("display", "none", "important");
+  // Classic：GJJ 藏参五件套（ghostWidget 含 last_y=0 + computeLayoutSize，避免空白行 / 残留高度）
+  // Nodes 2.0：直接 hideEl 做一次即时隐藏；真正的持续隐藏由 injectGlobalHideCSS 注入的
+  //           全局 CSS 兜底（按 widget 名匹配，Vue 重渲后 CSS 自动重新生效，不会像
+  //           element.style.display 那样被重置而让原始 widget 重新冒出）。
+  ghostWidget(widget);
+  const el = widget.element ?? widget.dom ?? widget.inputEl;
+  if (el) {
+    hideEl(el, true);
+    hideWidgetRow(el, node?.element ?? node?.dom);
+  }
 }
 
 function getFallbackPreset(index) {
@@ -792,7 +798,7 @@ app.registerExtension({
       const result = originalCreated?.apply(this, args);
       applyOutputPortLabels(this);
       applyNativeOutputPortShape(this);
-      this.widgets?.filter((widget) => WIDGET_NAMES.has(widget.name)).forEach(hideNativeWidget);
+      this.widgets?.filter((widget) => WIDGET_NAMES.has(widget.name)).forEach((w) => hideNativeWidget(w, this));
       applyPromptInputHeight(this);
       injectPromptFavorites(this);
       buildPresetWidget(this);
@@ -807,7 +813,7 @@ app.registerExtension({
       const result = originalConfigure?.apply(this, args);
       applyOutputPortLabels(this);
       applyNativeOutputPortShape(this);
-      this.widgets?.filter((widget) => WIDGET_NAMES.has(widget.name)).forEach(hideNativeWidget);
+      this.widgets?.filter((widget) => WIDGET_NAMES.has(widget.name)).forEach((w) => hideNativeWidget(w, this));
       applyPromptInputHeight(this);
       injectPromptFavorites(this);
       buildPresetWidget(this);
@@ -848,6 +854,9 @@ app.registerExtension({
   },
   setup() {
     ensureStyle();
+    // Nodes 2.0：注入按 widget 名匹配全局 CSS，隐藏原生 Active preset / Preset data / Output mode
+    // 行（Vue 重渲后自动重新生效，避免原生 widget 在 Nodes 2.0 下重新冒出）。Classic 由 ghostWidget 处理。
+    injectGlobalHideCSS([...WIDGET_NAMES], "wosai-pp-hide-native");
     offPresetLanguage?.();
     offPresetLanguage = onLangChange(() => {
       const nodes = app.graph?._nodes ?? app.graph?.nodes ?? [];
