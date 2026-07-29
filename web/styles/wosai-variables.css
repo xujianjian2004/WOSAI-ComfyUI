@@ -224,8 +224,9 @@
   --ws-pp-settings-padding: var(--ws-btn-padding-sm);
   --ws-pp-hint-min-width: 140px;
   --ws-pp-node-min-width: 240px;
-  /* 6 个预设（两行）+ 分页 + 中英文提示词输入区 + LiteGraph 标题栏 */
-  --ws-pp-node-height: 380px;
+  /* 内容驱动高度（由 preset-prompt.js 的 measurePresetContentHeight 动态计算）；
+     此值仅作为退化保底，不再硬编码为固定最小高度。 */
+  --ws-pp-node-height: 0px;
   --ws-pp-prompt-min-height: 112px;
   --ws-pp-widget-base-height: 46px;
   --ws-pp-clear-menu-min-width: 160px;

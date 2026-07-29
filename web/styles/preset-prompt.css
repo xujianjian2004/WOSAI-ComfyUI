@@ -258,6 +258,15 @@
   padding-bottom: 0 !important;
 }
 
+/* Nodes 2.0 (Vue): also strip bottom padding from the ComfyUI node container
+   to prevent a blank strip between pager and node bottom edge. */
+[data-testid^="node-body-"].wosai-pp-node-body > .comfyui-node-content,
+.wosai-pp-node-body > [class*="node-content"],
+.wosai-pp-node-body > [class*="node-body"] {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 [data-testid^="node-body-"].wosai-pp-node-body > .wosai-pp__host-brand-footer {
   display: none !important;
 }

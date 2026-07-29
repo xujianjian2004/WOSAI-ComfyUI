@@ -43,7 +43,7 @@ function getDefaultPresetDefinition(index) {
 }
 
 function ensureStyle() {
-  const href = new URL("./styles/preset-prompt.css?v=10", import.meta.url).href;
+  const href = new URL("./styles/preset-prompt.css?v=11", import.meta.url).href;
   const existing = document.getElementById(STYLE_ID);
   if (existing) {
     if (existing.href !== href) existing.href = href;
@@ -283,10 +283,19 @@ function scheduleNodeLayout(node, count, root) {
       node.size?.[0] ?? computedWidth,
       getWOSAIVarNum("--ws-pp-node-min-width", 0),
     );
-    // Preset Manager owns its content height. Nodes 2.0 can transiently grow
-    // the host node while DOM rows reflow; preserving that intermediate value
-    // leaves a large blank strip below the pager after a width-only resize.
-    const height = Math.max(computedHeight, getWOSAIVarNum("--ws-pp-node-height", 0));
+    // Content-driven height: prefer measured DOM over computeSize(), which may
+    // under-report in Nodes 2.0 (Vue layout vs LiteGraph widget sum mismatch).
+    // Include prompt widget heights explicitly since they live outside root.
+    const promptAreaHeight = PROMPT_WIDGET_NAMES.length * getWOSAIVarNum("--ws-pp-prompt-min-height", 0);
+    const contentHeight = node._wosaiPresetWidgetHeight + promptAreaHeight;
+    // Upper-bound to what ComfyUI thinks (prevents overflow); small safety floor
+    // prevents degenerate empty states. The old --ws-pp-node-height (380 px) hard
+    // floor caused persistent bottom whitespace when content was shorter.
+    const safetyFloor = getWOSAIVarNum("--ws-pp-widget-base-height", 0) * 4;
+    const height = Math.max(
+      Math.min(contentHeight, computedHeight),
+      safetyFloor,
+    );
     if (node.size?.[0] !== width || node.size?.[1] !== height) {
       node._wosaiPresetApplyingSize = true;
       try {
@@ -777,9 +786,13 @@ function buildPresetWidget(node) {
     getMaxHeight: () => node._wosaiPresetWidgetHeight,
     getHeight: () => node._wosaiPresetWidgetHeight,
   });
+  // Initial size: use content-driven height (same formula as scheduleNodeLayout)
+  // instead of a hardcoded floor that may not match actual content.
+  const initPromptHeight = PROMPT_WIDGET_NAMES.length * getWOSAIVarNum("--ws-pp-prompt-min-height", 0);
+  const initContentHeight = node._wosaiPresetWidgetHeight + initPromptHeight;
   node.setSize?.([
     Math.max(node.size?.[0] ?? 0, getWOSAIVarNum("--ws-pp-node-min-width")),
-    Math.max(node.size?.[1] ?? 0, getWOSAIVarNum("--ws-pp-node-height")),
+    Math.max(node.size?.[1] ?? 0, initContentHeight),
   ]);
   refresh();
 }
