@@ -20,7 +20,7 @@ class WOSAI_IgnoreGroups:
     CATEGORY = CATEGORY_PREFIX + "画布"
     OUTPUT_NODE = True
 
-    def execute(self):
+    def execute(self) -> tuple:
         return ()
 
 

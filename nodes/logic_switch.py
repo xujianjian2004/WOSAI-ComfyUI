@@ -5,6 +5,8 @@
       当 condition 未连接时，由 Default_Input 开关决定回落到哪一路。
 """
 import logging
+from typing import Optional
+
 from wosai_core.config import CATEGORY_PREFIX
 
 logger = logging.getLogger(__name__)
@@ -78,7 +80,14 @@ class WOSAI_LogicSwitch:
     CATEGORY = CATEGORY_PREFIX + "逻辑"
 
     # Adjust logic for the new default behavior control
-    def switch(self, Default_Input=False, condition=None, true_input=None, false_input=None, **translated_inputs):
+    def switch(
+        self,
+        Default_Input: bool = False,
+        condition: Optional[bool] = None,
+        true_input: Optional[object] = None,
+        false_input: Optional[object] = None,
+        **translated_inputs: object,
+    ) -> tuple:
         # 兼容旧版 i18N 曾把端口显示名写入 kwargs 的工作流；内部参数始终使用稳定英文名。
         if "默认输入" in translated_inputs:
             Default_Input = translated_inputs["默认输入"]

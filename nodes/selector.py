@@ -70,11 +70,11 @@ class WOSAI_Selector:
     @classmethod
     def VALIDATE_INPUTS(
         cls,
-        selected_index=0,
-        labels_json="",
-        columns=MAX_COLUMNS,
-        settings_json=DEFAULT_SETTINGS_JSON,
-    ):
+        selected_index: int = 0,
+        labels_json: str = "",
+        columns: int = MAX_COLUMNS,
+        settings_json: str = DEFAULT_SETTINGS_JSON,
+    ) -> "bool | str":
         labels = normalize_labels(labels_json)
         if not 1 <= int(columns) <= MAX_COLUMNS:
             return f"columns must be between 1 and {MAX_COLUMNS}"
@@ -85,20 +85,20 @@ class WOSAI_Selector:
     @classmethod
     def IS_CHANGED(
         cls,
-        selected_index=0,
-        labels_json="",
-        columns=MAX_COLUMNS,
-        settings_json=DEFAULT_SETTINGS_JSON,
-    ):
+        selected_index: int = 0,
+        labels_json: str = "",
+        columns: int = MAX_COLUMNS,
+        settings_json: str = DEFAULT_SETTINGS_JSON,
+    ) -> tuple:
         return int(selected_index), str(labels_json), int(columns)
 
     def select(
         self,
-        selected_index=0,
-        labels_json="",
-        columns=MAX_COLUMNS,
-        settings_json=DEFAULT_SETTINGS_JSON,
-    ):
+        selected_index: int = 0,
+        labels_json: str = "",
+        columns: int = MAX_COLUMNS,
+        settings_json: str = DEFAULT_SETTINGS_JSON,
+    ) -> tuple:
         labels = normalize_labels(labels_json)
         index = max(0, min(int(selected_index), len(labels) - 1))
         return (index,)
@@ -124,10 +124,10 @@ class WOSAI_BooleanSelector:
         }
 
     @classmethod
-    def IS_CHANGED(cls, value=False, settings_json=DEFAULT_SETTINGS_JSON):
+    def IS_CHANGED(cls, value: bool = False, settings_json: str = DEFAULT_SETTINGS_JSON) -> bool:
         return bool(value)
 
-    def select(self, value=False, settings_json=DEFAULT_SETTINGS_JSON):
+    def select(self, value: bool = False, settings_json: str = DEFAULT_SETTINGS_JSON) -> tuple:
         return (bool(value),)
 
 

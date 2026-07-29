@@ -146,11 +146,15 @@ async function _doInit (overrideLang) {
     const lang = overrideLang || detectLang();
     _currentLang = SUPPORTED_LANGS.includes(lang) ? lang : DEFAULT_LANG;
 
-    _dict = {};
+    // 增量构建新字典，加载完成后再原子替换 _dict。
+    // 这样语言切换（setLang）期间 t() 仍返回“上一语言”的译文，而非空字典，
+    // 避免 _dict 被清空瞬间调用方拿到原始 key（如 common.menu.save）造成界面闪烁。
+    const newDict = {};
     for (const layer of LAYERS) {
         const data = await loadLayer(_currentLang, layer);
-        Object.assign(_dict, flatten(data, layer));
+        Object.assign(newDict, flatten(data, layer));
     }
+    _dict = newDict;
     try { localStorage.setItem(STORAGE_KEYS.lang, _currentLang); } catch (_) {}
     // 预加载双语展示名（与当前语言无关），供搜索别名注入使用
     await _loadBilingualNodeDefs();

@@ -408,16 +408,17 @@ try:
                 Manual_Mode, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
 
         @classmethod
-        def fingerprint_inputs(cls, Manual_Mode="off", scale_method="Crop",
-                               scale_multiplier=1.0, Resolution=None,
-                               Aspect_Ratio=None, Custom_Width=256, Custom_Height=2048):
+        def fingerprint_inputs(cls, Manual_Mode: str = "off", scale_method: str = "Crop",
+                               scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
+                               Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256, Custom_Height: int = 2048) -> tuple:
             return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
 
         @classmethod
-        def execute(cls, Manual_Mode="off", scale_method="Crop",
-                    scale_multiplier=1.0, Resolution=None,
-                    Aspect_Ratio=None, Custom_Width=256, Custom_Height=2048,
-                    image=None, mask=None, latent=None, vae=None):
+        def execute(cls, Manual_Mode: str = "off", scale_method: str = "Crop",
+                    scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
+                    Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256, Custom_Height: int = 2048,
+                    image: Optional[torch.Tensor] = None, mask: Optional[torch.Tensor] = None,
+                    latent: Optional[dict] = None, vae: Optional[object] = None) -> _io.NodeOutput:
             result = WOSAI_SizeSelect().calculate_size(
                 Manual_Mode, scale_method, scale_multiplier,
                 Resolution, Aspect_Ratio, Custom_Width, Custom_Height,

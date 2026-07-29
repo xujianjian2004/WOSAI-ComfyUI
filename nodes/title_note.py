@@ -22,7 +22,7 @@ class WOSAI_TitleNote:
     FUNCTION = "note"
     CATEGORY = CATEGORY_PREFIX + "画布"
 
-    def note(self):
+    def note(self) -> tuple:
         return ()
 
 

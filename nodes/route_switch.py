@@ -35,7 +35,7 @@ class WOSAI_NumberSwitch:
         }
 
     @classmethod
-    def VALIDATE_INPUTS(cls, select=0, **kwargs):
+    def VALIDATE_INPUTS(cls, select: int = 0, **kwargs: object) -> "bool | str":
         try:
             index = int(select)
         except (TypeError, ValueError):
@@ -44,7 +44,7 @@ class WOSAI_NumberSwitch:
             return f"select must be between 0 and {MAX_SWITCH_INPUTS - 1}"
         return True
 
-    def switch(self, select=0, **values):
+    def switch(self, select: int = 0, **values: object) -> tuple:
         index = int(select)
         if not 0 <= index < MAX_SWITCH_INPUTS:
             raise ValueError(f"select must be between 0 and {MAX_SWITCH_INPUTS - 1}")
@@ -68,12 +68,12 @@ class WOSAI_LazyFallback:
             },
         }
 
-    def check_lazy_status(self, primary=None, fallback=None):
+    def check_lazy_status(self, primary: object = None, fallback: object = None) -> "list[str] | None":
         if primary is None and fallback is None:
             return ["fallback"]
         return None
 
-    def resolve(self, primary=None, fallback=None):
+    def resolve(self, primary: object = None, fallback: object = None) -> tuple:
         return (primary if primary is not None else fallback,)
 
 
@@ -124,11 +124,11 @@ try:
             )
 
         @classmethod
-        def validate_inputs(cls, select=0, **kwargs):
+        def validate_inputs(cls, select: int = 0, **kwargs: object) -> "bool | str":
             return WOSAI_NumberSwitch.VALIDATE_INPUTS(select, **kwargs)
 
         @classmethod
-        def execute(cls, select=0, values=None):
+        def execute(cls, select: int = 0, values: "dict | None" = None) -> _io.NodeOutput:
             values = values or {}
             index = int(select)
             if not 0 <= index < MAX_SWITCH_INPUTS:

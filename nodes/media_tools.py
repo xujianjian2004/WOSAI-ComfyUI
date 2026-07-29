@@ -92,7 +92,7 @@ class WOSAI_PointsEditor(PreviewImage):
         }
 
     @classmethod
-    def VALIDATE_INPUTS(cls, image=None, annotation_json="", preview_scale=0.75, **kwargs):
+    def VALIDATE_INPUTS(cls, image: "torch.Tensor | None" = None, annotation_json: str = "", preview_scale: float = 0.75, **kwargs: Any) -> "bool | str":
         if not 0.1 <= float(preview_scale) <= 1.0:
             return "preview_scale must be between 0.1 and 1.0"
         _parse_annotation(annotation_json)
@@ -100,12 +100,12 @@ class WOSAI_PointsEditor(PreviewImage):
 
     def annotate(
         self,
-        image,
-        annotation_json="",
-        preview_scale=0.75,
-        prompt=None,
-        extra_pnginfo=None,
-    ):
+        image: torch.Tensor,
+        annotation_json: str = "",
+        preview_scale: float = 0.75,
+        prompt: object = None,
+        extra_pnginfo: "dict | None" = None,
+    ) -> dict:
         state = _parse_annotation(annotation_json)
         frame_index = min(state["frame_index"], max(0, int(image.shape[0]) - 1))
         height = int(image.shape[1])
@@ -191,7 +191,7 @@ class WOSAI_ImageCompare(PreviewImage):
         images = result.get("ui", {}).get("images", [])
         return images[0] if images else None
 
-    def compare(self, image_a=None, image_b=None, prompt=None, extra_pnginfo=None):
+    def compare(self, image_a: "torch.Tensor | None" = None, image_b: "torch.Tensor | None" = None, prompt: object = None, extra_pnginfo: "dict | None" = None) -> dict:
         first = self._save_preview(image_a, "wosai_compare_a", prompt, extra_pnginfo)
         second = self._save_preview(image_b, "wosai_compare_b", prompt, extra_pnginfo)
         return {
@@ -230,7 +230,7 @@ class WOSAI_GetWidget:
         }
 
     @classmethod
-    def IS_CHANGED(cls, **kwargs):
+    def IS_CHANGED(cls, **kwargs: Any) -> float:
         # 返回 NaN 使 ComfyUI 在每次执行时都重新计算本节点：
         # 其输出随所连接目标节点的控件动态变化，不应被缓存复用。
         return float("nan")
@@ -262,13 +262,13 @@ class WOSAI_GetWidget:
 
     def get_widget(
         self,
-        unique_id,
-        dynprompt,
-        target_output=None,
-        widget_name="",
-        include_name=True,
-        include_extension=True,
-    ):
+        unique_id: str,
+        dynprompt: object,
+        target_output: object = None,
+        widget_name: str = "",
+        include_name: bool = True,
+        include_extension: bool = True,
+    ) -> tuple:
         current = dynprompt.get_node(unique_id)
         target_link = current.get("inputs", {}).get("target_output")
         if not self._is_link(target_link):
@@ -302,7 +302,7 @@ class WOSAI_FirstLastFrame:
     def INPUT_TYPES(cls):
         return {"required": {"image": ("IMAGE",)}}
 
-    def extract(self, image):
+    def extract(self, image: torch.Tensor) -> tuple:
         if image is None or int(image.shape[0]) == 0:
             if image is None:
                 raise ValueError("image is required")
