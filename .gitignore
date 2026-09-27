@@ -17,10 +17,18 @@ Thumbs.db
 
 # Runtime data
 presets/
-# Keep the shipped color preset tracked even though the directory is ignored,
+# Keep shipped preset data tracked even though the directory is ignored,
 # otherwise the release package (MANIFEST.in) would silently drop it.
 !presets/
 !presets/color_presets.json
+!presets/preset_prompt_catalog.json
+# Generated at runtime by the Prompt Manager; never commit user state.
+presets/preset_library.json
+presets/preset_library.backup.json
+
+# Local runtime artifacts / debug dumps
+*.zip
+comfyui_detail.log
 
 # Node.js
 node_modules/
@@ -28,6 +36,7 @@ node_modules/
 .playwright-results/
 web/node_modules/
 .wosai-release-*/
+.release-test-*/
 .runtime-host-test/
 
 # AI 重构工具临时快照 (codex / vscode check 副产物，如 xxx.js._chk.mjs)

@@ -1,4 +1,4 @@
-# WOSAI-ComfyUI v2.0 — 运行时依赖
+# WOSAI-ComfyUI v2.1 — 运行时依赖
 # ─────────────────────────────────
 # 本插件不单独安装运行时依赖；依赖由 ComfyUI 宿主环境提供。
 # 运行时会使用 torch、numpy、Pillow、aiohttp，请使用完整的 ComfyUI 环境。

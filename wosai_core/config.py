@@ -1,6 +1,6 @@
 """WOSAI 全局配置：版本号 / 品牌 / 分类前缀 / 默认滑条参数。"""
 
-VERSION: str = "2.0.0"  # 单一版本源：__init__.__version__ 与 pyproject/VERSION 均由此派生
+VERSION: str = "2.1.0"  # 单一版本源：__init__.__version__ 与 pyproject/VERSION 均由此派生
 AUTHOR: str = "穿山阅海"
 EMAIL: str = "xujianjian2004@126.com"
 STUDIO: str = "WOSAI STUDIO"

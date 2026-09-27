@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "WOSAI-ComfyUI"
-version = "2.0.0"
+version = "2.1.0"
 description = "WOSAI-ComfyUI：专业的可视化节点美化与增强工具"
 readme = "README.md"
 license = { text = "MIT" }
@@ -41,6 +41,6 @@ exclude = ["*__pycache__*"]
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.package-data]
-"*" = ["web/**/*", "data/**/*"]
+# 运行时资源（web/ presets/ workflows/ docs/）不是 Python 包，
+# 随 sdist / ComfyUI ZIP 经 MANIFEST.in 与 scripts/build_release.py 分发。
+# nodes/ 与 wosai_core/ 本身不携带包内数据文件，故不声明 package-data。
