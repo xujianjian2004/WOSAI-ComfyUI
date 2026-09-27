@@ -42,21 +42,3 @@ export function getSlotPos(node, isInput, slotIdx) {
     node.getConnectionPos(isInput, slotIdx, out);
     return out;
 }
-
-// 在对象方法上链式追加回调（保留原方法返回值）
-export function chainCallback(object, property, callback) {
-    if (object == null) {
-        console.error("[WOSAI] tried to add callback to non-existent object");
-        return;
-    }
-    if (property in object) {
-        const callback_orig = object[property];
-        object[property] = function () {
-            const r = callback_orig.apply(this, arguments);
-            callback.apply(this, arguments);
-            return r;
-        };
-    } else {
-        object[property] = callback;
-    }
-}

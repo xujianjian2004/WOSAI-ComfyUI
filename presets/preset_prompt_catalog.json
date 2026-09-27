@@ -1,0 +1,797 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "去除水印",
+      "label_i18n": "Remove Watermark",
+      "prompt_cn": "完整保留原图主体、光影、色彩与构图，清除画面内各类标识印记、水印字符，智能填充周边背景纹理，修补区域过渡自然无痕，无色块断层与修改痕迹。",
+      "prompt_en": "Completely retain the original subject, light, color and composition, remove all logo marks and watermark text in the image, intelligently fill surrounding background texture, seamless transition of repaired area without color block faults or editing traces."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "照片修复",
+      "label_i18n": "Photo Restoration",
+      "prompt_cn": "老旧影像全维度修复，去除泛黄、色偏、折痕、裂纹、污渍霉斑与划痕，补全破损残缺区域，校正白平衡，还原原生色彩与胶片颗粒质感，保留人物五官神态不变。",
+      "prompt_en": "Comprehensive restoration of old photos, eliminate yellowing, color cast, creases, cracks, stains, mold spots and scratches, repair damaged missing areas, correct white balance, restore original color and film grain texture, keep facial features and expressions unchanged."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "黑白上色",
+      "label_i18n": "Colorize B&W",
+      "prompt_cn": "单色黑白影像自然真实上色，肤色、服饰、环境材质色彩贴合真实物理质感，保留原图构图、人物样貌与复古胶片颗粒，饱和度适中不过度失真，光影逻辑统一。",
+      "prompt_en": "Natural and realistic colorization for monochrome black-and-white images, skin, clothing and environmental materials with authentic physical colors, retain original composition, character appearance and retro film grain, moderate saturation without excessive distortion, unified light and shadow logic."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "消除噪点",
+      "label_i18n": "Denoise",
+      "prompt_cn": "智能去除画面高ISO颗粒噪点、压缩杂色与彩色噪点，平滑过渡明暗区域，最大程度保留主体边缘细节，避免过度磨皮模糊，画质干净通透。",
+      "prompt_en": "Intelligently remove high ISO grain noise, compression artifacts and chroma noise, smooth light and shadow transition, preserve subject edge details as much as possible, avoid over-blurring, clean and transparent image quality."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "过曝修复",
+      "label_i18n": "Fix Overexposure",
+      "prompt_cn": "找回高光过曝丢失的画面细节，压亮部亮度，均衡整体曝光，保留暗部层次不发黑，色彩校正自然，不破坏原有光影氛围与物体轮廓。",
+      "prompt_en": "Recover lost details from overexposed highlights, reduce highlight brightness, balance overall exposure, retain shadow details without blocking up, natural color correction, do not destroy original light atmosphere and object outline."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "欠曝提亮",
+      "label_i18n": "Brighten Underexposure",
+      "prompt_cn": "提亮暗部死黑区域，找回阴影隐藏纹理细节，控制提亮产生的噪点，维持高光不过曝，画面曝光均匀，对比度舒适自然。",
+      "prompt_en": "Brighten blocked shadow areas, restore hidden texture details in shadows, suppress noise caused by lifting shadows, prevent highlight blowout, uniform exposure and comfortable contrast."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "透视校正",
+      "label_i18n": "Perspective Correction",
+      "prompt_cn": "矫正画面倾斜、广角畸变、垂直线条透视扭曲，修正建筑物/平面物体横竖比例，画面横平竖直，构图规整，内容无拉伸变形。",
+      "prompt_en": "Correct image tilt, wide-angle distortion and vertical perspective warp, adjust vertical and horizontal proportion of planar objects, keep straight lines and regular composition, no stretching deformation."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "画作修复",
+      "label_i18n": "Artwork Restoration",
+      "prompt_cn": "画作破损修复，修补画面掉漆、划痕、褶皱、褪色区域，还原原画笔触、色彩层次与肌理质感，对齐构图比例，修复痕迹完全融合原生画面。",
+      "prompt_en": "Repair damaged decorative paintings, fix peeling paint, scratches, wrinkles and faded areas, restore original brush strokes, color hierarchy and texture, align composition proportion, repair traces fully integrated into original picture."
+    },
+    {
+      "category": "瑕疵修复",
+      "category_i18n": "Flaw Repair",
+      "label": "HDR效果",
+      "label_i18n": "HDR Effect",
+      "prompt_cn": "HDR高动态范围合成，同时保住高光与暗部全部细节，超大宽容度，画面通透立体，明暗层次极致丰富。",
+      "prompt_en": "HDR high dynamic range synthesis, preserve full details in highlights and shadows simultaneously, ultra wide latitude, transparent three-dimensional image, extremely rich light and shadow layers."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "高清修复",
+      "label_i18n": "HD Restoration",
+      "prompt_cn": "画面全局清晰度提升，修复模糊、虚化、压缩噪点，强化物体边缘细节、材质纹理与光影层次，不改变原图构图、人物结构与画面氛围，8K超高清画质输出。",
+      "prompt_en": "Global image clarity improvement, fix blurriness, out-of-focus and compression noise, strengthen edge details, material texture and light-shadow hierarchy, do not change original composition, character structure and atmosphere, output 8K ultra HD image."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "风景增强",
+      "label_i18n": "Landscape Enhance",
+      "prompt_cn": "自然风光画面优化，提升远景层次、天空通透度、植被与水体细节，均衡明暗对比度，优化空气透视感，保留原有景物结构不变，画面通透富有空间立体感。",
+      "prompt_en": "Optimize natural scenery image, improve distant layering, sky transparency, vegetation and water body details, balance brightness contrast, enhance atmospheric perspective, keep original landscape structure unchanged, create transparent and three-dimensional space."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "打光重塑",
+      "label_i18n": "Relight",
+      "prompt_cn": "对画面主体进行全局重新布光，自定义光源方向、软硬光质、光影明暗比例，重塑体积立体感，保留物体本身材质与色彩不变。",
+      "prompt_en": "Global relighting for main subject, customize light source direction, light hardness and shadow ratio, rebuild three-dimensional volume, keep original object material and color unchanged."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "美食精修",
+      "label_i18n": "Food Retouch",
+      "prompt_cn": "美食画面专业商业精修，提升食材肌理光泽、汤汁通透质感，优化餐具环境光影，色彩浓郁有食欲，景深干净高级商业菜品画质。",
+      "prompt_en": "Commercial food photography retouching, improve ingredient texture and soup transparency, optimize tableware lighting, appetizing rich color, clean depth of field for premium commercial food image."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "电影调色",
+      "label_i18n": "Cinematic Grading",
+      "prompt_cn": "院线电影级调色，暗角压边，柔和对比度，低饱和高级肤色，胶片颗粒感，景深氛围感拉满，叙事大片质感。",
+      "prompt_en": "Theatrical cinematic color grading, vignette dark edge, soft contrast, low saturation premium skin tone, film grain, strong depth of field, blockbuster narrative texture."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "柔焦梦幻",
+      "label_i18n": "Soft Focus Dream",
+      "prompt_cn": "全局柔光柔焦虚化，前景后景浅景深光斑，轻微高斯模糊，朦胧梦幻氛围感，主体依旧清晰突出。",
+      "prompt_en": "Global soft focus blur, foreground & background shallow depth-of-field bokeh, slight gaussian blur, hazy dream atmosphere, clear prominent main subject."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "黑白对比",
+      "label_i18n": "B&W Contrast",
+      "prompt_cn": "纯黑白高对比度影调，加深黑白反差，强化明暗硬边缘，浓郁胶片颗粒，视觉冲击力强烈。",
+      "prompt_en": "Pure black and white high contrast tone, deepen black-white difference, strengthen hard light edges, heavy film grain, strong visual impact."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "暖色调",
+      "label_i18n": "Warm Tone",
+      "prompt_cn": "整体画面统一暖色温调色，橙黄/金棕柔和底色，提升画面温馨氛围感，物体色彩还原自然不偏色。",
+      "prompt_en": "Global warm color temperature grading, soft orange/golden brown base tone, enhance warm atmosphere, natural object color without cast."
+    },
+    {
+      "category": "画质增强",
+      "category_i18n": "Quality Enhancement",
+      "label": "冷色调",
+      "label_i18n": "Cool Tone",
+      "prompt_cn": "全局冷色调校准，青蓝、冰蓝低饱和底色，清冷高级氛围感，明暗对比均衡，细节完整保留。",
+      "prompt_en": "Global cool tone calibration, cyan-blue low saturation base, cold advanced atmosphere, balanced contrast and complete details."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "人像精修",
+      "label_i18n": "Portrait Retouch",
+      "prompt_cn": "人像精细化处理，自然磨皮保留皮肤毛孔纹理，均匀肤色，修饰面部瑕疵，优化五官立体光影，脸型五官原生不夸张改动，肤质通透高级。",
+      "prompt_en": "Delicate portrait retouching, natural skin smoothing while retaining pores, even skin tone, remove facial blemishes, optimize three-dimensional facial lighting, keep original facial features without exaggerated modification, advanced transparent skin texture."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "证件处理",
+      "label_i18n": "ID Photo",
+      "prompt_cn": "按证件照规范统一处理，替换背景为{指定底色}，调整头部比例、肩膀构图，统一光线正面柔和布光，修正色彩白平衡，符合正式证件照片规范。",
+      "prompt_en": "Standardize ID photo, replace background with {designated solid color}, adjust head and shoulder composition ratio, use soft frontal lighting, correct white balance, comply with official ID photo specifications."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "牙齿美白",
+      "label_i18n": "Teeth Whitening",
+      "prompt_cn": "仅针对牙齿区域自然提亮美白，去除牙面发黄与杂色，保留牙齿体积光影与纹理，不影响嘴唇、面部其他肤色，效果真实不假面。",
+      "prompt_en": "Natural whitening only for tooth area, remove yellow tint and discoloration, retain tooth volume light and texture, do not affect lips and surrounding facial skin, realistic effect."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "眼睛增亮",
+      "label_i18n": "Eye Brightening",
+      "prompt_cn": "提亮眼球瞳孔通透度，增加眼神光，优化虹膜细节，轻微放大双眼神态，保留原生眼部结构，不夸张变形，眼神灵动有神。",
+      "prompt_en": "Brighten eyeball transparency, add catchlight, enhance iris details, slightly optimize eye expression, keep original eye structure without exaggerated distortion, vivid and energetic eyes."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "去除反光",
+      "label_i18n": "Remove Glare",
+      "prompt_cn": "消除镜片表面光斑、镜面反光与过曝白点，完整还原眼镜后方眼部细节，镜框轮廓不变，镜片通透自然，无修补违和痕迹。",
+      "prompt_en": "Eliminate lens surface glare, specular reflection and overexposed spots, fully restore eye details behind glasses, keep frame outline unchanged, transparent natural lenses without unnatural repair marks."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "妆容美化",
+      "label_i18n": "Makeup Enhancement",
+      "prompt_cn": "为面部自然叠加精致妆容，可选眼影、腮红、唇色、修容等妆效，贴合面部骨骼光影，妆感轻薄真实，不改变五官基础样貌。",
+      "prompt_en": "Naturally apply delicate makeup on face, optional eyeshadow, blush, lipstick and contour, fit facial bone lighting, light and realistic makeup effect, no change on basic facial features."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "微笑增强",
+      "label_i18n": "Smile Enhancement",
+      "prompt_cn": "自然优化嘴角弧度，提升微笑舒展度，同步调整苹果肌与面部肌肉线条，保持面部对称协调，原生感拉满，不扭曲脸型五官。",
+      "prompt_en": "Naturally optimize mouth corner radian and smile stretch, adjust malar fat pad and facial muscle lines, maintain facial symmetry and coordination, highly original look without distorted face."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "发型发色",
+      "label_i18n": "Hair Style and Color",
+      "prompt_cn": "替换为{指定发型样式}与{指定发色}，发丝光影、透视与头部角度完美贴合，边缘和头皮自然融合，毛发蓬松质感真实，不改动脸型五官。",
+      "prompt_en": "Replace with {assigned hairstyle} and {assigned hair color}, hair light and perspective perfectly fit head angle, natural edge fusion with scalp, fluffy realistic hair texture, no modification on face shape and features."
+    },
+    {
+      "category": "人像美化",
+      "category_i18n": "Portrait Beautification",
+      "label": "日系清新",
+      "label_i18n": "Japanese Fresh",
+      "prompt_cn": "日系小清新胶片调色，低对比度，轻微过曝柔化，淡马卡龙低饱和色彩，通透干净少女感画质。",
+      "prompt_en": "Japanese fresh film grading, low contrast, slight overexposure softness, low saturation macaron color, clean and transparent youthful texture."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "智能移除",
+      "label_i18n": "Smart Removal",
+      "prompt_cn": "精准抹除画面内{指定多余物体}，AI智能推演周边纹理自动填充，修补区域光影、透视、纹理和原图无缝衔接，无任何修改痕迹。",
+      "prompt_en": "Accurately erase {designated redundant objects} in image, AI intelligently deduce surrounding texture for automatic filling, repaired area seamlessly match original light, perspective and texture with zero editing traces."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "添加对象",
+      "label_i18n": "Add Object",
+      "prompt_cn": "在画面合理空间内添加{指定物体元素}，完美匹配原图光照、透视、色彩、阴影与景深，物体融入环境真实自然，无拼接违和感。",
+      "prompt_en": "Add {designated object elements} in reasonable image space, perfectly match original light, perspective, color, shadow and depth of field, naturally integrated into environment without splicing flaws."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "对象替换",
+      "label_i18n": "Replace Object",
+      "prompt_cn": "将原图原有目标物体替换为{新目标物体}，严格对齐位置大小、视角透视、受光方向、环境色反射，边缘融合无痕，整体画质统一。",
+      "prompt_en": "Replace original target object with {new target object}, strictly align position, size, viewing perspective, lighting direction and ambient color reflection, seamless edge fusion, unified overall image quality."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "背景替换",
+      "label_i18n": "Replace Background",
+      "prompt_cn": "主体人物/物体完整抠图保留原有光影，背景整体替换为{自定义背景画面}，主体边缘与新背景色彩、光影自然融合，过渡真实。",
+      "prompt_en": "Cut out main subject with original lighting fully retained, replace entire background with {custom background image}, subject edges naturally blend with new background color and light, realistic transition."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "文字精修",
+      "label_i18n": "Text Cleanup",
+      "prompt_cn": "对画面内现有文字进行修正、消除、重绘或字体优化，匹配所在区域光影与透视，修复后文字和画面融为一体，无突兀色块。",
+      "prompt_en": "Correct, remove, redraw or optimize existing text in picture, match local light and perspective, repaired text integrate into image without abrupt color blocks."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "招牌替换",
+      "label_i18n": "Signboard Replace",
+      "prompt_cn": "替换画面招牌、牌匾、标识牌内原有文字为{自定义文字内容}，字体大小、透视、光影、褪色磨损质感完全贴合载体表面。",
+      "prompt_en": "Replace original text on signs and plaques with {custom text content}, font size, perspective, lighting and worn texture fully fit carrier surface."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "天气变换",
+      "label_i18n": "Weather Change",
+      "prompt_cn": "将画面环境季节/天气替换为{指定季节天气}，同步修改植被状态、空气氛围、光线色调、地面附着物，整体环境逻辑统一真实。",
+      "prompt_en": "Switch scene season/weather to {assigned season & weather}, synchronously modify vegetation state, atmospheric haze, light tone and ground attachments, unified and realistic environmental logic."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "夜景转换",
+      "label_i18n": "Night Conversion",
+      "prompt_cn": "日间画面转为夜晚夜景效果，压暗环境基底，添加环境灯光、光晕辉光、暗部氛围反光，建筑与物体夜景光影逻辑合理。",
+      "prompt_en": "Convert daytime image to night scene, darken base environment, add ambient lamp glow and shadow reflection, reasonable night lighting logic for buildings and objects."
+    },
+    {
+      "category": "物体编辑",
+      "category_i18n": "Object Editing",
+      "label": "氛围特效",
+      "label_i18n": "Atmosphere FX",
+      "prompt_cn": "叠加{自定义氛围特效}，例如雾气、光斑、星尘、丁达尔光束、花瓣粒子等，特效遵循画面透视与光照，氛围感柔和不遮挡主体。",
+      "prompt_en": "Overlay {custom atmosphere effects} such as fog, bokeh, stardust, tyndall beam and particle elements, effects follow image perspective and lighting, soft atmosphere without blocking main subject."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "智能扩图",
+      "label_i18n": "Smart Outpainting",
+      "prompt_cn": "向外延展画布边界，AI根据原图内容、构图、光影、纹理智能补齐延伸画面，延展部分风格、画质与原图高度一致，构图自然舒展。",
+      "prompt_en": "Expand canvas outward, AI intelligently complete extended area based on original content, composition, light and texture, extended part highly consistent with original style and quality, natural stretched composition."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "动漫风格",
+      "label_i18n": "Anime Style",
+      "prompt_cn": "照片转为日系二次元动漫画风，干净平涂色彩，清晰轮廓线条，柔和阴影分层，保留原图人物姿态与构图，氛围感统一。",
+      "prompt_en": "Convert photo to Japanese anime style, clean flat coloring, clear outline lines, soft shadow layering, retain original character posture and composition."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "油画风格",
+      "label_i18n": "Oil Painting",
+      "prompt_cn": "画面转为厚涂油画质感，明显颜料笔触肌理，色彩堆叠层次丰富，光影厚重立体，保留原图主体内容与构图结构。",
+      "prompt_en": "Convert to impasto oil painting texture, obvious paint brushstroke texture, rich stacked color layers, heavy three-dimensional light and shadow, keep original subject and composition."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "水彩风格",
+      "label_i18n": "Watercolor",
+      "prompt_cn": "通透水彩手绘效果，颜料晕染渐变、水痕渗透肌理，低对比度柔和色彩，留白写意质感，不改动画面主体内容。",
+      "prompt_en": "Transparent watercolor hand-painted effect, pigment bleeding gradient and water stain texture, low contrast soft color, freehand blank texture, keep original main content."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "素描风格",
+      "label_i18n": "Sketch Style",
+      "prompt_cn": "黑白铅笔素描效果，明暗排线层次，铅笔颗粒质感，轮廓结构完整还原原图物体造型，纯手绘速写质感。",
+      "prompt_en": "Black and white pencil sketch effect, hatching light-shadow layers, pencil grain texture, fully restore object outline and structure of original image, pure hand-drawn sketch texture."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "水墨风格",
+      "label_i18n": "Ink Wash",
+      "prompt_cn": "中式水墨写意画风，浓淡墨色晕染，飞白笔触留白，虚实相生东方意境，保留原图构图与主体形态。",
+      "prompt_en": "Chinese freehand ink wash style, thick and light ink bleeding, flying white brush strokes and blank space, oriental virtual-real artistic conception, retain original composition and subject shape."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "未来科幻",
+      "label_i18n": "Futuristic Sci-Fi",
+      "prompt_cn": "赛博朋克科幻色调，高饱和霓虹撞色，蓝紫青主色调，辉光光晕、暗部细节强化，未来都市科技氛围感。",
+      "prompt_en": "Cyberpunk sci-fi color grading, high saturation neon contrasting colors, dominant blue-purple-cyan tone, glow halo and enhanced shadow details, futuristic urban tech atmosphere."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "赛博色调",
+      "label_i18n": "Cyberpunk Tone",
+      "prompt_cn": "科技感赛博色调，洋红与青蓝互补撞色，暗部辉光提亮，霓虹反光质感，未来科幻冷峻氛围。",
+      "prompt_en": "Tech cyber color grading, magenta & cyan complementary contrasting color, shadow glow lift, neon reflection texture, futuristic cold sci-fi atmosphere."
+    },
+    {
+      "category": "风格转换",
+      "category_i18n": "Style Transfer",
+      "label": "故障艺术",
+      "label_i18n": "Glitch Art",
+      "prompt_cn": "数字故障艺术效果，色彩分离偏移、像素拖影、扫描线错位，赛博失真撕裂视觉，原图主体结构可识别。",
+      "prompt_en": "Digital glitch art effect, color channel shift, pixel trailing, scan line dislocation, cyber distorted tearing vision, recognizable original subject structure."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "黏土风格",
+      "label_i18n": "Clay Style",
+      "prompt_cn": "立体软陶黏土建模质感，哑光磨砂材质，圆润块面光影，轻微手工捏制肌理，卡通3D手办视觉效果，主体形态不变。",
+      "prompt_en": "3D polymer clay texture, matte frosted material, rounded block lighting, slight handmade kneading texture, cartoon figure visual effect, unchanged subject shape."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "剪纸风格",
+      "label_i18n": "Paper Cut",
+      "prompt_cn": "中式剪纸扁平化剪影效果，纯色块镂空分层，硬朗边缘线条，传统剪纸纹样质感，完整保留画面元素布局。",
+      "prompt_en": "Flat Chinese paper-cut silhouette effect, solid color hollow layering, sharp edge lines, traditional paper-cut pattern texture, fully retain element layout."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "像素风格",
+      "label_i18n": "Pixel Art",
+      "prompt_cn": "复古像素画效果，规整色块像素颗粒，低分辨率点阵视觉，8-bit游戏复古质感，物体轮廓结构清晰可辨。",
+      "prompt_en": "Retro pixel art effect, regular color block pixel grids, low-resolution dot matrix vision, 8-bit retro game texture, clear recognizable object outline."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "卡通插画",
+      "label_i18n": "Cartoon Illustration",
+      "prompt_cn": "照片转为扁平卡通插画风，明快纯色块面，简洁轮廓线条，弱化真实光影，保留主体姿态与构图，清新治愈的插画质感。",
+      "prompt_en": "Convert photo to flat cartoon illustration style, bright solid color blocks, clean outline lines, soften realistic light and shadow, retain subject posture and composition, fresh healing illustration texture."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "浮世绘",
+      "label_i18n": "Ukiyo-e",
+      "prompt_cn": "画面转为日式浮世绘木版画风，平面化构图，清晰黑色描边，分层套色块面，保留原图主体形态，东方古典版画韵味。",
+      "prompt_en": "Convert to Japanese ukiyo-e woodblock print style, flattened composition, clear black outlines, layered color blocks, retain original subject shape, classical oriental print charm."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "复古海报",
+      "label_i18n": "Retro Poster",
+      "prompt_cn": "转为复古旅行海报质感，扁平几何色块，粗描边与装饰字体感，做旧纹理与颗粒，色彩怀旧浓郁，画面叙事感强。",
+      "prompt_en": "Convert to vintage travel poster texture, flat geometric color blocks, bold outlines and decorative typography feel, worn texture and grain, nostalgic rich color, strong narrative poster feel."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "哥特暗黑",
+      "label_i18n": "Gothic Dark",
+      "prompt_cn": "画面转为哥特暗黑插画风，深沉冷暗色调，强烈明暗对比，锐利阴影与纹理细节，保留主体结构，神秘阴郁氛围。",
+      "prompt_en": "Convert to gothic dark illustration style, deep cold dark tone, strong light-shadow contrast, sharp shadow and texture details, retain subject structure, mysterious gloomy atmosphere."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "波普艺术",
+      "label_i18n": "Pop Art",
+      "prompt_cn": "转为波普艺术风，高饱和撞色平涂，半调网点与粗黑描边，夸张卡通化处理，保留主体辨识度，时尚潮流视觉。",
+      "prompt_en": "Convert to pop art style, high saturation contrasting flat colors, halftone dots and bold black outlines, exaggerated cartoon treatment, retain subject recognizability, fashionable trendy visual."
+    },
+    {
+      "category": "美术画风",
+      "category_i18n": "Art Style",
+      "label": "马赛克玻璃",
+      "label_i18n": "Mosaic Glass",
+      "prompt_cn": "画面转为彩绘玻璃马赛克质感，几何色块拼接，深色铅条勾边，透光斑斓色彩，保留主体轮廓，教堂花窗艺术氛围。",
+      "prompt_en": "Convert to stained glass mosaic texture, geometric color block splicing, dark lead-line edges, translucent brilliant colors, retain subject outline, church window art atmosphere."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "电商白底",
+      "label_i18n": "White Background",
+      "prompt_cn": "将商品或主体从原背景中精准抠取，替换为纯净白底，边缘平滑无残留，光影自然过渡，符合电商主图规范，画质高清。",
+      "prompt_en": "Precisely cut out product or subject from original background, replace with pure white background, smooth edge without residue, natural light transition, comply with e-commerce main image spec, high-definition quality."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "商品抠图",
+      "label_i18n": "Product Cutout",
+      "prompt_cn": "对复杂边缘商品{毛发、透明、镂空材质}进行高精度抠图，保留细节纹理与半透明质感，边缘干净无锯齿，便于后续合成。",
+      "prompt_en": "High-precision cutout for products with complex edges (hair, transparent, hollow materials), retain detail texture and semi-transparent quality, clean anti-aliased edges, ready for compositing."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "虚拟换装",
+      "label_i18n": "Virtual Try-On",
+      "prompt_cn": "为模特更换{指定服装款式与颜色}，衣料褶皱、光影、透视贴合身形姿态，边缘与皮肤自然融合，不改变人物五官脸型。",
+      "prompt_en": "Change model into {assigned clothing style and color}, fabric folds, light and perspective fit body posture, natural edge fusion with skin, do not change facial features."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "海报合成",
+      "label_i18n": "Poster Composite",
+      "prompt_cn": "将商品主体合成进{指定海报场景}，统一光照、透视、景深与色彩氛围，主体与背景自然融合，布局构图符合商业视觉规范。",
+      "prompt_en": "Composite product subject into {assigned poster scene}, unify lighting, perspective, depth of field and color atmosphere, natural fusion of subject and background, layout complies with commercial visual spec."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "文字排版",
+      "label_i18n": "Text Layout",
+      "prompt_cn": "在画面预留区域添加{广告文案/标题文字}，字体、字号、颜色与排版风格贴合整体设计，匹配局部光影透视，文字清晰可读不突兀。",
+      "prompt_en": "Add {ad copy/headline text} in reserved image area, font, size, color and layout fit overall design, match local light and perspective, text clear and readable without abruptness."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "标签添加",
+      "label_i18n": "Add Label",
+      "prompt_cn": "在商品图合适位置叠加{促销角标/价格标签/徽章}，样式立体贴合载体，光影透视自然，不遮挡主体关键信息，营销视觉突出。",
+      "prompt_en": "Overlay {promo badge/price tag/emblem} at suitable position, three-dimensional style fits carrier, natural light and perspective, do not block key subject info, prominent marketing visual."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "产品投影",
+      "label_i18n": "Product Shadow",
+      "prompt_cn": "为商品添加真实接地投影与镜面倒影，控制光影方向、虚化与透明度，增强立体悬浮感与高级商业质感，背景干净统一。",
+      "prompt_en": "Add realistic contact shadow and mirror reflection for product, control light direction, blur and transparency, enhance three-dimensional floating feel and premium commercial texture, clean unified background."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "多图拼版",
+      "label_i18n": "Multi-Image Grid",
+      "prompt_cn": "将多张商品/场景图按{指定网格版式}整齐拼接，统一色调与间距，对齐边距与留白，输出规整电商详情页或多宫格视觉。",
+      "prompt_en": "Neatly splice multiple product/scene images by {assigned grid layout}, unify tone and spacing, align margins and blank, output tidy e-commerce detail page or multi-grid visual."
+    },
+    {
+      "category": "电商专区",
+      "category_i18n": "E-commerce",
+      "label": "尺寸适配",
+      "label_i18n": "Size Adaptation",
+      "prompt_cn": "按{指定平台画幅比例}智能裁剪或扩边适配，主体居中保留完整，构图均衡不裁切关键内容，画质清晰符合各渠道发布规范。",
+      "prompt_en": "Intelligently crop or extend to {assigned platform aspect ratio}, keep subject centered and complete, balanced composition without cutting key content, clear quality meets each channel publishing spec."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "双重曝光",
+      "label_i18n": "Double Exposure",
+      "prompt_cn": "将两张影像巧妙叠加融合，主体轮廓与风景/纹理虚实交错，过渡自然有层次，艺术化叙事双重意象，画面高级不杂乱。",
+      "prompt_en": "Skillfully overlay and blend two images, subject outline interweaves with landscape/texture in virtual-real manner, natural layered transition, artistic narrative double imagery, premium and uncluttered."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "霓虹辉光",
+      "label_i18n": "Neon Glow",
+      "prompt_cn": "为画面添加霓虹灯管辉光与光晕，强化边缘发光与暗部冷光反射，色彩明艳梦幻，夜晚都市或科幻氛围感拉满。",
+      "prompt_en": "Add neon tube glow and halo to image, enhance edge luminescence and shadow cold-light reflection, bright dreamy color, full night-city or sci-fi atmosphere."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "怀旧氛围",
+      "label_i18n": "Nostalgic Mood",
+      "prompt_cn": "蒸汽波复古潮流滤镜，粉紫青渐变天空，网格地平线，像素化与故障质感，低饱和梦幻色调，90年代赛博怀旧氛围。",
+      "prompt_en": "Vaporwave retro trend filter, pink-purple-cyan gradient sky, grid horizon, pixelated and glitch texture, low-saturation dreamy tone, 90s cyber-nostalgic atmosphere."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "极光梦幻",
+      "label_i18n": "Aurora Dream",
+      "prompt_cn": "在画面天空或暗部叠加流动极光光带，青绿紫渐变晕染，柔和辉光与星点，梦幻空灵氛围，不破坏主体清晰。",
+      "prompt_en": "Overlay flowing aurora bands in sky or shadow areas, cyan-green-purple gradient bleeding, soft glow and star points, dreamy ethereal atmosphere, without destroying subject clarity."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "艺术镜像",
+      "label_i18n": "Artistic Mirror",
+      "prompt_cn": "以画面中心或主体为轴生成对称万花筒图案，多重镜像重复与几何裂变，色彩斑斓韵律感，抽象艺术视觉冲击。",
+      "prompt_en": "Generate symmetric kaleidoscope pattern around center or subject, multiple mirror repetition and geometric fission, colorful rhythmic feel, abstract art visual impact."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "光绘长曝",
+      "label_i18n": "Light Painting",
+      "prompt_cn": "模拟长曝光光绘效果，叠加流动光轨与光丝线条，轨迹顺滑有质感，暗部压暗突出光效，创意摄影梦幻质感。",
+      "prompt_en": "Simulate long-exposure light painting, overlay flowing light trails and filament lines, smooth textured trajectory, darken shadow to highlight light effect, creative photography dreamy texture."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "彩虹渐变",
+      "label_i18n": "Rainbow Gradient",
+      "prompt_cn": "为画面高光与边缘添加虹彩薄膜光泽，肥皂泡/油膜般的干涉色渐变，梦幻轻盈通透，主体色彩不被覆盖。",
+      "prompt_en": "Add iridescent thin-film sheen to highlights and edges, soap-bubble/oil-film interference color gradient, dreamy light transparent, subject color not covered."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "浮雕立体",
+      "label_i18n": "Emboss 3D",
+      "prompt_cn": "画面转为石材/金属浮雕质感，明暗阶梯化分层，硬朗边缘立体凹凸，光影厚重有体积感，保留主体造型结构。",
+      "prompt_en": "Convert to stone/metal relief texture, stepped light-shadow layering, hard-edge three-dimensional relief, heavy shadow with volume, retain subject modeling structure."
+    },
+    {
+      "category": "滤镜特效",
+      "category_i18n": "Filter Effects",
+      "label": "复古做旧",
+      "label_i18n": "Vintage Aged",
+      "prompt_cn": "添加老照片做旧质感，轻微划痕、暗角、泛黄与颗粒，降低对比柔和色调，怀旧年代感，主体依旧清晰可辨。",
+      "prompt_en": "Add old-photo worn texture, slight scratches, vignette, yellowing and grain, lower contrast soft tone, nostalgic vintage feel, subject still clearly recognizable."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "亮度调节",
+      "label_i18n": "Brightness Adjust",
+      "prompt_cn": "全局调整画面亮度与对比度，提亮暗部、压低过亮，增强明暗反差与通透感，保持主体细节不丢失，曝光均衡自然。",
+      "prompt_en": "Globally adjust brightness and contrast, brighten shadow, suppress over-bright, enhance light-shadow contrast and transparency, keep subject details, balanced natural exposure."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "饱和增强",
+      "label_i18n": "Saturation Boost",
+      "prompt_cn": "整体或分区调整色彩饱和度，增强或收敛画面鲜艳度，自然不过度艳俗，肤色与材质色彩还原真实。",
+      "prompt_en": "Adjust color saturation globally or regionally, enhance or restrain vividness, natural without over-garish, realistic skin and material color restoration."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "色相调色",
+      "label_i18n": "Hue Shift",
+      "prompt_cn": "整体旋转画面色相偏移，统一改变色彩倾向而不改明度结构，营造特定色调氛围，过渡平滑无断层。",
+      "prompt_en": "Globally rotate hue shift, uniformly change color tendency without altering luminance structure, create specific tone atmosphere, smooth transition without fault."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "色调修复",
+      "label_i18n": "Tone Repair",
+      "prompt_cn": "分别修复暗部与亮部细节，提亮死黑、压回过曝，恢复中间调层次，保留高光不过度灰平，画质通透。",
+      "prompt_en": "Separately recover shadow and highlight details, lift blocked black, pull back overexposure, restore mid-tone layers, keep highlight without over-flat, transparent quality."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "曲线调色",
+      "label_i18n": "Curve Grading",
+      "prompt_cn": "通过亮度曲线对各明度区间独立调校，精细控制暗部、中间调、高光形态，分区强化对比与色调，画质专业可控。",
+      "prompt_en": "Independently calibrate each luminance range via tone curve, precisely control shadow, mid-tone and highlight shape, regionally enhance contrast and tone, professional controllable quality."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "青橙影调",
+      "label_i18n": "Teal and Orange",
+      "prompt_cn": "经典青橙互补调色，阴影偏青蓝、高光偏橙黄，增强皮肤质感与电影氛围，对比沉稳不刺眼。",
+      "prompt_en": "Classic teal-orange complementary grading, shadow leans cyan-blue, highlight leans orange-yellow, enhance skin texture and cinematic atmosphere, steady contrast without harshness."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "复古做旧",
+      "label_i18n": "Vintage Look",
+      "prompt_cn": "降低整体饱和并提亮暗部，添加轻微泛白褪色与柔光，模拟老胶片褪色感，怀旧文艺色调，主体清晰。",
+      "prompt_en": "Lower overall saturation and lift shadow, add slight whitish fade and soft light, simulate old film fading, nostalgic artistic tone, subject clear."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "渐变渲染",
+      "label_i18n": "Gradient Render",
+      "prompt_cn": "按{指定渐变色带}映射画面明度区间，整体统一渲染色调，冷暖层次分明，艺术化但不丢失主体结构。",
+      "prompt_en": "Map image luminance range by {assigned gradient color band}, unify overall rendered tone, clear warm-cool layers, artistic without losing subject structure."
+    },
+    {
+      "category": "光影调色",
+      "category_i18n": "Light & Color",
+      "label": "色调分离",
+      "label_i18n": "Posterize",
+      "prompt_cn": "为暗部与高光分别赋予不同色彩{如青/橙、蓝/黄}，强化冷暖对比与胶片质感，层次丰富不脏腻。",
+      "prompt_en": "Assign different colors to shadow and highlight (e.g. cyan/orange, blue/yellow), enhance warm-cool contrast and film texture, rich layers without muddiness."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "艺术花体",
+      "label_i18n": "Artistic Script",
+      "prompt_cn": "主标题文字为{旷野春风}，字体华丽艺术花体，笔画锐利尖角搭配流畅曲线；渐变青绿色至银白色金属通透质感不变；背景延续纯黑色，保留颗粒肌理、流动光效、闪烁星芒光斑元素；搭配英文副标题Wilderness Spring Breeze与装饰文字，排版层次分明；现代艺术融合自然诗意意境，空灵神秘氛围感，高清字体海报，强视觉冲击。",
+      "prompt_en": "Main title text fixed as \"旷野春风\", gorgeous artistic script font with sharp corners and smooth curves; gradient cyan-green to silver-white metallic transparent texture unchanged; solid black background retained, with grain texture, flowing light effects and twinkling star light spots; equipped with English subtitle \"Wilderness Spring Breeze\" and decorative text with distinct layout layers; modern art integrated with natural poetic conception, ethereal and mysterious atmosphere, high-definition font poster with strong visual impact."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "赛博故障",
+      "label_i18n": "Cyber Glitch",
+      "prompt_cn": "主标题文字为{赛博朋克}，字体机械切割尖锐衬线造型；荧光粉渐变电光蓝霓虹质感不变，保留故障线条、全息粒子、金属丝带英文小字Cyberpunk；背景延续纯黑色，添加辉光、扫描线光影；二次元科幻UI游戏标题字体，未来赛博浪漫氛围，光影锐利，8K超高细节精致画面。",
+      "prompt_en": "Main title text fixed as \"赛博朋克\", font with mechanically cut sharp serif shape unchanged; gradient neon texture from fluorescent pink to electric blue, glitch lines, holographic particles and metal ribbon English subtitle \"Cyberpunk\" retained; solid black background with glow and scan line light effects; two-dimensional sci-fi UI game title font, futuristic cyber romantic atmosphere, sharp light and shadow, 8K ultra-high detail exquisite picture."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "暗黑哥特",
+      "label_i18n": "Dark Gothic",
+      "prompt_cn": "主标题文字为{暗夜咏奏}，字体带尖刺荆棘华丽哥特衬线；暗红渐变墨黑金属质感不变，保留血纹、破碎星芒、玫瑰剪影装饰，搭配英文小字Night Ode；背景延续纯黑色，金属拉丝暗纹厚重光影；二次元暗黑游戏UI标题字体，中世纪血族诡谲暗黑浪漫，8K超高精细质感。",
+      "prompt_en": "Main title text fixed as \"暗夜咏奏\", gorgeous gothic serif font covered with thorns and spikes unchanged; gradient metal texture from dark red to ink black, blood lines, broken star auras and rose silhouette decorations, English subtitle \"Night Ode\" retained; solid black background with brushed metal dark texture and heavy light shadow; two-dimensional dark game UI title font, eerie dark romance of medieval blood clan, 8K ultra-fine texture."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "鎏金书法",
+      "label_i18n": "Gilded Calligraphy",
+      "prompt_cn": "主标题文字为{万物有灵}，字体苍劲狂草书法，保留飞白、泼墨沙砾肌理；渐变香槟金至白金色鎏金金属质感不变，边缘微弱发光；环绕金色蝴蝶、流沙、光晕星尘光斑；背景延续纯黑色，高对比度；国潮仙侠字体海报，极简大片构图，高级质感。",
+      "prompt_en": "Main title text fixed as \"万物有灵\", powerful cursive calligraphy font with flying white and splashed ink sand texture retained; gradient gilded metal texture from champagne gold to platinum with faint edge glow unchanged; surrounded by golden butterflies, flowing sand, halos and stardust spots; solid black background with high contrast; national trend xianxia font poster, minimalist blockbuster composition, advanced texture."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "幻想魔法",
+      "label_i18n": "Fantasy Magic",
+      "prompt_cn": "主标题文字为{银河星辰}，字体优雅尖锐哥特衬线；荧光蓝渐变淡紫通透发光质感不变，保留星光、星芒、弯月、透明发光丝带、魔法阵线条；搭配丝带英文小字Galactic Stars；背景延续纯黑色，二次元游戏UI字体，梦幻银河浪漫氛围，柔和通透光影，8K超高细节。",
+      "prompt_en": "Main title text fixed as \"银河星辰\", elegant sharp gothic serif font unchanged; gradient transparent luminous texture from fluorescent blue to lavender, starlight, star halos, crescent moons, transparent luminous ribbons and magic array lines retained; ribbon English subtitle \"Galactic Stars\" matched; solid black background, two-dimensional game UI font, dreamy galactic romantic atmosphere, soft and transparent light shadow, 8K ultra-high details."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "水墨樱花",
+      "label_i18n": "Ink Sakura",
+      "prompt_cn": "主标题文字为{浮梦觅影}，字体柔中带刚毛笔衬线造型；浅蓝渐变樱花粉水墨晕染质感不变，保留浮世绘波纹、日式家纹、樱花装饰，水墨丝带英文小字TideMistMirage；背景延续纯黑色，添加水墨晕染、烫金细节；二次元和风奇幻UI字体，日式夏夜雅致朦胧氛围，8K高清精致。",
+      "prompt_en": "Main title text fixed as \"浮梦觅影\", soft yet rigid brush serif font unchanged; gradient ink wash texture from light blue to cherry pink, ukiyo-e ripples, Japanese family crests and cherry blossom decorations, ink ribbon English subtitle \"TideMistMirage\" retained; solid black background with ink wash and gilded details; two-dimensional Japanese fantasy UI font, elegant hazy atmosphere of Japanese summer night, 8K high-definition exquisite."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "森系藤蔓",
+      "label_i18n": "Forest Vines",
+      "prompt_cn": "主标题文字为{绿野仙踪}，字体藤蔓缠绕柔化衬线；薄荷绿渐变星光白通透质感不变，保留叶脉、萤火光斑、花瓣、半透明叶片丝带英文小字The Wizard of Oz；背景延续纯黑色，漫反射柔和柔光；二次元奇幻UI字体，森林精灵清新治愈氛围，8K超高精细画面。",
+      "prompt_en": "Main title text fixed as \"绿野仙踪\", softened serif font wrapped by vines unchanged; gradient transparent texture from mint green to star white, leaf veins, firefly spots, petals and translucent leaf ribbon English subtitle \"The Wizard of Oz\" retained; solid black background with diffuse soft glow; two-dimensional fantasy UI font, fresh healing atmosphere of forest elves, 8K ultra-fine picture."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "粒子消散",
+      "label_i18n": "Particle Dissolve",
+      "prompt_cn": "主标题文字为{流沙逝梦}，字体带动态模糊、颗粒消散效果；绿蓝紫渐变霓虹光泽不变，保留像素色散拖影、粗糙颗粒、流动彩色光斑；背景延续纯黑色，字体海报设计；赛博迷幻虚实交织氛围，颗粒流动动态视觉效果。",
+      "prompt_en": "Main title text fixed as \"流沙逝梦\", font with motion blur and particle dissipation effects unchanged; gradient neon luster of green, blue and purple, pixel dispersion trailing shadows, rough particles and flowing color light spots retained; solid black background for font poster design; cyber psychedelic interlaced virtual-real atmosphere, dynamic visual effect of flowing particles."
+    },
+    {
+      "category": "字体设计",
+      "category_i18n": "Typography Design",
+      "label": "国风琉璃",
+      "label_i18n": "Chinese Glaze",
+      "prompt_cn": "主标题文字为{山河琉璃}，字体端正温润宋楷国风字体，笔画圆润通透；渐变蜜蜡黄至冰透粉琉璃通透玉石质感不变，自带琉璃冰裂纹、通透水波纹光泽；环绕祥云、玉珠、流苏、鎏金云纹装饰，搭配丝带英文小字Glazed Mountains；背景延续纯黑色，镜面反光折射光影；古风仙侠国潮标题字体，温润华贵东方古韵，玉石通透柔光，8K超清细腻材质细节。",
+      "prompt_en": "Main title text fixed as \"山河琉璃\", gentle and regular Chinese Song Kai font with rounded transparent strokes unchanged; gradient transparent jade texture from amber yellow to icy pink glaze, with glass ice cracks and transparent water ripple luster retained; surrounded by auspicious clouds, jade beads, tassels and gilded cloud pattern decorations, matched with ribbon English subtitle \"Glazed Mountains\"; solid black background with mirror refraction light shadow; ancient Chinese xianxia national trend title font, gentle and luxurious oriental charm, transparent soft jade light, 8K ultra-clear delicate material details."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "泛黄去渍",
+      "label_i18n": "Yellow Stain Removal",
+      "prompt_cn": "专业老旧影像修复，去除画面泛黄、色偏、各类污渍、霉斑与划痕，校正白平衡，完整保留原始人物五官、服饰及场景细节，效果自然真实。",
+      "prompt_en": "Aged image restoration, remove yellow tint, fix color cast, balance white. Restore sepia/B&W film look. Clean all kinds of stains, mold, scratches and aging marks. Reduce haze, boost contrast. Gently restore details, preserve facial features and expression, no oversharpen, keep vintage grain. Clear and layered."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "污渍清理",
+      "label_i18n": "Stain Cleanup",
+      "prompt_cn": "精细清理老旧影像上各类污渍、水渍、浮尘与霉斑，保留载体纹理与人物全部细节，修复成品干净自然无违和痕迹。",
+      "prompt_en": "Aged image cleanup, erase graffiti, all types of stains, mold spots, peeling areas. Reconstruct face, hair, clothes. Fix yellowing, restore true colors. Reduce haze, boost contrast, enhance clarity. Keep skin texture, preserve facial features and expression, no oversharpen. Vintage film style, clear and layered."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "折痕修复",
+      "label_i18n": "Crease Repair",
+      "prompt_cn": "修复老旧影像内折痕、裂纹、压痕与划伤，补全连贯纹理与破损边缘，严格保持人物比例、神态与原有背景不变。",
+      "prompt_en": "Monochrome image repair, remove cracks, deep creases, peeling areas. Rebuild face, hair, fabric details. Fix contrast, reduce haze, brighten picture, restore pure grayscale. Gently restore skin texture and features, no oversharpen, protect original expression. Repair damaged edges, clean and clear, keep vintage grain."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "反光祛除",
+      "label_i18n": "Glare Removal",
+      "prompt_cn": "去除画面表层反光、杂散高光、透明介质眩光与局部过曝区域，还原被遮挡的原生细节，统一均衡整体光影。",
+      "prompt_en": "Image restoration, remove medium glare, light reflections, shadow occlusion. Reveal hidden picture details, preserve facial features and expression. Fix yellowing, clean damage, restore authentic film texture. Gentle processing, no oversharpen. Clean edges, high clarity, no repair artifacts."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "残缺补全",
+      "label_i18n": "Damage Inpainting",
+      "prompt_cn": "智能补全影像缺失、破损、撕裂区域，完整延续原图纹理、光线与构图逻辑，不改动人物样貌与画面原有信息。",
+      "prompt_en": "Image inpainting, fill missing areas, fix torn edges and heavy damage. Rebuild face, strands of hair, clothing. Balance white, remove yellow tint, restore sepia/B&W film look. Reduce haze, boost contrast. Gently restore skin texture, preserve figure identity and expression, no oversharpen. Clean, detailed, layered picture."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "黑白上色",
+      "label_i18n": "Colorize B&W",
+      "prompt_cn": "为单色老旧影像自然上色，肤色、服饰、环境光影贴合时代质感与真实材质，完整保留清晰细节，色彩饱和度适中不夸张失真。",
+      "prompt_en": "Colorize old monochrome image, keep original face, figure, composition and vintage film grain, do not alter figure appearance. Natural era-authentic colors for skin, clothes, furniture and scenery. Remove yellow stains, scratches, mold and haze, adjust contrast, soften light transitions. Retain skin and hair details, balanced saturation, no oversaturation or distortion. Realistic retro color film look, clean with period atmosphere."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "高清增晰",
+      "label_i18n": "HD Sharpen",
+      "prompt_cn": "老旧照片无损高清提升，修复模糊发虚、压缩噪点，强化发丝、皮肤、景物细微纹理，保留复古胶片颗粒，不锐化过度，画面细腻清晰。",
+      "prompt_en": "Lossless HD upgrade for aged photos, fix blurriness and compression noise, strengthen fine textures of hair, skin and scenery, retain vintage film grain without oversharpening, delicate and clear picture."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "褪色还原",
+      "label_i18n": "Faded Color Restore",
+      "prompt_cn": "修复老照片大面积褪色、色彩断层、局部发白，还原原生复古色彩层次，平衡全域色彩，保留载体纸张肌理，无人工修复色块。",
+      "prompt_en": "Repair large-area fading, color faults and local whitening of old photos, restore original retro color layers, balance global tone, retain paper texture without artificial patched color blocks."
+    },
+    {
+      "category": "照片处理",
+      "category_i18n": "Photo Processing",
+      "label": "人像复原",
+      "label_i18n": "Portrait Reconstruction",
+      "prompt_cn": "老照片人像专项优化，柔和修复面部斑点、模糊五官，重塑立体光影，保留原生面部轮廓与年代特征，肤质温润自然，不改变人物原貌。",
+      "prompt_en": "Special optimization for portraits in old photos, gently repair facial spots and blurry facial features, reconstruct three-dimensional light and shadow, retain original facial outline and era characteristics, soft natural skin without altering the figure’s appearance."
+    }
+  ]
+}

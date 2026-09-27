@@ -83,19 +83,7 @@
   overflow: hidden;
 }
 
-/* ── 视觉签名：左边笔触 + 顶角橙光 ── */
-.wosai-panel::before {
-  content: '';
-  position: absolute;
-  left: 0; top: 0;
-  width: var(--ws-panel-edge-width); height: 100%;
-  background: var(--ws-brand-edge);
-  border-radius: var(--ws-panel-edge-radius);
-  opacity: 0.7;
-  pointer-events: none;
-  z-index: 2;
-}
-
+/* ── 视觉签名：仅保留顶角柔光；面板不使用左侧品牌色笔触 ── */
 .wosai-panel::after {
   content: '';
   position: absolute;
@@ -107,16 +95,11 @@
 }
 
 /* 禁用边框笔触和光晕 */
-[data-ws-no-edge]::before,
 [data-ws-no-edge]::after {
   display: none !important;
 }
 
-/* 浅色主题下调暗笔触/光晕 */
-[data-theme="light"] .wosai-panel::before {
-  opacity: 0.45;
-}
-
+/* 浅色主题下调暗光晕 */
 [data-theme="light"] .wosai-panel::after {
   opacity: 0.6;
 }

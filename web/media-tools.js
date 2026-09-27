@@ -24,7 +24,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=4", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=10", import.meta.url).href],
 ];
 
 function imageUrl(data) {
@@ -392,30 +392,47 @@ function createImageCompare(node) {
     const stage = document.createElement("div");
     stage.className = "wosai-image-compare-stage";
     const first = document.createElement("img");
+    first.draggable = false;
     const secondWrap = document.createElement("div");
     secondWrap.className = "wosai-image-compare-top";
     const second = document.createElement("img");
+    second.draggable = false;
     const line = document.createElement("div");
     line.className = "wosai-image-compare-line";
+    // 分割线悬停热区：把 2px 细线的可命中范围加宽，便于抓住分割线拖动
+    const grab = document.createElement("div");
+    grab.className = "wosai-image-compare-grab";
+    grab.setAttribute("aria-hidden", "true");
+    // 十字准心手柄：默认隐藏，悬停分割线或拖动时淡入
+    const handle = document.createElement("div");
+    handle.className = "wosai-image-compare-handle";
+    handle.setAttribute("aria-hidden", "true");
+    handle.innerHTML = [
+        '<svg viewBox="0 0 24 24" focusable="false">',
+        '<circle cx="12" cy="12" r="6.4"/>',
+        '<path d="M12 1.6v3.8M12 18.6v3.8M1.6 12h3.8M18.6 12h3.8"/>',
+        '<circle class="wosai-image-compare-handle-dot" cx="12" cy="12" r="1.5"/>',
+        "</svg>",
+    ].join("");
     const empty = document.createElement("div");
     empty.className = "wosai-media-empty";
     empty.textContent = t("nodes.imageCompare.empty", "Connect two images and execute");
     secondWrap.append(second);
-    stage.append(first, secondWrap, line, empty);
+    // 图像区按顺序挂：图层 → 分割线交互层 → A/B 角标与交换按钮浮层 → 隐藏的原生滑块
+    stage.append(first, secondWrap, line, grab, handle);
+    // 原生滑块不再单独占一行（视觉隐藏，1px）：只承担键盘操作与无障碍语义，
+    // 分割位置完全由图像区内的拖拽 / 十字准心手柄控制
     const slider = document.createElement("input");
     slider.type = "range";
-    slider.className = "wosai-media-range";
+    slider.className = "wosai-image-compare-range";
     slider.min = "0";
     slider.max = "100";
     slider.value = "50";
     slider.setAttribute("aria-label", t("nodes.imageCompare.position", "Comparison position"));
-    slider.classList.add("wosai-image-compare-range");
-    const controls = document.createElement("div");
-    controls.className = "wosai-image-compare-controls";
     const startLabel = document.createElement("span");
-    startLabel.className = "wosai-image-compare-label";
+    startLabel.className = "wosai-image-compare-label is-start";
     const endLabel = document.createElement("span");
-    endLabel.className = "wosai-image-compare-label";
+    endLabel.className = "wosai-image-compare-label is-end";
     const swap = document.createElement("button");
     swap.type = "button";
     swap.className = "wosai-image-compare-swap";
@@ -425,17 +442,51 @@ function createImageCompare(node) {
         '<path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
         "</svg>",
     ].join("");
-    controls.append(startLabel, slider, endLabel, swap);
-    root.append(stage, controls);
+    stage.append(startLabel, endLabel, swap, slider, empty);
+    root.append(stage);
 
     node.properties ??= {};
     let payload = { a: null, b: null };
     let swapped = Boolean(node.properties.wosai_compare_swapped);
+    const state = {
+        aspectRatio: 16 / 9,
+        normalizeSizeOnLoad: false,
+    };
+
+    const updateAspectRatio = () => {
+        const aRatio = first.naturalWidth && first.naturalHeight
+            ? first.naturalWidth / first.naturalHeight
+            : 0;
+        const bRatio = second.naturalWidth && second.naturalHeight
+            ? second.naturalWidth / second.naturalHeight
+            : 0;
+        const ratio = aRatio || bRatio || (16 / 9);
+        const changed = Math.abs(state.aspectRatio - ratio) > 0.001;
+        if (changed) {
+            state.aspectRatio = ratio;
+            stage.style.setProperty("--wosai-compare-ratio", `${ratio} / 1`);
+        }
+        if (state.normalizeSizeOnLoad) {
+            state.normalizeSizeOnLoad = false;
+            const minWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
+            const minHeight = getWOSAIVarNum("--ws-compare-node-min-height", 320);
+            const computed = node.computeSize?.();
+            node.setSize?.([
+                Math.max(minWidth, Number(node.size?.[0]) || 0),
+                Math.max(minHeight, Number(computed?.[1]) || 0),
+            ]);
+            node.setDirtyCanvas?.(true, true);
+        } else if (changed) {
+            markChanged(node);
+        }
+    };
 
     const updateSplit = () => {
         const value = normalizeSplitPercent(slider.value);
         secondWrap.style.clipPath = `inset(0 ${100 - value}% 0 0)`;
         line.style.left = `${value}%`;
+        // 写在 root 上：分割线、拖拽热区、十字手柄读同一个百分比，保证严格共线
+        root.style.setProperty("--wosai-compare-split", `${value}%`);
     };
     const renderImages = () => {
         const display = compareDisplayPair(payload, swapped);
@@ -447,7 +498,6 @@ function createImageCompare(node) {
         else second.removeAttribute("src");
         root.classList.toggle("has-first", Boolean(display.a));
         root.classList.toggle("has-second", Boolean(display.b));
-        root.classList.toggle("is-swapped", swapped);
         startLabel.textContent = swapped ? "B" : "A";
         endLabel.textContent = swapped ? "A" : "B";
         swap.disabled = !(payload.a && payload.b);
@@ -460,6 +510,8 @@ function createImageCompare(node) {
             : t("nodes.imageCompare.empty", "Connect two images and execute");
     };
     slider.addEventListener("input", updateSplit, { signal });
+    // 交换按钮位于图像区内，需拦住 pointerdown，避免触发 stage 的分割线拖拽
+    swap.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
     swap.addEventListener("click", () => {
         if (swap.disabled) return;
         stage.classList.add("is-swapping");
@@ -469,6 +521,8 @@ function createImageCompare(node) {
         requestAnimationFrame(() => stage.classList.remove("is-swapping"));
         markChanged(node);
     }, { signal });
+    first.addEventListener("load", updateAspectRatio, { signal });
+    second.addEventListener("load", updateAspectRatio, { signal });
     const setSplitFromPointer = (event) => {
         const rect = stage.getBoundingClientRect();
         const value = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
@@ -477,18 +531,31 @@ function createImageCompare(node) {
     };
     stage.addEventListener("pointerdown", (event) => {
         stage.setPointerCapture?.(event.pointerId);
+        stage.classList.add("is-dragging");
+        event.preventDefault();
         setSplitFromPointer(event);
     }, { signal });
     stage.addEventListener("pointermove", (event) => {
         if (event.buttons) setSplitFromPointer(event);
     }, { signal });
+    const endSplitDrag = () => stage.classList.remove("is-dragging");
+    stage.addEventListener("pointerup", endSplitDrag, { signal });
+    stage.addEventListener("pointercancel", endSplitDrag, { signal });
+    stage.addEventListener("lostpointercapture", endSplitDrag, { signal });
     updateSplit();
 
-    const getWidgetHeight = () => (
-        getWOSAIVarNum("--ws-media-preview-min-height", 260)
-        + getWOSAIVarNum("--ws-media-slider-row-height", 34)
-        + getWOSAIVarNum("--ws-gap-sm", 8) * 3
-    );
+    const getWidgetHeight = () => {
+        const gap = getWOSAIVarNum("--ws-gap-sm", 8);
+        // 控件高度 = 上下内边距 + 图像区高度；图像区高度严格等于 宽度 / 宽高比，
+        // 所以宽度优先取舞台实测值（首帧未挂载时按节点宽度扣除左右内边距估算）
+        const padInline = Math.max(gap, getWOSAIVarNum("--ws-compare-swap-size", 34) / 2);
+        const contentWidth = Math.max(
+            getWOSAIVarNum("--ws-media-preview-min-width", 240),
+            stage.clientWidth || (Number(node.size?.[0]) || 420) - padInline * 2,
+        );
+        const stageHeight = contentWidth / Math.max(0.1, state.aspectRatio);
+        return stageHeight + gap * 2;
+    };
     addSizedDOMWidget(node, "wosai_compare_ui", "wosai_compare", root, {
         serialize: false,
         hideOnZoom: false,
@@ -497,11 +564,12 @@ function createImageCompare(node) {
         getHeight: getWidgetHeight,
     });
     node.__wosaiCompareRoot = root;
-    node.__wosaiCompareSetImages = (nextPayload) => {
+    node.__wosaiCompareSetImages = (nextPayload, normalizeSize = false) => {
         payload = {
             a: nextPayload?.a ?? null,
             b: nextPayload?.b ?? null,
         };
+        state.normalizeSizeOnLoad ||= normalizeSize;
         renderImages();
     };
     node.__wosaiCompareSyncState = () => {
@@ -583,7 +651,7 @@ function patchNodeType(nodeType, nodeData) {
             return result;
         }
         const result = originalExecuted?.apply(this, arguments);
-        if (nodeData.name === COMPARE_TYPE) this.__wosaiCompareSetImages?.(message?.wosai_compare?.[0]);
+        if (nodeData.name === COMPARE_TYPE) this.__wosaiCompareSetImages?.(message?.wosai_compare?.[0], true);
         return result;
     };
     const removed = function () {

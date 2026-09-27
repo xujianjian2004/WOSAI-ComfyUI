@@ -1,9 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "recent": [
     {
       "hex": "#343434"
     }
   ],
-  "custom": []
+  "customSolid": [],
+  "customGrad2": [],
+  "customGrad3": []
 }

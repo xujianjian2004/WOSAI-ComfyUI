@@ -222,12 +222,29 @@
   --ws-pp-tab-padding: var(--ws-btn-padding-sm);
   --ws-pp-settings-min-height: var(--ws-btn-h-xs);
   --ws-pp-settings-padding: var(--ws-btn-padding-sm);
+  --ws-pp-category-width: 116px;
+  --ws-pp-category-title-height: 14px;
+  --ws-pp-header-min-height: 30px;
+  --ws-pp-action-min-width: 34px;
+  --ws-pp-category-icon-size: 13px;
   --ws-pp-hint-min-width: 140px;
   --ws-pp-node-min-width: 240px;
   /* 内容驱动高度（由 preset-prompt.js 的 measurePresetContentHeight 动态计算）；
      此值仅作为退化保底，不再硬编码为固定最小高度。 */
   --ws-pp-node-height: 0px;
   --ws-pp-prompt-min-height: 112px;
+  --ws-pp-prompt-fixed-height: 96px;
+  --ws-pp-native-prompt-min-height: 104px;
+  --ws-pp-native-prompt-max-height: 260px;
+  --ws-pp-category-height: 30px;
+  --ws-pp-category-max-height: 282px;
+  --ws-pp-manager-height: 282px;
+  --ws-pp-manager-paged-height: 330px;
+  --ws-pp-card-min-width: 112px;
+  --ws-pp-tab-height: 78px;
+  --ws-pp-card-cover-height: 46px;
+  --ws-pp-card-label-line-height: 16px;
+  --ws-pp-cover-icon-size: 20px;
   --ws-pp-widget-base-height: 46px;
   --ws-pp-clear-menu-min-width: 160px;
   --ws-pp-pager-size: 24px;
@@ -444,6 +461,7 @@
   --ws-tn-preset-orange:       var(--ws-accent);
   --ws-tn-preset-pink:         #E91E63;
   --ws-tn-preset-sky-blue:     #0288D1;
+  --ws-tn-border-stroke-width: 2px;
   --ws-tn-style-btn-padding:   3px 7px;
   --ws-tn-target-btn-padding:  3px 8px;
   --ws-tn-reset-btn-padding:   3px 6px;
@@ -592,7 +610,12 @@
   --ws-media-slider-row-height: 34px;
   --ws-media-action-icon-size: 18px;
   --ws-points-node-min-height: 320px;
-  --ws-compare-node-min-height: 320px;
+  --ws-compare-node-min-height: 280px;
+  --ws-compare-handle-size: 28px;
+  --ws-compare-handle-icon-size: 18px;
+  --ws-compare-badge-size: 24px;
+  --ws-compare-swap-size: 34px;
+  --ws-compare-range-size: 1px;
   --ws-get-widget-node-min-width: 300px;
   --ws-get-widget-node-min-height: 132px;
   --ws-get-widget-control-height: 92px;
@@ -938,6 +961,9 @@
   --ws-hk-mini-icon-bg-top: 2px;
   --ws-hk-mini-bar-height: 70px;
   --ws-hk-mini-bar-padding-x: 14px;
+  --ws-hk-mini-compact-size: 30px;
+  --ws-hk-mini-compact-icon-size: 15px;
+  --ws-hk-mini-compact-gap: 6px;
   --ws-hk-mini-more-width: 26px;
   --ws-hk-mini-more-icon-size: 20px;
   --ws-hk-mini-caption-bottom: 7px;

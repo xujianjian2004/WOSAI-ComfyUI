@@ -119,6 +119,18 @@ async function registerNativeWosaiSettings() {
             onChange: (value) => window.__wosaiSetCrosshairEnabled?.(!!value),
         },
         {
+            id: STORAGE_KEYS.miniBarCompact,
+            name: t("menus.hubBar.compactMode", "Compact MiniBar"),
+            category: [root, canvasTools, t("menus.hubBar.compactMode", "Compact MiniBar")],
+            type: "boolean",
+            defaultValue: localStorage.getItem(STORAGE_KEYS.miniBarCompact) !== "false",
+            onChange: (value) => {
+                const enabled = !!value;
+                localStorage.setItem(STORAGE_KEYS.miniBarCompact, enabled ? "true" : "false");
+                window.__wosaiSetMiniBarCompactMode?.(enabled);
+            },
+        },
+        {
             id: "wosai-autoConnect",
             name: t("menus.hubBar.autoConnect"),
             category: [root, linkTools, t("menus.hubBar.autoConnect")],

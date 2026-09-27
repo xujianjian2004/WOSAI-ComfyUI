@@ -181,11 +181,11 @@ export function syncGlassSurfaces(root = document, theme = getGlassTheme()) {
 const _listeners = new Set();
 export function onGlassChange(fn) { _listeners.add(fn); return () => _listeners.delete(fn); }
 function _broadcast() {
-    const t = getGlassTheme();
-    syncGlassSurfaces(document, t);
+    const theme = getGlassTheme();
+    syncGlassSurfaces(document, theme);
     // 迭代快照：回调中可能注册新订阅（如面板重建），Set.forEach 会访问
     // 迭代中新增的成员，导致同一次广播触发新订阅 → 无限循环（已踩坑）
-    [..._listeners].forEach(fn => { try { fn(t, getGlassMode()); } catch (e) { console.warn("[WOSAI glass] listener error:", e); } });
+    [..._listeners].forEach(fn => { try { fn(theme, getGlassMode()); } catch (e) { console.warn("[WOSAI glass] listener error:", e); } });
 }
 
 export function setGlassMode(m) {

@@ -19,14 +19,27 @@ export function isGroupObj(it) {
 }
 
 /**
+ * 读取 ComfyUI 宿主 app 实例。
+ * 注意：本模块刻意不静态 import scripts/app.js（保持可单测 / 无宿主依赖），
+ * 因此必须经 window 访问；裸引用 app 在不暴露该全局的宿主中会抛 ReferenceError，
+ * 且 `app?.graph` 这类可选链也无法兜底未声明的标识符。
+ * @returns {object|null}
+ */
+function resolveApp() {
+    if (typeof window === "undefined") return null;
+    return window.app || window.comfyAPI?.app?.app || null;
+}
+
+/**
  * 获取当前画布选中的节点（排除分组对象）
  * Classic + Nodes 2.0 双向兼容：
  *   selected_nodes → selectedItems(Set) → node.selected 标志 — 三路兜底去重
- * @param {object} [canvas] - app.canvas 引用（可选，默认读取 app.canvas）
+ * @param {object} [canvas] - app.canvas 引用（可选，默认读取当前画布）
  * @returns {Array} 选中节点数组
  */
 function getActiveCanvas() {
-    return (typeof window !== "undefined" && window.LGraphCanvas?.active_canvas) || app.canvas;
+    if (typeof window === "undefined") return null;
+    return window.LGraphCanvas?.active_canvas || resolveApp()?.canvas || null;
 }
 
 export function getSelectedNodes(canvas = getActiveCanvas()) {
@@ -79,7 +92,7 @@ export function getNodesInGroup(g) {
     const inside = g._nodes || g.nodes || [];
     if (inside.length) return inside;
     // 回退：手动计算边界包含
-    const graph = app?.graph;
+    const graph = resolveApp()?.graph;
     if (!graph || !g?.pos || !g?.size) return [];
     const all = graph._nodes || graph.nodes || [];
     const gx = g.pos[0], gy = g.pos[1], gw = g.size[0], gh = g.size[1];
@@ -99,7 +112,7 @@ export function getNodesInGroup(g) {
  * @returns {{ x: number, y: number }} - 屏幕坐标（fixed 定位用）
  */
 export function calcSnapToNodeSide(panelW, panelH, gap = 12, selectedNodes = null) {
-    const c = window.app?.canvas;
+    const c = resolveApp()?.canvas;
     if (!c?.ds || !c?.canvas) {
         return { x: (window.innerWidth - panelW) / 2, y: (window.innerHeight - panelH) / 2 };
     }

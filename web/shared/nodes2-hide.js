@@ -149,38 +149,11 @@ export function createHiddenObserver(node, hiddenWidgets, callbacks = {}) {
         }
     };
 
-    // MutationObserver：监听后续动态渲染的 widget
-    // 80ms 防抖间隔为业务逻辑常量，不 token 化
-    if (typeof MutationObserver === 'undefined') {
-        return {
-            observer: null,
-            disconnect() {},
-            nukeHidden: _nukeHidden,
-            start() { requestAnimationFrame(_tryHide); },
-        };
-    }
-    const observer = new MutationObserver((mutations) => {
-        if (_hidObTimer) return;
-        const hasAdded = mutations.some(m => m.addedNodes.length > 0);
-        _hidObTimer = setTimeout(() => {
-            _hidObTimer = null;
-            const root = node.element || node.dom;
-            if (!root) return;
-            observer.disconnect();
-            try {
-                _hideByWidgetEl(root);
-                const collapsed = _hideByDomPosition(root);
-                if (collapsed && onCollapsed) onCollapsed();
-                if (hasAdded) _nukeHidden();
-            } finally {
-                const r2 = node.element || node.dom;
-                if (r2 && observer) observer.observe(r2, { childList: true, subtree: true });
-            }
-        }, 80);
-    });
-
     // 启动序列
     // 20/150ms 与 5/300ms 为隐藏重试策略的业务常量，不 token 化
+    // observer 以 let 声明：无 MutationObserver 环境（旧版/测试 JS 运行时）
+    // 下仍可复用同一 start()/cleanup 路径，且避免 _tryHide 的 TDZ 崩溃。
+    let observer = null;
     let _hideTries = 0;
     const _tryHide = () => {
         const root = node.element || node.dom;
@@ -194,6 +167,30 @@ export function createHiddenObserver(node, hiddenWidgets, callbacks = {}) {
         if (collapsed && updateSize) updateSize();
         if (_hideTries++ < 5) setTimeout(_tryHide, 300);
     };
+
+    // MutationObserver：监听后续动态渲染的 widget
+    // 80ms 防抖间隔为业务逻辑常量，不 token 化
+    if (typeof MutationObserver !== 'undefined') {
+        observer = new MutationObserver((mutations) => {
+            if (_hidObTimer) return;
+            const hasAdded = mutations.some(m => m.addedNodes.length > 0);
+            _hidObTimer = setTimeout(() => {
+                _hidObTimer = null;
+                const root = node.element || node.dom;
+                if (!root) return;
+                observer.disconnect();
+                try {
+                    _hideByWidgetEl(root);
+                    const collapsed = _hideByDomPosition(root);
+                    if (collapsed && onCollapsed) onCollapsed();
+                    if (hasAdded) _nukeHidden();
+                } finally {
+                    const r2 = node.element || node.dom;
+                    if (r2 && observer) observer.observe(r2, { childList: true, subtree: true });
+                }
+            }, 80);
+        });
+    }
 
     return {
         observer,

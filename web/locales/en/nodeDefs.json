@@ -163,13 +163,12 @@
   "WOSAI_PresetPromptSelector": {
     "display_name": "Preset Manager",
     "category": "🟠 Prompts",
-    "description": "Manage prompt presets; click a label to switch, then output one or all presets.",
+    "description": "Manage bilingual prompt presets; click a label to output the selected preset.",
     "inputs": {
       "active_index": { "name": "Active preset", "tooltip": "Selected prompt preset index" },
       "presets_data": { "name": "Preset data", "tooltip": "Serialized prompt preset data managed by the tab editor" },
       "prompt_cn": { "name": "Prompt (CN)", "tooltip": "Chinese prompt synchronized from the selected preset" },
-      "prompt_en": { "name": "Prompt (EN)", "tooltip": "English prompt synchronized from the selected preset" },
-      "batch_output": { "name": "Output mode", "tooltip": "Off outputs the selected preset; on outputs all presets" }
+      "prompt_en": { "name": "Prompt (EN)", "tooltip": "English prompt synchronized from the selected preset" }
     },
     "outputs": {
       "prompt_cn": { "name": "prompt (CN)" },

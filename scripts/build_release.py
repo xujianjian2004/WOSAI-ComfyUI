@@ -27,7 +27,13 @@ ROOT_FILES = (
 )
 RUNTIME_DIRECTORIES = ("nodes", "wosai_core", "web", "presets", "workflows", "docs")
 EXCLUDED_PARTS = {"__pycache__", "node_modules"}
-EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".test.mjs", "._chk.mjs")
+EXCLUDED_SUFFIXES = (".pyc", ".pyo", ".test.mjs", "._chk.mjs", ".zip")
+# 运行时用户状态：Prompt Manager 在本地生成/改写的预设库，绝不进发布包，
+# 否则会把使用者本地的预设内容打包分发出去。
+EXCLUDED_RELATIVE_PATHS = {
+    "presets/preset_library.json",
+    "presets/preset_library.backup.json",
+}
 ZIP_TIMESTAMP = (2026, 1, 1, 0, 0, 0)
 
 
@@ -43,6 +49,8 @@ def included_files() -> list[Path]:
     result = []
     for path in files:
         relative = path.relative_to(ROOT)
+        if relative.as_posix() in EXCLUDED_RELATIVE_PATHS:
+            continue
         if any(part in EXCLUDED_PARTS for part in relative.parts):
             continue
         if path.name.endswith(EXCLUDED_SUFFIXES):

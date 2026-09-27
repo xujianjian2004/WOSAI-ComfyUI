@@ -15,6 +15,7 @@ export const STORAGE_KEYS = {
     menuHideEnabled: "wosai-menu-hide-enabled",
     /** 启动器显隐状态 */
     showLauncher: "WOSAI.ColorBar.ShowLauncher",
+    miniBarCompact: "wosai-mini-bar-compact",
     /** 忽略组快捷键 */
     igShortcut: "wosai_ig_shortcut",
 };

@@ -19,28 +19,111 @@ _PRESETS_FILE = _PRESETS_DIR / "color_presets.json"
 _SAVE_LOCK = Lock()
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT = {"version": 1, "recent": [], "custom": []}
+# 数据结构与前端 web/shared/color-store.js 对齐：
+#   recent       [{hex}]
+#   customSolid  [{type:'solid', title, bg}]
+#   customGrad2  [{type:'grad2', dir, stops:[{hex, p}]}]
+#   customGrad3  [{type:'grad3', dir, stops:[{hex, p}]}]
+_DEFAULT = {
+    "version": 2,
+    "recent": [],
+    "customSolid": [],
+    "customGrad2": [],
+    "customGrad3": [],
+}
 
-# 防御上限：避免异常客户端写入超大文件
+# 防御上限：避免异常客户端写入超大文件（与前端 color-store.js 的上限一致）
 _MAX_RECENT = 12
-_MAX_CUSTOM = 24
+_MAX_CUSTOM = 16
 _MAX_BODY = 64 * 1024  # 64KB
+_MAX_TITLE = 32       # 自定义纯色预设标题长度上限
+
+# 合法渐变方向符号（与 web/shared/color-core.js 的 DIRS / CSS_DIR_MAP 一致）
+_DIR_SYMBOLS = frozenset("↖↑↗←→↙↓↘")
+_DEFAULT_DIR = "↓"
 
 
-def _sanitize_list(items, cap):
-    """只保留 {hex: '#RRGGBB'} 形式的合法条目。"""
+def _is_hex(value) -> bool:
+    """判断是否为规范 7 位 #RRGGBB 十六进制颜色。"""
+    return (
+        isinstance(value, str)
+        and len(value) == 7
+        and value.startswith("#")
+        and all(c in "0123456789abcdefABCDEF" for c in value[1:])
+    )
+
+
+def _sanitize_hex_list(items, cap):
+    """取色历史：只保留 {hex: '#RRGGBB'} 形式的合法条目。"""
     out = []
     if not isinstance(items, list):
         return out
     for item in items:
         hex_val = item.get("hex") if isinstance(item, dict) else None
-        if (
-            isinstance(hex_val, str)
-            and len(hex_val) == 7
-            and hex_val.startswith("#")
-            and all(c in "0123456789abcdefABCDEF" for c in hex_val[1:])
-        ):
+        if _is_hex(hex_val):
             out.append({"hex": hex_val})
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _sanitize_title(value) -> str:
+    """自定义纯色预设标题：仅保留字符串并截断。"""
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:_MAX_TITLE]
+
+
+def _sanitize_solid_list(items, cap):
+    """自定义纯色预设：[{type:'solid', title, bg}]，bg 必须为合法 hex。"""
+    out = []
+    if not isinstance(items, list):
+        return out
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        bg = item.get("bg")
+        if not _is_hex(bg):
+            continue
+        out.append({"type": "solid", "title": _sanitize_title(item.get("title")), "bg": bg})
+        if len(out) >= cap:
+            break
+    return out
+
+
+def _sanitize_gradient_list(items, kind, cap):
+    """自定义渐变预设：[{type:'grad2'|'grad3', dir, stops:[{hex, p}]}]。
+
+    至少保留 2 个合法色标（2 色标渐变可由前端推导中间色），
+    超过 grad2=2 / grad3=3 的色标被截断，位置钳制在 [0, 1]。
+    """
+    out = []
+    if not isinstance(items, list):
+        return out
+    stop_cap = 3 if kind == "grad3" else 2
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        raw_stops = item.get("stops")
+        if not isinstance(raw_stops, list):
+            continue
+        stops = []
+        for stop in raw_stops:
+            if not isinstance(stop, dict) or not _is_hex(stop.get("hex")):
+                continue
+            pos = stop.get("p")
+            if isinstance(pos, bool) or not isinstance(pos, (int, float)):
+                pos = 0.0
+            stops.append({"hex": stop["hex"], "p": min(max(float(pos), 0.0), 1.0)})
+            if len(stops) >= stop_cap:
+                break
+        # 少于两个色标无法构成渐变，丢弃
+        if len(stops) < 2:
+            continue
+        direction = item.get("dir")
+        if direction not in _DIR_SYMBOLS:
+            direction = _DEFAULT_DIR
+        out.append({"type": kind, "dir": direction, "stops": stops})
         if len(out) >= cap:
             break
     return out
@@ -53,9 +136,11 @@ def _load() -> dict:
         if not isinstance(data, dict):
             return dict(_DEFAULT)
         return {
-            "version": 1,
-            "recent": _sanitize_list(data.get("recent"), _MAX_RECENT),
-            "custom": _sanitize_list(data.get("custom"), _MAX_CUSTOM),
+            "version": 2,
+            "recent": _sanitize_hex_list(data.get("recent"), _MAX_RECENT),
+            "customSolid": _sanitize_solid_list(data.get("customSolid"), _MAX_CUSTOM),
+            "customGrad2": _sanitize_gradient_list(data.get("customGrad2"), "grad2", _MAX_CUSTOM),
+            "customGrad3": _sanitize_gradient_list(data.get("customGrad3"), "grad3", _MAX_CUSTOM),
         }
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return dict(_DEFAULT)
@@ -94,6 +179,10 @@ async def get_color_presets(request) -> web.Response:
 
 @routes.post("/wosai/color_presets")
 async def post_color_presets(request) -> web.Response:
+    # See preset_library: older route stacks can dispatch GET to the last
+    # handler registered for a duplicate path.
+    if request.method == "GET":
+        return web.json_response(_load())
     if not is_same_origin_request(request):
         return web.json_response({"error": "cross-origin request rejected"}, status=403)
     if request.content_length and request.content_length > _MAX_BODY:
@@ -116,9 +205,11 @@ async def post_color_presets(request) -> web.Response:
     if not isinstance(body, dict):
         return web.json_response({"error": "invalid payload"}, status=400)
     data = {
-        "version": 1,
-        "recent": _sanitize_list(body.get("recent"), _MAX_RECENT),
-        "custom": _sanitize_list(body.get("custom"), _MAX_CUSTOM),
+        "version": 2,
+        "recent": _sanitize_hex_list(body.get("recent"), _MAX_RECENT),
+        "customSolid": _sanitize_solid_list(body.get("customSolid"), _MAX_CUSTOM),
+        "customGrad2": _sanitize_gradient_list(body.get("customGrad2"), "grad2", _MAX_CUSTOM),
+        "customGrad3": _sanitize_gradient_list(body.get("customGrad3"), "grad3", _MAX_CUSTOM),
     }
     try:
         _save(data)

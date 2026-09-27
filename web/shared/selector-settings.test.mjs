@@ -30,7 +30,7 @@ test("selector settings retain only the supported dimensions and labels", () => 
 
   assert.equal(settings.fontSize, 24);
   assert.equal(settings.buttonHeight, 30);
-  assert.equal(settings.gap, 0);
+  assert.equal(settings.gap, 5);
   assert.equal(settings.falseLabel, "No");
   assert.deepEqual(Object.keys(settings), [
     "fontSize",

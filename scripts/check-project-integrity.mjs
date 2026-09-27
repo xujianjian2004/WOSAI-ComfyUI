@@ -12,6 +12,14 @@ const EXCLUDED_DIRECTORIES = new Set([
     "playwright-report",
     "playwright-results",
 ]);
+// 发布校验会在仓库根临时解压出 .wosai-release-<随机> 目录（正常会被清理）。
+// 一旦残留，其相对导入会解析到 staging 之外并被误判为"缺失文件"，故按前缀跳过。
+const EXCLUDED_DIRECTORY_PREFIXES = [".wosai-release-"];
+
+function isExcludedDirectory(name) {
+    return EXCLUDED_DIRECTORIES.has(name)
+        || EXCLUDED_DIRECTORY_PREFIXES.some((prefix) => name.startsWith(prefix));
+}
 const TEXT_EXTENSIONS = new Set([
     ".css",
     ".in",
@@ -27,7 +35,7 @@ const issues = [];
 async function walk(directory) {
     const files = [];
     for (const entry of await readdir(directory, { withFileTypes: true })) {
-        if (entry.isDirectory() && EXCLUDED_DIRECTORIES.has(entry.name)) continue;
+        if (entry.isDirectory() && isExcludedDirectory(entry.name)) continue;
         const absolute = path.join(directory, entry.name);
         if (entry.isDirectory()) files.push(...await walk(absolute));
         else files.push(absolute);

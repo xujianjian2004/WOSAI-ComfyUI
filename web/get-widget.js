@@ -21,7 +21,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const GET_WIDGET_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=3", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=10", import.meta.url).href],
 ];
 
 function findWidget(node, name) {

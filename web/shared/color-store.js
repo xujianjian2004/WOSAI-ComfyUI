@@ -13,7 +13,7 @@ const LS_CUSTOM_GRAD3 = 'wosai-nodecolor-custom-grad3';
 const API_PATH = '/wosai/color_presets';
 
 // 共享状态：调用方直接读写对应列表，改完调用 persist()
-// store.custom 保留为旧版兼容访问入口（读取时返回当前模式列表）
+// 三个自定义列表按类型拆分，服务端与 localStorage 使用同一结构（version 2）
 export const store = {
     recent:       [],   // [{hex}]
     customSolid:  [],   // [{type:'solid', title, bg}]

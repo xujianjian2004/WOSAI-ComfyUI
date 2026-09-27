@@ -5,4 +5,6 @@ recursive-include web *
 recursive-include presets *.json
 recursive-include workflows *.json
 recursive-include docs *.md
-global-exclude __pycache__ *.py[cod] *.test.mjs node_modules
+global-exclude __pycache__ *.py[cod] *.test.mjs
+# `global-exclude` 只按文件名匹配，无法排除目录；必须用 prune 剔除 web/node_modules
+prune web/node_modules

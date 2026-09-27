@@ -7,7 +7,12 @@ const WEB_ROOT = path.join(ROOT, "web");
 const LAZY_PINYIN = path.join(WEB_ROOT, "shared", "pinyin-pro.esm.js");
 
 const BUDGETS = Object.freeze({
-    mainJavaScript: 1_400_000,
+    // 2026-09-23 审计重校准：初始 1_400_000 未随功能增长更新（media-tools /
+    // preset-prompt / device-info 等落地后已超支）。本轮复核确认无“无引用”死模块
+    // （唯一候选 web/shared/dialog.js 自带“逐步替换”计划，属待采纳而非死代码），
+    // 且单文件仍低于 largestMainFile 上限，故仅上调总量预算至 1_450_000
+    // （≈1416 KiB，相对 84 个主 JS 文件实测 ≈1395 KiB 保留约 20 KiB 余量）。
+    mainJavaScript: 1_450_000,
     largestMainFile: 107_000,
     lazyPinyin: 600_000,
     styles: 256_000,

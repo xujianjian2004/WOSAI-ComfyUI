@@ -5,15 +5,16 @@
 // button instead of a synthetic click proxy.
 import { app } from "../../../scripts/app.js";
 import { quickToast } from "./shared/toast.js";
-import { t } from "./shared/i18n.js";
+import { t, onLangChange } from "./shared/i18n.js";
 import { getSelectedGroups, getSelectedNodes } from "./shared/canvas-utils.js";
 import { getGlassTheme, onGlassChange } from "./shared/glass-theme.js";
 import { hideTip, showTip } from "./shared/tooltip.js";
+import { STORAGE_KEYS } from "./shared/constants.js";
 
 // Keep the adapter owner version separate from the resource query version in
 // extension.json.  A new owner version lets a refreshed module replace an
 // older cached registration without duplicating commands.
-const ADAPTER_VERSION = 62;
+const ADAPTER_VERSION = 63;
 const CORE_COMMANDS = Object.freeze({
     color: "wosai.selection.color",
     align: "wosai.selection.align",
@@ -81,6 +82,9 @@ const MINI_ICON = Object.freeze({
     clone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
     lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
     more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>',
+    compact: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
+    restoreLeft: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+    restoreRight: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>',
 });
 const TOOLTIP_MARK = "data-wosai-selection-tooltip";
 const TOOLBOX_ROOT_SELECTOR = [
@@ -92,16 +96,189 @@ const _commandTooltips = new Map();
 const _commandIcons = new Map();
 let _tooltipObserver = null;
 let _tooltipRefreshQueued = false;
+let _offHubBarLangChange = null;
 let _miniBarGlassListenerInstalled = false;
 let _miniBarSelectionRestoreInstalled = false;
 let _offMiniBarGlassChange = null;
 let _instantPointerOver = null;
 let _instantPointerOut = null;
 let _instantActiveAnchor = null;
+// Compact mode controls the initial presentation.  Once the user explicitly
+// opens the bar, preserve that choice across node changes until they collapse
+// it again (or an auto-hide action completes).
+let _miniBarExpanded = false;
+let _miniBarPositionListenerInstalled = false;
+let _miniBarPositionListener = null;
+
+function _isMiniBarCompactMode() {
+    try {
+        return localStorage.getItem(STORAGE_KEYS.miniBarCompact) !== "false";
+    } catch (_) {
+        return true;
+    }
+}
+
+function _setMiniBarCompactMode(enabled) {
+    try {
+        localStorage.setItem(STORAGE_KEYS.miniBarCompact, enabled ? "true" : "false");
+    } catch (_) {}
+    _miniBarExpanded = false;
+    document.documentElement?.toggleAttribute("data-wosai-mini-compact-mode", !!enabled);
+    _syncMiniBarCompactMode();
+}
+
+function _miniBarToggle(toolbox) {
+    let toggle = toolbox._wosaiMiniBarToggle;
+    if (toggle?.isConnected) return toggle;
+
+    toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "wosai-mini-compact-toggle";
+    const tooltipText = () => _miniBarExpanded
+        ? t("menus.hubBar.compactActions", "Collapse action bar")
+        : t("menus.hubBar.expandActions", "Expand action bar");
+    const togglePresentation = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!_miniBarSelectionSignature()) return;
+        _miniBarExpanded = !_miniBarExpanded;
+        hideTip();
+        _syncMiniBarCompactMode();
+    };
+    toggle.addEventListener("mouseenter", () => showTip(toggle, tooltipText()));
+    toggle.addEventListener("mouseleave", hideTip);
+    toggle.addEventListener("focus", () => showTip(toggle, tooltipText()));
+    toggle.addEventListener("blur", hideTip);
+    toggle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+    });
+    // Handle pointer release directly.  The expanded native toolbox installs
+    // its own pointer handlers, so waiting for a synthetic click can let that
+    // layer consume the interaction before this compact control sees it.
+    toggle.addEventListener("pointerup", (event) => {
+        toggle.dataset.wosaiPointerToggle = "1";
+        togglePresentation(event);
+    });
+    toggle.addEventListener("click", (event) => {
+        if (toggle.dataset.wosaiPointerToggle === "1") {
+            delete toggle.dataset.wosaiPointerToggle;
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+        togglePresentation(event);
+    });
+    document.body.appendChild(toggle);
+    toolbox._wosaiMiniBarToggle = toggle;
+    return toggle;
+}
+
+function _removeMiniBarToggle(toolbox) {
+    const toggle = toolbox?._wosaiMiniBarToggle;
+    toggle?.remove();
+    if (toolbox) delete toolbox._wosaiMiniBarToggle;
+}
+
+function _positionMiniBarToggle(toolbox, toggle) {
+    const applyPosition = () => {
+        if (!toolbox.isConnected || !toggle.isConnected || toolbox._wosaiMiniBarToggle !== toggle) return;
+        const rect = toolbox.getBoundingClientRect();
+        const size = toggle.getBoundingClientRect().width || 30;
+        const gap = Number.parseFloat(getComputedStyle(document.documentElement)
+            .getPropertyValue("--ws-hk-mini-compact-gap")) || 8;
+        const fitsLeft = rect.left - gap >= size;
+        const fitsRight = window.innerWidth - rect.right - gap >= size;
+        // Prefer the left edge so More and its popup remain clear.  If that
+        // would clip at the viewport edge, flip to the right and match the
+        // collapse arrow to the actual side.
+        const side = fitsLeft || !fitsRight ? "left" : "right";
+        const left = side === "left" ? rect.left - size - gap : rect.right + gap;
+        const top = rect.top + rect.height / 2 - size / 2;
+        const maxLeft = Math.max(gap, window.innerWidth - size - gap);
+        const maxTop = Math.max(gap, window.innerHeight - size - gap);
+        toggle.style.left = `${Math.round(Math.min(maxLeft, Math.max(gap, left)))}px`;
+        toggle.style.top = `${Math.round(Math.min(maxTop, Math.max(gap, top)))}px`;
+        toggle.dataset.side = side;
+        if (toggle.dataset.state === "expanded") {
+            toggle.innerHTML = MINI_ICON[side === "left" ? "restoreLeft" : "restoreRight"];
+        }
+        toggle.setAttribute("data-wosai-mini-positioned", "");
+    };
+
+    if (toggle.hasAttribute("data-wosai-mini-positioned")) {
+        applyPosition();
+        return;
+    }
+    if (toggle._wosaiMiniPositionQueued) return;
+    toggle._wosaiMiniPositionQueued = true;
+    // ComfyUI settles the native selection toolbar's position on the next
+    // render pass.  Keep the new trigger invisible until that position is
+    // stable, so it never appears at a stale coordinate then slides upward.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        toggle._wosaiMiniPositionQueued = false;
+        applyPosition();
+    }));
+}
+
+function _syncMiniBarCompactMode() {
+    if (!document.body) return;
+    const compactEnabled = _isMiniBarCompactMode();
+    const suppressed = _isTitleNoteMiniBarSelection();
+    document.documentElement?.toggleAttribute("data-wosai-mini-compact-mode", compactEnabled);
+    const signature = _miniBarSelectionSignature();
+    document.querySelectorAll('[data-testid="selection-toolbox"]').forEach((toolbox) => {
+        toolbox.toggleAttribute("data-wosai-mini-suppressed", suppressed);
+        if (suppressed) {
+            toolbox.removeAttribute("data-wosai-mini-compact");
+            toolbox.removeAttribute("data-wosai-mini-expanded");
+            _removeMiniBarToggle(toolbox);
+            return;
+        }
+        if (!signature || !compactEnabled) {
+            toolbox.removeAttribute("data-wosai-mini-compact");
+            toolbox.removeAttribute("data-wosai-mini-expanded");
+            if (!compactEnabled) {
+                toolbox.removeAttribute("data-wosai-mini-hidden");
+                toolbox.removeAttribute("data-wosai-mini-hidden-selection");
+            }
+            _removeMiniBarToggle(toolbox);
+            return;
+        }
+
+        const expanded = _miniBarExpanded;
+        toolbox.toggleAttribute("data-wosai-mini-compact", !expanded);
+        toolbox.toggleAttribute("data-wosai-mini-expanded", expanded);
+        if (expanded) toolbox.removeAttribute("data-wosai-mini-hidden");
+        const toggle = _miniBarToggle(toolbox);
+        toggle.dataset.state = expanded ? "expanded" : "compact";
+        toggle.setAttribute("data-theme", getGlassTheme());
+        toggle.setAttribute("aria-label", expanded ? t("menus.hubBar.compact", "Collapse MiniBar") : t("menus.hubBar.expand", "Expand MiniBar"));
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        toggle.innerHTML = MINI_ICON[expanded ? "restoreLeft" : "compact"];
+        _positionMiniBarToggle(toolbox, toggle);
+    });
+
+    document.querySelectorAll(".wosai-mini-compact-toggle").forEach((toggle) => {
+        const owner = [...document.querySelectorAll('[data-testid="selection-toolbox"]')]
+            .find((toolbox) => toolbox._wosaiMiniBarToggle === toggle);
+        if (!owner) toggle.remove();
+    });
+}
+
+function _installMiniBarPositionSync() {
+    if (_miniBarPositionListenerInstalled) return;
+    _miniBarPositionListenerInstalled = true;
+    _miniBarPositionListener = () => requestAnimationFrame(_syncMiniBarCompactMode);
+    window.addEventListener("resize", _miniBarPositionListener, { passive: true });
+    window.addEventListener("scroll", _miniBarPositionListener, true);
+}
 
 function _syncMiniBarGlassTheme(theme = getGlassTheme()) {
     document.querySelectorAll('[data-wosai-mini-surface]').forEach((surface) => {
         surface.setAttribute("data-theme", theme);
+    });
+    document.querySelectorAll(".wosai-mini-compact-toggle").forEach((toggle) => {
+        toggle.setAttribute("data-theme", theme);
     });
 }
 
@@ -128,6 +305,10 @@ function _miniBarSelectionSignature() {
         .join("|");
 }
 
+function _isTitleNoteMiniBarSelection() {
+    return _selectedMiniBarItems().some((item) => item?.type === "WOSAI_TitleNote");
+}
+
 function _restoreMiniBarsForSelectionChange() {
     const current = _miniBarSelectionSignature();
     document.querySelectorAll('[data-wosai-mini-hidden]').forEach((toolbox) => {
@@ -135,6 +316,7 @@ function _restoreMiniBarsForSelectionChange() {
         toolbox.removeAttribute("data-wosai-mini-hidden");
         toolbox.removeAttribute("data-wosai-mini-hidden-selection");
     });
+    _syncMiniBarCompactMode();
 }
 
 function _queueMiniBarSelectionRestore() {
@@ -153,11 +335,18 @@ function _hideMiniBarAfterAction(button) {
     if (!toolbox) return;
     toolbox.setAttribute("data-wosai-mini-hidden-selection", _miniBarSelectionSignature());
     toolbox.setAttribute("data-wosai-mini-hidden", "");
+    // Actions such as Color may need the current native bar out of the way,
+    // but they must not discard the user's explicit "keep MiniBar expanded"
+    // choice.  A later node selection restores the bar in that same session.
+    if (!_isMiniBarCompactMode() || !_miniBarExpanded) {
+        requestAnimationFrame(_syncMiniBarCompactMode);
+    }
 }
 
 function _ensureSelectionToolboxCaptions() {
     _installMiniBarGlassTheme();
     _installMiniBarSelectionRestore();
+    _installMiniBarPositionSync();
     if (document.getElementById("wosai-selection-toolbox-captions")) return;
     const style = document.createElement("style");
     style.id = "wosai-selection-toolbox-captions";
@@ -208,6 +397,17 @@ function _ensureSelectionToolboxCaptions() {
             box-sizing:border-box!important;
             align-items:center!important;
             border-radius:var(--ws-hk-bar-radius)!important;
+            transform-origin:left center;
+            transition:none!important;
+        }
+        [data-testid="selection-toolbox"][data-wosai-mini-compact] [data-wosai-mini-bar],
+        html[data-wosai-mini-compact-mode] [data-testid="selection-toolbox"]:not([data-wosai-mini-expanded]) [data-wosai-mini-bar] {
+            opacity:0;
+            transform:none;
+        }
+        [data-testid="selection-toolbox"][data-wosai-mini-expanded] [data-wosai-mini-bar] {
+            opacity:1;
+            transform:none;
         }
         [data-testid="selection-toolbox"][data-wosai-mini-surface] {
             overflow:visible!important;
@@ -218,11 +418,61 @@ function _ensureSelectionToolboxCaptions() {
             backdrop-filter:var(--ws-gt-blur)!important;
             -webkit-backdrop-filter:var(--ws-gt-blur)!important;
             color-scheme:dark;
-            transition:opacity .14s ease,background .18s ease,border-color .18s ease,box-shadow .18s ease;
+            transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
         }
         [data-testid="selection-toolbox"][data-wosai-mini-hidden] {
             opacity:0!important;
             pointer-events:none!important;
+        }
+        [data-testid="selection-toolbox"][data-wosai-mini-suppressed] {
+            display:none!important;
+        }
+        [data-testid="selection-toolbox"][data-wosai-mini-compact] {
+            opacity:0!important;
+            pointer-events:none!important;
+        }
+        html[data-wosai-mini-compact-mode] [data-testid="selection-toolbox"]:not([data-wosai-mini-expanded]) {
+            opacity:0!important;
+            pointer-events:none!important;
+        }
+        .wosai-mini-compact-toggle {
+            position:fixed;
+            z-index:var(--ws-z-hud);
+            display:grid;
+            place-items:center;
+            width:var(--ws-hk-mini-compact-size);
+            min-width:var(--ws-hk-mini-compact-size);
+            height:var(--ws-hk-mini-compact-size);
+            padding:0;
+            border:var(--ws-gt-border-dark);
+            border-radius:var(--ws-radius-full);
+            background:var(--ws-gt-glass-dark);
+            box-shadow:var(--ws-gt-shadow-dark);
+            backdrop-filter:var(--ws-gt-blur);
+            -webkit-backdrop-filter:var(--ws-gt-blur);
+            color:var(--ws-text-secondary);
+            cursor:pointer;
+            pointer-events:auto!important;
+            visibility:hidden;
+            transition:none!important;
+        }
+        .wosai-mini-compact-toggle[data-wosai-mini-positioned] {
+            visibility:visible;
+        }
+        .wosai-mini-compact-toggle:hover {
+            color:var(--ws-accent);
+            background:var(--ws-hk-btn-hover-bg-dark);
+        }
+        .wosai-mini-compact-toggle svg {
+            width:var(--ws-hk-mini-compact-icon-size);
+            height:var(--ws-hk-mini-compact-icon-size);
+            display:block;
+        }
+        [data-theme="light"] ~ .wosai-mini-compact-toggle,
+        .wosai-mini-compact-toggle[data-theme="light"] {
+            background:var(--ws-gt-glass-light);
+            border:var(--ws-gt-border-light);
+            box-shadow:var(--ws-gt-shadow-light);
         }
         [data-testid="selection-toolbox"][data-wosai-mini-surface][data-theme="light"] {
             background:var(--ws-gt-glass-light)!important;
@@ -355,6 +605,10 @@ function _ensureSelectionToolboxCaptions() {
         }
         [data-testid="selection-toolbox"][data-wosai-mini-surface][data-theme="light"] button[data-wosai-mini-captioned]:hover::before {
             background:var(--ws-hk-btn-hover-bg-light);
+        }
+        @media (prefers-reduced-motion:reduce) {
+            [data-wosai-mini-bar],
+            .wosai-mini-compact-toggle { transition:none!important; }
         }
         [data-wosai-mini-arrange-surface] {
             background:transparent!important;
@@ -589,6 +843,8 @@ function _disposeHubBarRuntime() {
     _tooltipObserver?.disconnect();
     _tooltipObserver = null;
     _tooltipRefreshQueued = false;
+    _offHubBarLangChange?.();
+    _offHubBarLangChange = null;
     _offMiniBarGlassChange?.();
     _offMiniBarGlassChange = null;
     _miniBarGlassListenerInstalled = false;
@@ -606,7 +862,24 @@ function _disposeHubBarRuntime() {
         _instantPointerOut = null;
     }
     _instantActiveAnchor = null;
+    _miniBarExpanded = false;
+    document.querySelectorAll('[data-testid="selection-toolbox"]').forEach((toolbox) => {
+        toolbox.removeAttribute("data-wosai-mini-compact");
+        toolbox.removeAttribute("data-wosai-mini-expanded");
+        toolbox.removeAttribute("data-wosai-mini-suppressed");
+        _removeMiniBarToggle(toolbox);
+    });
+    document.documentElement?.removeAttribute("data-wosai-mini-compact-mode");
+    if (_miniBarPositionListenerInstalled) {
+        window.removeEventListener("resize", _miniBarPositionListener);
+        window.removeEventListener("scroll", _miniBarPositionListener, true);
+        _miniBarPositionListener = null;
+        _miniBarPositionListenerInstalled = false;
+    }
     delete window.__wosaiSelectionToolboxInstantTipsInstalled;
+    if (window.__wosaiSetMiniBarCompactMode === _setMiniBarCompactMode) {
+        delete window.__wosaiSetMiniBarCompactMode;
+    }
     hideTip();
 }
 
@@ -670,6 +943,35 @@ function _command(id, label, icon, handler) {
     _commandIcons.set(id, icon);
     CAPTIONED_COMMANDS.add(id);
     return { id, label, icon, function: handler };
+}
+
+/** 核心命令的当前语言文案（注册与语言切换刷新共用的单一来源）。 */
+function _coreCommandLabels() {
+    return {
+        [CORE_COMMANDS.color]: t("menus.hubBar.color"),
+        [CORE_COMMANDS.align]: t("menus.layoutToolkit.tabAlign"),
+        [CORE_COMMANDS.node]: t("menus.layoutToolkit.tabNode"),
+        [CORE_COMMANDS.replace]: t("menus.layoutToolkit.replaceNode"),
+        [CORE_COMMANDS.collapse]: t("menus.layoutToolkit.collapseLabel"),
+        [CORE_COMMANDS.clone]: t("menus.layoutToolkit.clone"),
+        [CORE_COMMANDS.lock]: t("menus.layoutToolkit.lock"),
+    };
+}
+
+/**
+ * 语言切换后刷新命令文案。命令标签在注册时一次性求值并缓存到
+ * _commandTooltips，若不刷新则切换语言后原生 MiniBar 的标题与即时
+ * tooltip 仍停留在页面加载时的语言。
+ */
+function _refreshCommandLabels() {
+    for (const [id, label] of Object.entries(_coreCommandLabels())) {
+        if (label) _commandTooltips.set(id, label);
+    }
+    for (const entry of _extras().values()) {
+        const label = t(entry.hubLabelKey || entry.labelKey || entry.id);
+        if (label) _commandTooltips.set(`${EXTRA_COMMAND_PREFIX}${entry.id}`, label);
+    }
+    _queueTooltipRefresh();
 }
 
 function _extras() {
@@ -775,7 +1077,7 @@ function _getSelectionToolboxCommands(selectedItem) {
     if (!selectedItem) return [];
     // TitleNote is a canvas annotation. Hovering it should never surface the
     // selection Mini Bar, even if it is currently selected with other items.
-    if (selectedItem.type === "WOSAI_TitleNote") return [];
+    if (_isTitleNoteMiniBarSelection()) return [];
     const nodes = getSelectedNodes();
     const groups = getSelectedGroups();
     const singleNode = nodes.length === 1 && groups.length === 0;
@@ -800,23 +1102,31 @@ function _registerCoreCommands() {
     // A numeric owner version lets a fresh adapter replace commands created by
     // an older cached instance on the same page. Older builds stored `true`.
     window.__wosaiSelectionToolboxCoreRegistered = ADAPTER_VERSION;
+    const labels = _coreCommandLabels();
     app.registerExtension({
         name: "WOSAI.SelectionToolbox",
         commands: [
-            _command(CORE_COMMANDS.color, t("menus.hubBar.color"), "pi pi-palette", () => _openCoreAction("color")),
-            _command(CORE_COMMANDS.align, t("menus.layoutToolkit.tabAlign"), "pi pi-align-center", () => _openCoreAction("align")),
-            _command(CORE_COMMANDS.node, t("menus.layoutToolkit.tabNode"), "pi pi-box", () => _openCoreAction("node")),
-            _command(CORE_COMMANDS.replace, t("menus.layoutToolkit.replaceNode"), "pi pi-sync", () => _openCoreAction("replace")),
-            _command(CORE_COMMANDS.collapse, t("menus.layoutToolkit.collapseLabel"), "pi pi-window-minimize", () => _openCoreAction("collapse")),
-            _command(CORE_COMMANDS.clone, t("menus.layoutToolkit.clone"), "pi pi-clone", () => _openCoreAction("clone")),
-            _command(CORE_COMMANDS.lock, t("menus.layoutToolkit.lock"), "pi pi-lock", () => _openCoreAction("lock")),
+            _command(CORE_COMMANDS.color, labels[CORE_COMMANDS.color], "pi pi-palette", () => _openCoreAction("color")),
+            _command(CORE_COMMANDS.align, labels[CORE_COMMANDS.align], "pi pi-align-center", () => _openCoreAction("align")),
+            _command(CORE_COMMANDS.node, labels[CORE_COMMANDS.node], "pi pi-box", () => _openCoreAction("node")),
+            _command(CORE_COMMANDS.replace, labels[CORE_COMMANDS.replace], "pi pi-sync", () => _openCoreAction("replace")),
+            _command(CORE_COMMANDS.collapse, labels[CORE_COMMANDS.collapse], "pi pi-window-minimize", () => _openCoreAction("collapse")),
+            _command(CORE_COMMANDS.clone, labels[CORE_COMMANDS.clone], "pi pi-clone", () => _openCoreAction("clone")),
+            _command(CORE_COMMANDS.lock, labels[CORE_COMMANDS.lock], "pi pi-lock", () => _openCoreAction("lock")),
         ],
         getSelectionToolboxCommands: _getSelectionToolboxCommands,
         remove() {
             _disposeHubBarRuntime();
         },
     });
+    // 订阅语言变化：切换语言后刷新 MiniBar 的标题与即时 tooltip。
+    _offHubBarLangChange ??= onLangChange(() => _refreshCommandLabels());
 }
+
+// Settings owns the persisted preference; this narrow bridge only updates the
+// native selection toolbox presentation without replacing its actions.
+window.__wosaiSetMiniBarCompactMode = _setMiniBarCompactMode;
+document.documentElement?.toggleAttribute("data-wosai-mini-compact-mode", _isMiniBarCompactMode());
 
 function _registerExtraCommand(def) {
     if (!def?.id || !app?.registerExtension) return;

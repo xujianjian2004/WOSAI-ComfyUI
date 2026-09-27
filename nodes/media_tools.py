@@ -162,6 +162,10 @@ class WOSAI_ImageCompare(PreviewImage):
     CATEGORY = f"{CATEGORY_PREFIX}Image"
     DESCRIPTION = "Compare two images with an interactive split view"
     RETURN_TYPES = ()
+    # PreviewImage inherits SaveImage.RETURN_NAMES = ("images",), which would
+    # mismatch the empty RETURN_TYPES and leak a stray output_name to
+    # /object_info. Declare it explicitly to match the zero-output contract.
+    RETURN_NAMES = ()
     FUNCTION = "compare"
     OUTPUT_NODE = True
 

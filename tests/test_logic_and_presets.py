@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
 
 try:
     import torch
@@ -44,16 +45,60 @@ class PresetPromptSelectorTests(unittest.TestCase):
     def test_single_output_uses_editor_text(self):
         self.assertEqual(
             self.node.select_preset(0, prompt_cn="中文", prompt_en="English"),
-            (["中文"], ["English"]),
+            ("中文", "English"),
         )
 
-    def test_batch_output_normalizes_every_record(self):
+    def test_empty_native_prompts_fall_back_to_active_preset(self):
+        payload = json.dumps([
+            {"label": "one", "prompt_cn": "甲", "prompt_en": "A"},
+            {"label": "two", "prompt_cn": "乙", "prompt_en": "B"},
+        ])
+        self.assertEqual(self.node.select_preset(1, payload, prompt_cn="", prompt_en=""), ("乙", "B"))
+
+    def test_catalog_defaults_provide_at_least_nine_presets_per_category(self):
+        required = self.node.INPUT_TYPES()["required"]
+        presets = json.loads(required["presets_data"][1]["default"])
+        categories = {item["category"] for item in presets}
+        self.assertGreater(len(categories), 1)
+        for category in categories:
+            self.assertGreaterEqual(sum(item["category"] == category for item in presets), 9)
+
+    def test_catalog_json_is_the_default_source_and_has_i18n_ids(self):
+        catalog_path = Path(__file__).resolve().parents[1] / "presets" / "preset_prompt_catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        presets = catalog["presets"]
+        required = self.node.INPUT_TYPES()["required"]
+        categories = []
+        expected = []
+        for preset in presets:
+            if preset["category"] not in categories:
+                if len(categories) >= 6:
+                    continue
+                categories.append(preset["category"])
+            expected.append(preset)
+        self.assertEqual(json.loads(required["presets_data"][1]["default"]), expected)
+        self.assertTrue(all(item.get("category_i18n") and item.get("label_i18n") for item in presets))
+        self.assertNotIn("batch_output", required)
+
+    def test_legacy_batch_output_is_ignored(self):
         payload = json.dumps([
             {"label": "one", "prompt_cn": "甲", "prompt_en": "A"},
             {"label": "two", "prompt_cn": "乙", "prompt_en": "B"},
         ])
 
-        self.assertEqual(self.node.select_preset(0, payload, batch_output=True), (["甲", "乙"], ["A", "B"]))
+        self.assertEqual(
+            self.node.select_preset(0, payload, prompt_cn="当前中文", prompt_en="Current English", batch_output=True),
+            ("当前中文", "Current English"),
+        )
+
+    def test_thumbnail_metadata_survives_preset_normalization(self):
+        presets = _normalize_presets(json.dumps([{
+            "label": "粘土风格",
+            "thumbnail": "assets/presets/clay-style.webp",
+            "prompt_cn": "粘土风格",
+            "prompt_en": "clay style",
+        }]))
+        self.assertEqual(presets[0]["thumbnail"], "assets/presets/clay-style.webp")
 
 
 @unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")

@@ -1,0 +1,14 @@
+{
+  "note": "CSS/JS 规范欠账棘轮基线：仅当问题数超过此基线时 lint 才失败。修复后运行 node scripts/lint-wosai-css.cjs --update-baseline 下调。",
+  "total": 72,
+  "bySeverity": {
+    "严重": 27,
+    "重要": 45,
+    "优化": 0
+  },
+  "byType": {
+    "硬编码颜色": 27,
+    "硬编码尺寸": 32,
+    "未使用变量": 13
+  }
+}

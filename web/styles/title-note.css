@@ -169,11 +169,13 @@
     resize: none;
     appearance: none;
     -webkit-appearance: none;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
     box-sizing: border-box;
     pointer-events: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    white-space: pre;
+    overflow-wrap: normal;
+    word-wrap: normal;
     padding: var(--ws-gap-2xs) 0 0 0;
     background: transparent;
     transition: font-size var(--ws-transition-fast),

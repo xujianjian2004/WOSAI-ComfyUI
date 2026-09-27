@@ -4,8 +4,15 @@
  * 扫描项目中的 CSS/JS 文件，检测硬编码颜色、硬编码尺寸、未使用变量、i18n 硬编码、路径混用。
  *
  * 用法：
- *   node scripts/lint-wosai-css.cjs
- *   node scripts/lint-wosai-css.cjs --json
+ *   node scripts/lint-wosai-css.cjs                  # 棘轮模式：超过基线才失败
+ *   node scripts/lint-wosai-css.cjs --summary        # 单行结论
+ *   node scripts/lint-wosai-css.cjs --json           # 机器可读
+ *   node scripts/lint-wosai-css.cjs --strict         # 忽略基线，任何问题都失败
+ *   node scripts/lint-wosai-css.cjs --update-baseline  # 修复后下调基线
+ *
+ * 棘轮基线（scripts/lint-wosai-css.baseline.json）：
+ *   历史欠账（硬编码颜色/尺寸、未使用变量）已被冻结，新增问题才会让门禁转红；
+ *   每偿还一批欠账就用 --update-baseline 把基线压下来，保证只降不升。
  */
 
 const fs = require('fs');
@@ -219,6 +226,10 @@ const I18N_TEXT_WHITELIST = [
   '设置',
   '选择',
   '颜色选择器',
+  // 与后端同步的分类标识（`preset_prompt.py` 的默认/兜底分类）。这些是用于
+  // 分类匹配的数据常量，界面展示走 category_i18n，翻译它们会破坏分类匹配。
+  '通用',
+  '未分类',
 ];
 
 // 正则
@@ -227,8 +238,55 @@ const RGB_COLOR_RE = /rgba?\s*\([^)]+\)/g;
 const HSL_COLOR_RE = /hsla?\s*\([^)]+\)/g;
 const PX_VALUE_RE = /\b\d+\.?\d*px\b/g;
 const CSS_VAR_DEF_RE = /(--ws-[\w-]+)\s*:/g;
-const CSS_VAR_USE_RE = /var\(\s*(--ws-[\w-]+)\s*\)/g;
+// 使用点匹配刻意不要求紧跟 ")"：`var(--x, 96px)` 这类带 fallback 的引用也必须计为
+// 已使用，否则会误报"未使用变量"（原 /var\(\s*(--ws-[\w-]+)\s*\)/ 会漏掉带兜底值的用法）。
+const CSS_VAR_USE_RE = /var\(\s*(--ws-[\w-]+)/g;
 const CSS_CONTENT_RE = /content\s*:\s*["'][^"']+["']/g;
+// i18n 调用的中文兜底参数：t("key", "中文兜底") 里的第二个字面量是设计的一部分，
+// 不是待翻译的硬编码文案，需要跳过（否则每个 t(key, fallback) 都会被误报）。
+const I18N_FALLBACK_RE = /\b(?:t|i18n\.t)\s*\(\s*(?:"[^"\n]*"|'[^'\n]*')\s*,\s*(["'])/g;
+
+const BASELINE_FILE = path.join(__dirname, 'lint-wosai-css.baseline.json');
+
+function emptyBaseline() {
+  return { total: 0, byType: {}, bySeverity: {} };
+}
+
+function loadBaseline() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf-8'));
+    return {
+      total: Number(raw.total) || 0,
+      byType: raw.byType && typeof raw.byType === 'object' ? raw.byType : {},
+      bySeverity: raw.bySeverity && typeof raw.bySeverity === 'object' ? raw.bySeverity : {},
+    };
+  } catch {
+    return emptyBaseline();
+  }
+}
+
+function saveBaseline(summary) {
+  const payload = {
+    note: 'CSS/JS 规范欠账棘轮基线：仅当问题数超过此基线时 lint 才失败。修复后运行 node scripts/lint-wosai-css.cjs --update-baseline 下调。',
+    total: summary.totalIssues,
+    bySeverity: summary.severity,
+    byType: summary.byType,
+  };
+  fs.writeFileSync(BASELINE_FILE, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
+  return payload;
+}
+
+function computeRegressions(summary, baseline) {
+  const regressions = [];
+  if (summary.totalIssues > baseline.total) {
+    regressions.push(`问题总数 ${summary.totalIssues} > 基线 ${baseline.total}`);
+  }
+  for (const [type, count] of Object.entries(summary.byType)) {
+    const allowed = Number(baseline.byType[type]) || 0;
+    if (count > allowed) regressions.push(`${type} ${count} > 基线 ${allowed}`);
+  }
+  return regressions;
+}
 
 function walk(dir, callback) {
   if (!fs.existsSync(dir)) return;
@@ -323,6 +381,19 @@ function isInsideCalc(text, index) {
   return index > lastStart;
 }
 
+/** 收集 t("key", "中文兜底") 中兜底字面量的起始下标，供 i18n 规则跳过。 */
+function collectI18nFallbackIndices(text) {
+  const indices = new Set();
+  I18N_FALLBACK_RE.lastIndex = 0;
+  let match;
+  while ((match = I18N_FALLBACK_RE.exec(text)) !== null) {
+    // 正则末尾停在兜底字符串的起始引号之后
+    indices.add(I18N_FALLBACK_RE.lastIndex - 1);
+  }
+
+  return indices;
+}
+
 function lintFile(file, issues) {
   const text = fs.readFileSync(file, 'utf-8');
   const isCSS = file.endsWith('.css');
@@ -398,8 +469,11 @@ function lintFile(file, issues) {
   if (isJS) {
     // 更精确：匹配引号包裹、包含至少 2 个连续汉字或 3 个以上分散汉字的字符串
     const I18N_STRING_RE = /(["'])([^"'\n\r]*[\u4e00-\u9fa5][^"'\n\r]*)\1/g;
+    const fallbackIndices = collectI18nFallbackIndices(text);
     let strMatch;
     while ((strMatch = I18N_STRING_RE.exec(text)) !== null) {
+      // t("key", "中文兜底") 的兜底参数不算硬编码文案
+      if (fallbackIndices.has(strMatch.index)) continue;
       const raw = strMatch[0];
       const inner = strMatch[2];
 
@@ -514,6 +588,8 @@ function main() {
   const args = process.argv.slice(2);
   const outputJson = args.includes('--json');
   const outputSummary = args.includes('--summary');
+  const updateBaseline = args.includes('--update-baseline');
+  const strict = args.includes('--strict');
 
   const issues = [];
   const cssFiles = collectFiles(CSS_DIRS, ['.css']);
@@ -545,24 +621,43 @@ function main() {
     summary.byType[issue.type] = (summary.byType[issue.type] || 0) + 1;
   }
 
+  if (updateBaseline) {
+    const saved = saveBaseline(summary);
+    console.log(
+      `lint 基线已更新: ${path.relative(ROOT, BASELINE_FILE)} → ${saved.total} issues ` +
+      `(${JSON.stringify(saved.byType)})`
+    );
+    process.exitCode = 0;
+    return;
+  }
+
+  const baseline = strict ? emptyBaseline() : loadBaseline();
+  const regressions = computeRegressions(summary, baseline);
+  summary.baseline = baseline;
+  summary.regressions = regressions;
+
   if (outputJson) {
     process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
-    process.exitCode = issues.length > 0 ? 1 : 0;
+    process.exitCode = regressions.length > 0 ? 1 : 0;
     return;
   }
 
   if (outputSummary) {
+    const verdict = regressions.length > 0 ? 'FAIL' : 'PASS';
     console.log(
-      `WOSAI UI lint: ${summary.totalIssues} issues ` +
+      `WOSAI UI lint [${verdict}]: ${summary.totalIssues} issues / 基线 ${baseline.total} ` +
       `(${summary.severity['严重']} critical, ${summary.severity['重要']} important, ${summary.severity['优化']} advisory)`
     );
-    process.exitCode = issues.length > 0 ? 1 : 0;
+    if (regressions.length > 0) {
+      for (const item of regressions) console.log(`  - 超出基线: ${item}`);
+    }
+    process.exitCode = regressions.length > 0 ? 1 : 0;
     return;
   }
 
   console.log('# WOSAI UI Linter 报告\n');
   console.log(`扫描文件: ${summary.totalFiles} 个（CSS ${summary.cssFiles}, JS ${summary.jsFiles}）`);
-  console.log(`问题总数: ${summary.totalIssues} 个\n`);
+  console.log(`问题总数: ${summary.totalIssues} 个（棘轮基线 ${baseline.total}）\n`);
   console.log(
     `严重: ${summary.severity['严重']} | 重要: ${summary.severity['重要']} | 优化: ${summary.severity['优化']}\n`
   );
@@ -601,7 +696,20 @@ function main() {
   for (const [type, count] of Object.entries(summary.byType)) {
     console.log(`- ${type}: ${count} 处`);
   }
+  console.log();
 
+  if (regressions.length === 0) {
+    console.log(
+      `未超过棘轮基线（当前 ${summary.totalIssues} / 基线 ${baseline.total}），门禁通过；` +
+      `仍有历史欠账待偿还，修复后请执行 --update-baseline 下调基线。`
+    );
+    process.exit(0);
+  }
+
+  console.log('## 超出基线（门禁失败）');
+  for (const item of regressions) {
+    console.log(`- ${item}`);
+  }
   process.exit(1);
 }
 

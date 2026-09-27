@@ -12,6 +12,7 @@ import { getWOSAIVar, getWOSAIVarNum } from "./shared/shared-utils.js";
 import { registerSelectionFollower } from "./shared/selection-follow.js";
 import { readIgnoreGroupsState, writeIgnoreGroupsState } from "./shared/ignore-groups-state.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
+import { patchMethod } from "./shared/method-patch.js";
 import {
     groupBounds as readGroupBounds,
     groupColor,
@@ -779,7 +780,7 @@ function buildWosaiIgnoreGroupsUI(node) {
        规避 DPR/坐标换算坑；单钩子 + _locState 状态，避免多次点击重复挂钩。
        相位：闪烁 2s → 边框淡出 2s → 自动清除，总时长 4s。 */
     let _locState = null;
-    let _locHookInstalled = false;
+    let _locHookDispose = null;
     let _locTimer = null;
     let _locRaf = 0;
     const LOC_PULSE_DURATION = 2000;
@@ -811,57 +812,64 @@ function buildWosaiIgnoreGroupsUI(node) {
     }
 
     function installLocHook() {
-        if (_locHookInstalled) return;
+        if (_locHookDispose) return;
         const canvas = app.canvas;
-        if (!canvas) return;
-        _locHookInstalled = true;
-        const prev = canvas.onDrawForeground;
-        canvas.onDrawForeground = function (ctx, ...args) {
-            if (typeof prev === "function") prev.call(this, ctx, ...args);
-            if (!_locState) return;
-            const now = performance.now();
-            if (now >= _locState.endAt) { _locState = null; return; }
-            const b = _locState.bounds;
-            const ds = canvas.ds;
-            const scale = (ds && ds.scale) || 1;
-            const x = b[0], y = b[1], w = b[2], h = b[3];
-            const rGraph = 14 / scale;                       // 屏幕恒定圆角
-            const elapsed = now - _locState.start;
-            const pulsing = elapsed < _locState.pulseDur;
-            let alpha, lw;
-            if (pulsing) {
-                const p = elapsed / _locState.pulseDur;        // 0..1
-                const s = 0.5 - 0.5 * Math.cos(p * Math.PI * 3);
-                alpha = 0.35 + 0.65 * s;
-                lw = (3 + 4 * s) / scale;
-            } else {
-                alpha = 1;
-                lw = 2.5 / scale;
-            }
-            if (!pulsing) {
-                const fadeProgress = Math.min(1, (elapsed - _locState.pulseDur) / _locState.fadeDur);
-                const fade = 1 - fadeProgress;
-                alpha = fade;
-                lw = (2.5 * (0.7 + 0.3 * fade)) / scale;
-            }
-            if (pulsing) {
-                const settle = Math.min(1, Math.max(0, (elapsed - _locState.pulseDur + 180) / 180));
-                if (settle > 0) alpha += (1 - alpha) * settle;
-            }
-            const [R, G, Bb] = IG_BRAND;
-            ctx.save();
-            // 外圈低透明度光晕，增强品牌感
-            ctx.strokeStyle = "rgba(" + R + "," + G + "," + Bb + "," + (0.22 * alpha).toFixed(3) + ")";
-            ctx.lineWidth = lw + 8 / scale;
-            _igRoundRectPath(ctx, x, y, w, h, rGraph);
-            ctx.stroke();
-            // 主品牌橙边框
-            ctx.strokeStyle = "rgba(" + R + "," + G + "," + Bb + "," + alpha.toFixed(3) + ")";
-            ctx.lineWidth = lw;
-            _igRoundRectPath(ctx, x, y, w, h, rGraph);
-            ctx.stroke();
-            ctx.restore();
-        };
+        if (!canvas || typeof canvas.onDrawForeground !== "function") return;
+        // 画布被所有 IgnoreGroups 节点共享。旧实现直接赋值并递增 prev 链，
+        // 每个节点首次“定位”都会永久叠加一层包装（闭包持有该节点整个 UI
+        // 作用域），且 cleanupNode 从不还原。改用可组合补丁：每个节点一层，
+        // 节点删除时按引用释放自己的层，顺序无关。
+        _locHookDispose = patchMethod(
+            canvas,
+            "onDrawForeground",
+            `WOSAI.IgnoreGroups.locate.${node.id}`,
+            (next) => function (ctx, ...args) {
+                if (typeof next === "function") next.call(this, ctx, ...args);
+                if (!_locState) return;
+                const now = performance.now();
+                if (now >= _locState.endAt) { _locState = null; return; }
+                const b = _locState.bounds;
+                const ds = canvas.ds;
+                const scale = (ds && ds.scale) || 1;
+                const x = b[0], y = b[1], w = b[2], h = b[3];
+                const rGraph = 14 / scale;                       // 屏幕恒定圆角
+                const elapsed = now - _locState.start;
+                const pulsing = elapsed < _locState.pulseDur;
+                let alpha, lw;
+                if (pulsing) {
+                    const p = elapsed / _locState.pulseDur;        // 0..1
+                    const s = 0.5 - 0.5 * Math.cos(p * Math.PI * 3);
+                    alpha = 0.35 + 0.65 * s;
+                    lw = (3 + 4 * s) / scale;
+                } else {
+                    alpha = 1;
+                    lw = 2.5 / scale;
+                }
+                if (!pulsing) {
+                    const fadeProgress = Math.min(1, (elapsed - _locState.pulseDur) / _locState.fadeDur);
+                    const fade = 1 - fadeProgress;
+                    alpha = fade;
+                    lw = (2.5 * (0.7 + 0.3 * fade)) / scale;
+                }
+                if (pulsing) {
+                    const settle = Math.min(1, Math.max(0, (elapsed - _locState.pulseDur + 180) / 180));
+                    if (settle > 0) alpha += (1 - alpha) * settle;
+                }
+                const [R, G, Bb] = IG_BRAND;
+                ctx.save();
+                // 外圈低透明度光晕，增强品牌感
+                ctx.strokeStyle = "rgba(" + R + "," + G + "," + Bb + "," + (0.22 * alpha).toFixed(3) + ")";
+                ctx.lineWidth = lw + 8 / scale;
+                _igRoundRectPath(ctx, x, y, w, h, rGraph);
+                ctx.stroke();
+                // 主品牌橙边框
+                ctx.strokeStyle = "rgba(" + R + "," + G + "," + Bb + "," + alpha.toFixed(3) + ")";
+                ctx.lineWidth = lw;
+                _igRoundRectPath(ctx, x, y, w, h, rGraph);
+                ctx.stroke();
+                ctx.restore();
+            },
+        );
     }
     function flashGroup(bounds) {
         if (!bounds || bounds.length < 4) return;
@@ -1654,6 +1662,14 @@ function buildWosaiIgnoreGroupsUI(node) {
         if (domWidget && _origWidgetComputeSize) domWidget.computeSize = _origWidgetComputeSize;
         if (_igResizeObserver) { _igResizeObserver.disconnect(); _igResizeObserver = null; }
         _igObservedHost = null;
+        /* 定位高亮资源：释放共享画布上的补丁层并取消未完成的定时器/动画帧，
+           避免节点删除后仍持有本节点作用域。 */
+        if (_locHookDispose) { _locHookDispose(); _locHookDispose = null; }
+        if (_locTimer) { clearTimeout(_locTimer); _locTimer = null; }
+        if (_locRaf) { cancelAnimationFrame(_locRaf); _locRaf = 0; }
+        _locState = null;
+        /* 节点 body DOM 重试定时器 */
+        if (node._igDomPatchTimer) { clearTimeout(node._igDomPatchTimer); node._igDomPatchTimer = null; }
     }
     node._wosaiCleanup = cleanupNode;
     /* 暴露 _applyScale 给顶层 _igPatchNodeDOM 调用：
@@ -1702,7 +1718,24 @@ const _IG_DOM_PREFIX = "wosai-ig-node";
 function _igPatchNodeDOM(node) {
     if (!node || node.type !== _IG_TYPE) return;
     const el = document.querySelector(`[data-testid="node-body-${node.id}"]`);
-    if (!el) { setTimeout(() => _igPatchNodeDOM(node), 80); return; }
+    if (!el) {
+        // Classic 模式没有 Vue node-body，或节点已被删除：不能无限轮询。
+        // 限制重试次数并确认节点仍在画布上，同时把定时器登记到节点，
+        // 使 cleanupNode 能够清理。
+        const tries = (node._igDomPatchTries || 0) + 1;
+        node._igDomPatchTries = tries;
+        if (tries > 20) return;
+        const graph = app.graph;
+        const alive = graph?.getNodeById?.(node.id) === node
+            || Boolean((graph?._nodes || []).includes(node));
+        if (!alive) return;
+        node._igDomPatchTimer = setTimeout(() => {
+            node._igDomPatchTimer = null;
+            _igPatchNodeDOM(node);
+        }, 80);
+        return;
+    }
+    node._igDomPatchTries = 0;
     el.classList.add(_IG_DOM_PREFIX + "-body");
     /* 节点 body DOM（Vue）已就绪 → isNodes20Mode() 现在会返回 true。
        补算一次尺寸，使首次加载与 recreate 最终收敛到同一结果。 */
@@ -1786,7 +1819,11 @@ app.registerExtension({
         if (nodeData?.name?.startsWith("WOSAI_")) {
             applyNodeDefTranslation(nodeData);
         }
-        if (nodeData.name !== "WOSAI_IgnoreGroups") return;
+        if (nodeData?.name !== "WOSAI_IgnoreGroups") return;
+        // 幂等：热重载或重复注册时若二次包装原型，会叠套 UI 构建与 setInterval，
+        // 且模块级 _igOrig* 会指向第一次的包装，导致 remove() 无法真正还原。
+        if (nodeType.prototype.__wosaiIgPatched) return;
+        nodeType.prototype.__wosaiIgPatched = true;
         _igNodeType = nodeType;
 
         _igOrigOnNodeCreated = nodeType.prototype.onNodeCreated;
@@ -1905,6 +1942,7 @@ app.registerExtension({
             if (_igOrigOnRemoved != null) _igNodeType.prototype.onRemoved = _igOrigOnRemoved;
             delete _igNodeType.prototype.getWosaiShortcut;
             delete _igNodeType.prototype.saveShortcut;
+            delete _igNodeType.prototype.__wosaiIgPatched;
             _igNodeType = null;
         }
         _igOrigOnNodeCreated = null;

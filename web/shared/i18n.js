@@ -52,6 +52,22 @@ function normalizeLang (lang) {
     return DEFAULT_LANG;
 }
 
+/**
+ * 判断来源语言本身是否属于 WOSAI 支持范围（zh / en 及其区域变体）。
+ * 与 normalizeLang 不同：对 ja、ko 等不支持语言返回 false，用于区分
+ * “用户主动切到支持语言”与“宿主语言不受支持被降级渲染”。
+ */
+function _isSupportedSource (lang) {
+    if (!lang || typeof lang !== "string") return false;
+    const raw = lang.trim();
+    const lower = raw.toLowerCase();
+    if (SUPPORTED_LANGS.includes(lower)) return true;
+    if (lower.startsWith("zh") || lower === "chinese"
+        || raw.includes("\u4e2d\u6587") || raw.includes("\u7b80\u4f53") || raw.includes("\u7e41\u4f53")) return true;
+    if (lower.startsWith("en") || lower === "english") return true;
+    return false;
+}
+
 function _getLangFromSettingValues () {
     const sv = app?.ui?.settings?.settingValues;
     if (!sv) return null;
@@ -510,8 +526,10 @@ export async function setLang (lang) {
     _loaded = false;
     _loadingPromise = null;
     await initI18N(_currentLang);
-    // 同步回 ComfyUI 设置，保持双向一致
-    _syncLangToComfySettings(_currentLang);
+    // 同步回 ComfyUI 设置，保持双向一致。
+    // 仅当来源语言本身受 WOSAI 支持时才回写：否则 ja/ko 等不受支持语言
+    // 会被归一为 zh 并覆盖用户的 ComfyUI 原生语言设置。
+    if (_isSupportedSource(lang)) _syncLangToComfySettings(_currentLang);
     // 更新 LiteGraph 节点定义翻译（后端 Python 节点，走 nodeDefs.* 命名空间）
     try { _refreshNodeDefs(); } catch (_) {}
     // 更新纯前端 LiteGraph 节点类的静态 title / 属性面板标题（如 TitleNote）

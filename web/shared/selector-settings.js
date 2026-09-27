@@ -50,7 +50,7 @@ export function normalizeSelectorSettings(raw) {
     return {
         fontSize: clampInteger(value.fontSize, DEFAULT_SELECTOR_SETTINGS.fontSize, 10, 24),
         buttonHeight: clampInteger(value.buttonHeight, DEFAULT_SELECTOR_SETTINGS.buttonHeight, 30, 80),
-        gap: clampInteger(value.gap, DEFAULT_SELECTOR_SETTINGS.gap, 0, 20),
+        gap: clampInteger(value.gap, DEFAULT_SELECTOR_SETTINGS.gap, 5, 10),
         falseLabel: normalizeLabel(value.falseLabel),
         trueLabel: normalizeLabel(value.trueLabel),
     };

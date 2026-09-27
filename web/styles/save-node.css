@@ -999,6 +999,14 @@
     padding: var(--ws-gap-xs) var(--ws-gap-lg) !important;
     white-space: nowrap;
 }
+.ws-batch-btn--cat {
+    color: var(--ws-accent) !important;
+    border-color: var(--ws-accent) !important;
+}
+.ws-batch-btn--cat:hover {
+    background: var(--ws-accent) !important;
+    color: var(--ws-text-on-accent) !important;
+}
 .ws-batch-btn--danger {
     color: var(--ws-danger) !important;
     border-color: var(--ws-danger) !important;

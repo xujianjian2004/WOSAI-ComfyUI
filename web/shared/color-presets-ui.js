@@ -49,17 +49,6 @@ export function renderBuiltinPresets(area, S, _grayMode, { saveAndSync, refresh,
     area.appendChild(g);
 }
 
-/** 生成自定义 chip 背景样式（仅 grad3） */
-function _customChipBg(p) {
-    const parts = (p.stops || []).map(s => s.hex).join(', ');
-    return `linear-gradient(135deg, ${parts})`;
-}
-
-/** 生成自定义 chip tooltip 文字（仅 grad3） */
-function _customChipTip(p) {
-    return (p.stops || []).map(s => s.hex.toUpperCase()).join(' → ');
-}
-
 /**
  * 将当前面板状态保存为自定义预设（始终按三色渐变保存）
  */

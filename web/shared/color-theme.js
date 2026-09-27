@@ -82,18 +82,7 @@ export function setSelectedStyleId(id) {
     if (THEME_STYLES[id]) localStorage.setItem(LS_SELECTED, id);
 }
 
-// ── 应用 / 撤销 ──────────────────────────────────────────
-let _lastSnapshot = null;   // { nodes: [{node,color,bgcolor,gradient}], groups: [{g,color}] }
-
-function takeSnapshot(nodes) {
-    return nodes.map(n => ({
-        node: n,
-        color: n.color,
-        bgcolor: n.bgcolor,
-        gradient: n._gradient ? JSON.parse(JSON.stringify(n._gradient)) : null,
-    }));
-}
-
+// ── 应用 ────────────────────────────────────────────────
 // 将主题应用到目标范围。返回各大类命中数统计。
 // 范围规则：
 //   applyTheme(id)                → 全图节点 + 全部分组框
@@ -108,18 +97,14 @@ export function applyTheme(styleId, nodes, groups) {
 
     // 分组目标：显式传入用之；未传 nodes（全图模式）时取全部分组；否则不涂分组
     const graphGroups = groups !== undefined ? groups : (nodes ? [] : app_graph_groups());
-    _lastSnapshot = {
-        nodes: takeSnapshot(targets),
-        groups: graphGroups.map(g => ({ g, color: g.color })),
-    };
     const stats = {};
 
     for (const n of targets) {
         const cat = classifyNode(n);
         stats[cat] = (stats[cat] || 0) + 1;
         const hex = style.colors[cat] || style.colors.tool;
-        const t = hex2hsv(hex);
-        const d = deriveDarkBg(t.h, t.s, t.v);
+        const hsv = hex2hsv(hex);
+        const d = deriveDarkBg(hsv.h, hsv.s, hsv.v);
         const darkHex = hsv2hex(d.h, d.s, d.v);
 
         if (style.kind === 'grad') {
@@ -140,8 +125,8 @@ export function applyTheme(styleId, nodes, groups) {
         for (const n of inside) { const c = classifyNode(n); counts[c] = (counts[c] || 0) + 1; }
         const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
         const hex = style.colors[top] || style.colors.tool;
-        const t = hex2hsv(hex);
-        const d = deriveDarkBg(t.h, t.s, t.v);
+        const hsv = hex2hsv(hex);
+        const d = deriveDarkBg(hsv.h, hsv.s, hsv.v);
         g.color = hsv2hex(d.h, d.s, d.v);
     }
 

@@ -1,11 +1,68 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePresetImport, serializePresetExport } from "./preset-transfer-engine.js";
+import { parsePresetImport, serializePresetExport, serializePresetJson } from "./preset-transfer-engine.js";
 
 test("structured TXT export round-trips", () => {
     const presets = [{ label: "Repair", prompt_cn: "修复照片", prompt_en: "Restore photo" }];
     assert.deepEqual(parsePresetImport(serializePresetExport(presets)), presets);
+});
+
+test("Markdown headings preserve categories", () => {
+    const source = [
+        "# 瑕疵修复",
+        "",
+        "## 去除水印",
+        "",
+        "### prompt_cn",
+        "去除水印 {指定底色}",
+        "",
+        "### prompt_en",
+        "Remove watermark {designated color}",
+    ].join("\n");
+    const presets = parsePresetImport(source, "", "catalog.md");
+    assert.deepEqual(presets, [{
+        category: "瑕疵修复",
+        label: "去除水印",
+        prompt_cn: "去除水印 {指定底色}",
+        prompt_en: "Remove watermark {designated color}",
+    }]);
+    assert.match(serializePresetExport(presets), /^# 瑕疵修复/m);
+});
+
+test("JSON export is formatted and round-trips through the importer", () => {
+    const presets = [{ label: "Repair", prompt_cn: "修复照片", prompt_en: "Restore photo" }];
+    const exported = serializePresetJson(presets);
+    assert.match(exported, /\n$/);
+    assert.deepEqual(JSON.parse(exported), presets);
+    assert.deepEqual(parsePresetImport(exported, "", "presets.json"), presets);
+});
+
+test("JSON import and export preserve preset preview metadata", () => {
+    const presets = [{
+        category: "美术画风",
+        category_i18n: "category_06",
+        label: "粘土风格",
+        label_i18n: "preset_06_01",
+        thumbnail: "assets/presets/clay-style.webp",
+        prompt_cn: "粘土风格",
+        prompt_en: "clay style",
+    }];
+    const exported = serializePresetJson(presets);
+    assert.deepEqual(parsePresetImport(exported, "", "presets.json"), presets);
+});
+
+test("JSON export and import preserve empty placeholder presets", () => {
+    const placeholders = [{
+        category: "分类1",
+        label: "预设1",
+        prompt_cn: "",
+        prompt_en: "",
+        _wosaiPromptCnCleared: true,
+        _wosaiPromptEnCleared: true,
+    }];
+    const exported = serializePresetJson(placeholders);
+    assert.deepEqual(parsePresetImport(exported, "", "presets.json"), placeholders);
 });
 
 test("an intentionally empty label survives export and import", () => {

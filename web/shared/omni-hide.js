@@ -74,12 +74,16 @@ function _clearInlineBackground(node) {
     }
 }
 
-function _cleanupStaleCSS(graph) {
-    if (!_cssCache.size) return;
+function _cleanupStaleCaches(graph) {
     const getNode = graph?.getNodeById;
     if (typeof getNode !== 'function') return;
     for (const id of _cssCache.keys()) {
         if (!getNode.call(graph, id)) _cssCache.delete(id);
+    }
+    // _domCache 以 node.id 为键持有 DOM 强引用。节点删除后其 id 不会再被
+    // 查询，若不在此主动回收就会在会话内无上限累积（内存泄漏）。
+    for (const id of _domCache.keys()) {
+        if (!getNode.call(graph, id)) _domCache.delete(id);
     }
 }
 
@@ -104,13 +108,14 @@ export function _osRefreshDOMHide(nodeOrNodes) {
     // 未传参：执行全量重建，用于清理已删除节点或兜底调用
     if (!nodeOrNodes) {
         _rebuildAllCSS(style, graph);
+        _cleanupStaleCaches(graph);
         const allOs = (graph?._nodes || graph?.nodes || []).filter(n => n && n.type === "WOSAI_OmniSlider");
         for (const node of allOs) _clearInlineBackground(node);
         return;
     }
 
     // 增量更新：仅重新计算变更节点的 CSS，清理缓存中已不存在的节点
-    _cleanupStaleCSS(graph);
+    _cleanupStaleCaches(graph);
     const nodes = Array.isArray(nodeOrNodes) ? nodeOrNodes : [nodeOrNodes];
     for (const node of nodes) {
         if (!node || node.type !== "WOSAI_OmniSlider") continue;

@@ -24,10 +24,9 @@ test("menu-hide panel does not concatenate menu labels into HTML", () => {
 
 test("WOSAI native settings use one stable registration owner", () => {
     const settings = source("../settings.js");
+    const constants = source("./constants.js");
     const expectedIds = [
         "wosai-glass-theme",
-        "wosai-fps",
-        "WOSAI.ColorBar.ShowLauncher",
         "WOSAI.ColorBar.HoldMode",
         "WOSAI.LayoutToolkit.Crosshair",
         "wosai-autoConnect",
@@ -38,13 +37,30 @@ test("WOSAI native settings use one stable registration owner", () => {
         "wosai-perf-disableShadows",
         "wosai-perf-disableConnectionBorders",
         "wosai-perf-disableRoundedCorners",
-        "wosai-menu-hide-enabled",
         "WOSAI.About.Copyright",
     ];
 
     assert.match(settings, /app\.ui\.settings\.addSetting\(definition\)/);
     assert.match(settings, /await registerNativeWosaiSettings\(\)/);
     for (const id of expectedIds) assert.ok(settings.includes(`"${id}"`), `missing setting ${id}`);
+
+    // 常量型 id 经 STORAGE_KEYS 引用（单一来源），其值在 constants.js 中定义。
+    for (const [key, value] of [
+        ["fps", "wosai-fps"],
+        ["showLauncher", "WOSAI.ColorBar.ShowLauncher"],
+        ["menuHideEnabled", "wosai-menu-hide-enabled"],
+    ]) {
+        assert.match(
+            settings,
+            new RegExp(`id:\\s*STORAGE_KEYS\\.${key}\\b`),
+            `missing STORAGE_KEYS.${key} setting`,
+        );
+        assert.match(
+            constants,
+            new RegExp(`${key}:\\s*"${value.replace(/\./g, "\\.")}"`),
+            `STORAGE_KEYS.${key} must be ${value}`,
+        );
+    }
     assert.match(source("../color-bar.js"), /name: "WOSAI\.ColorBar",[\s\S]*?settings: \[\]/);
     assert.match(source("../layout-toolkit.js"), /name: "WOSAI\.LayoutToolkit",[\s\S]*?settings: \[\]/);
 });
@@ -65,7 +81,12 @@ test("MiniBar actions reuse initialized extension modules", () => {
     assert.match(code, /__wosaiSelectionToolboxCoreRegistered === ADAPTER_VERSION/);
     assert.match(code, /export function createHubBar\(\)\s*\{\s*_registerCoreCommands\(\);\s*\}\s*[\s\S]*?_registerCoreCommands\(\);/);
     assert.match(code, /return el\?\.closest\?\.\("button,\[role='button'\]"\)/);
-    assert.match(code, /if \(selectedItem\.type === "WOSAI_TitleNote"\) return \[\];/);
+    // TitleNote 抑制判定覆盖整个选中集合，而非单个 selectedItem。
+    assert.match(code, /if \(_isTitleNoteMiniBarSelection\(\)\) return \[\];/);
+    assert.match(
+        code,
+        /function _isTitleNoteMiniBarSelection\(\)\s*\{\s*return _selectedMiniBarItems\(\)\.some\(\(item\) => item\?\.type === "WOSAI_TitleNote"\);\s*\}/,
+    );
     assert.match(code, /button\[data-wosai-mini-captioned\]/);
     assert.ok(code.includes("return /\\barrange\\b|\\u6392\\u5217/i.test(marker)"));
     assert.match(code, /button\[data-wosai-mini-captioned\] \{\s+position:relative!important;\s+overflow:visible!important;\s+width:var\(--ws-hk-mini-button-width\)!important;[\s\S]*?height:var\(--ws-hk-mini-button-height\)!important;/);

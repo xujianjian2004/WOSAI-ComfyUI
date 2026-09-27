@@ -668,6 +668,69 @@ function _getWosaiNodeMenuItems(node) {
     } catch (e) { return []; }
 }
 
+const _WOSAI_NODE_MENU_ENTRY_SELECTOR = ".litemenu-entry, .context-menu-item, .menu-item, .lite-menu-item, [class*='menu-entry'], [class*='menu-item']";
+const _WOSAI_NODE_MENU_SEPARATOR_SELECTOR = ".separator, .litemenu-separator, hr";
+
+function _menuEntryLabel(entry) {
+    return String(entry?.innerText || entry?.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function _createNodeMenuSeparator(parent) {
+    const template = [...parent.children].find((child) => child.matches?.(_WOSAI_NODE_MENU_SEPARATOR_SELECTOR));
+    const separator = template?.cloneNode(false) || document.createElement("div");
+    if (!template) separator.className = "litemenu-separator";
+    separator.removeAttribute?.("id");
+    separator.dataset.wosaiNodeMenuSeparator = "";
+    return separator;
+}
+
+function _coalesceWosaiNodeMenuItems(items) {
+    const labels = items
+        .filter((item) => item && typeof item === "object" && item.wosaiNodeAction)
+        .map((item) => String(item.content || "").replace(/<[^>]*>/g, "").trim())
+        .filter(Boolean);
+    if (!labels.length) return;
+
+    const wanted = new Set(labels);
+    document.querySelectorAll(".litecontextmenu, .context-menu, .litegraph-contextmenu").forEach((menu) => {
+        const matchesByParent = new Map();
+        menu.querySelectorAll(_WOSAI_NODE_MENU_ENTRY_SELECTOR).forEach((entry) => {
+            const label = _menuEntryLabel(entry);
+            if (!wanted.has(label) || !entry.parentElement) return;
+            const entries = matchesByParent.get(entry.parentElement) || new Map();
+            if (!entries.has(label)) entries.set(label, entry);
+            matchesByParent.set(entry.parentElement, entries);
+        });
+
+        const [parent, entries] = [...matchesByParent.entries()]
+            .sort((a, b) => b[1].size - a[1].size)[0] || [];
+        if (!parent || !entries?.size) return;
+
+        const orderedEntries = labels.map((label) => entries.get(label)).filter(Boolean);
+        if (!orderedEntries.length) return;
+
+        parent.querySelectorAll("[data-wosai-node-menu-separator]").forEach((separator) => separator.remove());
+        const actionEntries = new Set(orderedEntries);
+        const firstNonWosaiEntry = [...parent.children].find((child) =>
+            child.matches?.(_WOSAI_NODE_MENU_ENTRY_SELECTOR) && !actionEntries.has(child));
+        const block = document.createDocumentFragment();
+        orderedEntries.forEach((entry) => block.appendChild(entry));
+
+        if (firstNonWosaiEntry) {
+            parent.insertBefore(block, firstNonWosaiEntry);
+            parent.insertBefore(_createNodeMenuSeparator(parent), firstNonWosaiEntry);
+        } else {
+            parent.appendChild(block);
+        }
+    });
+}
+
+function _scheduleWosaiNodeMenuCoalesce(items) {
+    requestAnimationFrame(() => requestAnimationFrame(() => _coalesceWosaiNodeMenuItems(items)));
+}
+
 window.__wosaiGetNodeMenuItems = _getWosaiNodeMenuItems;
 
 app.registerExtension({
@@ -794,6 +857,7 @@ app.registerExtension({
     getNodeMenuItems(node) {
         const items = _getWosaiNodeMenuItems(node);
         window.__wosaiProtectNodeMenuItems?.(items);
+        _scheduleWosaiNodeMenuCoalesce(items);
         return items;
     },
     getCanvasMenuItems(context) {

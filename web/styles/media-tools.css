@@ -12,6 +12,13 @@
   font: 500 var(--ws-text-sm)/1.2 var(--ws-font-family);
 }
 
+/* 左右各留半个手柄宽：分割线与十字手柄的圆心可以走到图像区的 0% / 100%，
+   此时手柄圆盘会溢出行边界，这里必须留出足够余量，否则会被 root 的
+   overflow:hidden 裁掉一块。取 max 是为了兼容 gap 令牌变小的情况。 */
+.wosai-image-compare {
+  padding-inline: max(var(--ws-gap-sm), calc(var(--ws-compare-handle-size) / 2));
+}
+
 .wosai-points-toolbar {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -122,11 +129,19 @@
 
 .wosai-image-compare-stage {
   position: relative;
-  flex: 0 0 var(--ws-media-preview-min-height);
-  overflow: hidden;
+  /* 不能用 flex:1：图像区高度必须严格等于「宽度 / 宽高比」，
+     否则 DOM 控件高度估算的误差会把它拉伸，图像上下出现留白 */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  /* 这里不能用 overflow:hidden：分割线 / 热区 / 十字手柄的圆心要走满 0%–100%，
+     圆盘必然溢出舞台边界，被裁就成了残缺的 D 形。圆角裁切改由下方图像图层自己承担。 */
+  overflow: visible;
   width: 100%;
-  height: var(--ws-media-preview-min-height);
-  border: var(--ws-border-width-thin) solid var(--ws-border);
+  aspect-ratio: var(--wosai-compare-ratio, 16 / 9);
+  /* 用内嵌 outline 代替 border：不产生内边距偏移，
+     使图像区的内容原点与 0–100% 分割坐标严格对齐（用 border 会恒定偏 1px） */
+  outline: var(--ws-border-width-thin) solid var(--ws-border);
+  outline-offset: calc(-1 * var(--ws-border-width-thin));
   border-radius: var(--ws-radius-lg);
   background: var(--ws-surface-3);
 }
@@ -139,7 +154,20 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
   transition: opacity var(--ws-transition);
+}
+
+/* 舞台不再裁剪，图像须自带圆角，避免四角方边溢出圆角轮廓 */
+.wosai-image-compare-stage > img {
+  border-radius: inherit;
+}
+
+.wosai-image-compare-stage > img,
+.wosai-image-compare-top img {
+  user-drag: none;
+  pointer-events: none;
 }
 
 .wosai-image-compare-stage img:not([src]) {
@@ -148,6 +176,7 @@
 
 .wosai-image-compare-top {
   overflow: hidden;
+  border-radius: var(--ws-radius-lg);
 }
 
 .wosai-image-compare-line {
@@ -157,7 +186,76 @@
   width: var(--ws-border-width);
   background: var(--ws-accent);
   box-shadow: var(--ws-shadow-sm);
+  /* 居中于 --wosai-compare-split，使线心与拇指/手柄圆心严格同 x */
+  transform: translateX(-50%);
   pointer-events: none;
+}
+
+/* 分割线悬停热区：把 2px 细线加宽为可命中的拖拽带（图片层已 pointer-events:none） */
+.wosai-image-compare-grab {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  left: var(--wosai-compare-split, 50%);
+  width: var(--ws-compare-handle-size);
+  transform: translateX(-50%);
+  cursor: ew-resize;
+}
+
+/* 十字准心手柄：悬停热区或拖动时淡入，提示此处可拖动分割线 */
+.wosai-image-compare-handle {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  left: var(--wosai-compare-split, 50%);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--ws-compare-handle-size);
+  height: var(--ws-compare-handle-size);
+  border: var(--ws-border-width-thin) solid var(--ws-border);
+  border-radius: var(--ws-radius-pill);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  box-shadow: var(--ws-shadow-sm);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.72);
+  pointer-events: none;
+  transition:
+    opacity var(--ws-transition),
+    transform var(--ws-transition),
+    border-color var(--ws-transition),
+    color var(--ws-transition);
+}
+
+.wosai-image-compare-grab:hover + .wosai-image-compare-handle,
+.wosai-image-compare:has(.wosai-image-compare-range:focus-visible) .wosai-image-compare-handle,
+.wosai-image-compare-stage.is-dragging .wosai-image-compare-handle {
+  border-color: var(--ws-accent);
+  color: var(--ws-accent);
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* 指针捕获会转移到 stage，拖动期间由 stage 维持拖拽光标 */
+.wosai-image-compare-stage.is-dragging {
+  cursor: ew-resize;
+}
+
+.wosai-image-compare-handle svg {
+  width: var(--ws-compare-handle-icon-size);
+  height: var(--ws-compare-handle-icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.wosai-image-compare-handle-dot {
+  fill: currentColor;
+  stroke: none;
 }
 
 .wosai-image-compare-stage.is-swapping > img,
@@ -165,40 +263,65 @@
   opacity: 0.35;
 }
 
-.wosai-image-compare-controls {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto var(--ws-media-slider-row-height);
-  flex: 0 0 var(--ws-media-slider-row-height);
-  align-items: center;
-  gap: var(--ws-gap-sm);
-  min-width: 0;
-  height: var(--ws-media-slider-row-height);
-  margin-top: var(--ws-gap-sm);
-}
-
+/* A/B 角标：浮在图像区下角，与居中的交换按钮构成 A ⇄ B 一行 */
 .wosai-image-compare-label {
-  min-width: 1ch;
-  color: var(--ws-text-secondary);
-  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
-  text-align: center;
-}
-
-.wosai-image-compare-swap {
+  position: absolute;
+  /* 与更高的交换按钮垂直居中：三者圆心共线 */
+  bottom: calc(
+    var(--ws-gap-sm) + (var(--ws-compare-swap-size) - var(--ws-compare-badge-size)) / 2
+  );
+  z-index: 3;
   display: grid;
   place-items: center;
   box-sizing: border-box;
-  width: var(--ws-media-slider-row-height);
-  height: var(--ws-media-slider-row-height);
-  border: var(--ws-border-width-thin) solid var(--ws-border);
+  min-width: var(--ws-compare-badge-size);
+  height: var(--ws-compare-badge-size);
+  border: var(--ws-glass-border);
+  border-radius: var(--ws-radius-pill);
+  padding-inline: var(--ws-gap-xs);
+  background: var(--ws-glass-bg);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
+  color: var(--ws-text-secondary);
+  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
+  text-align: center;
+  pointer-events: none;
+  transition: opacity var(--ws-transition);
+}
+
+.wosai-image-compare-label.is-start {
+  left: var(--ws-gap-sm);
+}
+
+.wosai-image-compare-label.is-end {
+  right: var(--ws-gap-sm);
+}
+
+/* 交换按钮：水平居中于图像区，与 A/B 角标同处一行 */
+.wosai-image-compare-swap {
+  position: absolute;
+  left: 50%;
+  bottom: var(--ws-gap-sm);
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--ws-compare-swap-size);
+  height: var(--ws-compare-swap-size);
+  transform: translateX(-50%);
+  border: var(--ws-glass-border);
   border-radius: var(--ws-radius);
   padding: 0;
-  background: var(--ws-surface-2);
+  background: var(--ws-glass-bg);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
   color: var(--ws-text-secondary);
   cursor: pointer;
   transition:
     border-color var(--ws-transition),
     background var(--ws-transition),
-    color var(--ws-transition);
+    color var(--ws-transition),
+    opacity var(--ws-transition);
 }
 
 .wosai-image-compare-swap svg {
@@ -231,6 +354,13 @@
   cursor: not-allowed;
 }
 
+/* 无图时不显示角标与交换按钮，避免压在空状态提示上 */
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-label,
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-swap {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .wosai-media-range {
   flex: 0 0 var(--ws-media-slider-row-height);
   box-sizing: border-box;
@@ -240,14 +370,31 @@
   accent-color: var(--ws-accent);
 }
 
+/* 图像对比已不再单独占一行滑块：原生 input 降级为 1px 隐藏控件，
+   只承担键盘操作（方向键微调）与无障碍语义；鼠标/触摸改由图像区上的
+   拖拽与十字准心手柄承担。pointer-events:none 避免它在左下角抢走拖拽起点，
+   键盘聚焦时则点亮十字手柄作为可见焦点提示（见上方 :focus-visible 规则）。 */
 .wosai-image-compare-range {
-  min-width: 0;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  z-index: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  width: var(--ws-compare-range-size);
+  height: var(--ws-compare-range-size);
   margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .wosai-image-compare-stage > img,
-  .wosai-image-compare-top {
+  .wosai-image-compare-top,
+  .wosai-image-compare-handle {
     transition: none;
   }
 }

@@ -1766,102 +1766,10 @@ class WosaiSaveNode {
         setTimeout(() => overlay.focus(), 0);
     }
 
-    showAddCategoryByNodeDrag(nodeInfo) {
-        const categoryColors = _getCategoryColors();
-        const defaultColor = categoryColors[this.data.categories.length % categoryColors.length] || _defaultCategoryColor();
-        const overlay = document.createElement("div");
-        overlay.className = "ws-dialog-overlay";
-        overlay.innerHTML = `
-            <div class="ws-dialog wosai-panel wosai-panel--glass ws-category-dialog" data-wosai-panel="">
-                <div class="ws-dialog-title">${this.escape(t("saveNode.addCategoryTitle"))}</div>
-                <div class="ws-dialog-body">
-                    ${this._categoryFormInner(nodeInfo.type, defaultColor)}
-                </div>
-                <div class="ws-dialog-footer">
-                    <button class="wosai-btn" id="ws-dlg-cancel">${this.escape(t("saveNode.cancel"))}</button>
-                    <button class="wosai-btn wosai-btn--primary" id="ws-dlg-ok">${this.escape(t("saveNode.addCategoryTitle"))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        // 吸附到收藏节点面板左侧、垂直居中
-        this._snapDialogToPanelLeftTop(overlay.querySelector(".ws-dialog"));
-        const close = () => { state.destroy?.(); overlay.remove(); };
-        overlay.addEventListener("mousedown", e => { if (e.target === overlay) close(); });
-        const nameInput = overlay.querySelector("#ws-cat-name");
-        nameInput.focus(); nameInput.select();
-        const state = this._wireCategoryColorPicker(overlay, defaultColor);
-        overlay.querySelector("#ws-dlg-cancel").addEventListener("click", close);
-        overlay.querySelector("#ws-dlg-ok").addEventListener("click", () => {
-            const name = nameInput.value.trim();
-            if (!name) { nameInput.focus(); nameInput.classList.add("ws-input-error"); return; }
-            const color = state.getColor();
-            this.addCategory(name, color);
-            const cat = this.data.categories.find(c => c.name === name);
-            if (cat && nodeInfo && nodeInfo.type) {
-                const existing = this.data.nodes.find(n => n.type === nodeInfo.type);
-                if (existing) {
-                    existing.categoryId = cat.id;
-                } else {
-                    this.addFavorite({ type: nodeInfo.type, title: nodeInfo.title || nodeInfo.type }, cat.id);
-                }
-            }
-            close();
-            this.renderAll();
-            this.saveData();
-        });
-        overlay.tabIndex = -1;
-        overlay.addEventListener("keydown", e => {
-            if (e.key === "Escape") close();
-            else if (e.key === "Enter") overlay.querySelector("#ws-dlg-ok").click();
-        });
-        setTimeout(() => overlay.focus(), 0);
-    }
-
-    showAddFavByNodeDrag(nodeInfo) {
-        const overlay = document.createElement("div");
-        overlay.className = "ws-dialog-overlay";
-        let catOptions = `<option value="default">${this.escape(t("saveNode.allCategory"))}</option>`;
-        this.data.categories.forEach(c => {
-            catOptions += `<option value="${this.escape(c.id)}">${this.escape(c.id === "default" ? t("saveNode.defaultCategoryName") : c.name)}</option>`;
-        });
-        overlay.innerHTML = `
-            <div class="ws-dialog wosai-panel wosai-panel--glass" data-wosai-panel="">
-                <div class="ws-dialog-title">${this.escape(t("saveNode.addFavoriteTitle"))}</div>
-                <div class="ws-dialog-body">
-                    <label>${this.escape(t("saveNode.nodeTypeLabel"))}</label>
-                    <input type="text" id="ws-fav-type" value="${this.escape(nodeInfo.type)}" readonly />
-                    <label>${this.escape(t("saveNode.categorySelect"))}</label>
-                    <select id="ws-fav-cat">${catOptions}</select>
-                </div>
-                <div class="ws-dialog-footer">
-                    <button class="wosai-btn wosai-btn--primary" id="ws-dlg-ok">${this.escape(t("saveNode.addFavoriteTitle"))}</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(overlay);
-        // 吸附到收藏节点面板左侧、垂直居中
-        this._snapDialogToPanelLeftTop(overlay.querySelector(".ws-dialog"));
-        const close = () => overlay.remove();
-        overlay.addEventListener("mousedown", e => { if (e.target === overlay) close(); });
-        overlay.querySelector("#ws-dlg-ok").addEventListener("click", () => {
-            const catId = overlay.querySelector("#ws-fav-cat").value;
-            this.addFavorite({ type: nodeInfo.type, title: nodeInfo.title || nodeInfo.type }, catId);
-            close();
-        });
-    }
-
     escape(str) {
         const div = document.createElement("div");
         div.textContent = str ?? "";
         return div.innerHTML;
-    }
-
-    /* ===== hex → rgba 工具 ===== */
-    hexToRGBA(hex, alpha) {
-        if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) hex = _defaultCategoryColor();
-        const alphaHex = Math.round(Math.max(0, Math.min(1, alpha ?? 1)) * 255).toString(16).padStart(2, "0");
-        return hex + alphaHex;
     }
 
     /** 导出收藏节点前的确认弹窗：吸附到面板右侧上方 */

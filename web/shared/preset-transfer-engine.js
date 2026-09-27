@@ -13,11 +13,33 @@ function withMeta(items, meta = {}) {
 function cleanPreset(item, index) {
     if (!item || typeof item !== "object") return null;
     const hasLabel = Object.prototype.hasOwnProperty.call(item, "label");
+    const category = String(item.category ?? item.group ?? "").trim();
     return {
+        ...(category ? { category } : {}),
+        ...(String(item.category_i18n ?? "").trim() ? { category_i18n: String(item.category_i18n).trim() } : {}),
         label: hasLabel ? String(item.label ?? "").trim() : `Preset ${index + 1}`,
+        ...(String(item.label_i18n ?? "").trim() ? { label_i18n: String(item.label_i18n).trim() } : {}),
+        ...(String(item.thumbnail ?? item.preview ?? "").trim() ? { thumbnail: String(item.thumbnail ?? item.preview).trim() } : {}),
         prompt_cn: String(item.prompt_cn ?? item.cn ?? "").trim(),
         prompt_en: String(item.prompt_en ?? item.en ?? "").trim(),
+        ...(item._wosaiLabelCleared ? { _wosaiLabelCleared: true } : {}),
+        ...(item._wosaiPromptCnCleared ? { _wosaiPromptCnCleared: true } : {}),
+        ...(item._wosaiPromptEnCleared ? { _wosaiPromptEnCleared: true } : {}),
     };
+}
+
+function isPresetRecord(item) {
+    if (!item || typeof item !== "object") return false;
+    return ["label", "name", "title", "category", "group", "prompt_cn", "prompt_en", "cn", "en", "thumbnail", "preview"]
+        .some((key) => Object.prototype.hasOwnProperty.call(item, key));
+}
+
+function normalizeStructuredPresets(items) {
+    return items
+        .filter(isPresetRecord)
+        .map(cleanPreset)
+        .filter(Boolean)
+        .slice(0, MAX_PRESET_COUNT);
 }
 
 function normalizeImportedPresets(items) {
@@ -105,6 +127,7 @@ function parsePlainGroup(lines, label) {
 function parseTextBlocks(text) {
     const lines = text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").split("\n");
     const presets = [];
+    let category = "";
     let current = null;
     let field = null;
     const append = (line) => {
@@ -114,9 +137,16 @@ function parseTextBlocks(text) {
 
     for (const rawLine of lines) {
         const line = rawLine.trimEnd();
+        const categoryHeading = line.match(/^#(?!#)(?:\s+(.*))?$/);
+        if (categoryHeading) {
+            category = (categoryHeading[1] ?? "").trim();
+            current = null;
+            field = null;
+            continue;
+        }
         const presetHeading = line.match(/^##(?:\s+(.*))?$/);
         if (presetHeading) {
-            current = { label: (presetHeading[1] ?? "").trim(), prompt_cn: "", prompt_en: "" };
+            current = { ...(category ? { category } : {}), label: (presetHeading[1] ?? "").trim(), prompt_cn: "", prompt_en: "" };
             presets.push(current);
             field = null;
             continue;
@@ -129,7 +159,7 @@ function parseTextBlocks(text) {
         }
         append(rawLine);
     }
-    return normalizeImportedPresets(presets.map((preset) => ({
+    return normalizeStructuredPresets(presets.map((preset) => ({
         ...preset,
         prompt_cn: preset.prompt_cn.replace(/\n+$/, ""),
         prompt_en: preset.prompt_en.replace(/\n+$/, ""),
@@ -202,7 +232,7 @@ function parseJsonPresets(source, fallbackLabel) {
         : Array.isArray(parsed?.presets)
             ? parsed.presets
             : [parsed];
-    return normalizeImportedPresets(items.map((item, index) => {
+    return normalizeStructuredPresets(items.map((item, index) => {
         if (typeof item === "string") {
             const language = detectLanguage(item);
             return {
@@ -213,9 +243,16 @@ function parseJsonPresets(source, fallbackLabel) {
         }
         if (!item || typeof item !== "object") return null;
         return {
+            ...((item.category ?? item.group) ? { category: item.category ?? item.group } : {}),
+            ...(item.category_i18n ? { category_i18n: item.category_i18n } : {}),
             label: item.label ?? item.name ?? `Preset ${index + 1}`,
+            ...(item.label_i18n ? { label_i18n: item.label_i18n } : {}),
+            ...(item.thumbnail ?? item.preview ? { thumbnail: item.thumbnail ?? item.preview } : {}),
             prompt_cn: item.prompt_cn ?? item.promptCn ?? item.cn ?? item.zh ?? item.chinese ?? "",
             prompt_en: item.prompt_en ?? item.promptEn ?? item.en ?? item.english ?? "",
+            ...(item._wosaiLabelCleared ? { _wosaiLabelCleared: true } : {}),
+            ...(item._wosaiPromptCnCleared ? { _wosaiPromptCnCleared: true } : {}),
+            ...(item._wosaiPromptEnCleared ? { _wosaiPromptEnCleared: true } : {}),
         };
     }));
 }
@@ -332,10 +369,22 @@ export function parsePresetImport(text, fallbackLabel = "", fileName = "") {
 }
 
 export function serializePresetExport(presets) {
-    const normalized = normalizeImportedPresets(Array.isArray(presets) ? presets : []);
-    const rows = ["# WOSAI Preset Manager"];
-    normalized.forEach((preset, index) => {
+    const normalized = normalizeStructuredPresets(Array.isArray(presets) ? presets : []);
+    const rows = [];
+    const includeCategories = normalized.some((preset) => preset.category);
+    let category = null;
+    normalized.forEach((preset) => {
+        const presetCategory = preset.category || "通用";
+        if (includeCategories && presetCategory !== category) {
+            category = presetCategory;
+            rows.push(rows.length ? "" : "", `# ${category}`);
+        }
         rows.push("", preset.label ? `## ${preset.label}` : "##", "", "### prompt_cn", preset.prompt_cn, "", "### prompt_en", preset.prompt_en);
     });
     return rows.join("\n").trimEnd() + "\n";
+}
+
+export function serializePresetJson(presets) {
+    const normalized = normalizeStructuredPresets(Array.isArray(presets) ? presets : []);
+    return `${JSON.stringify(normalized, null, 2)}\n`;
 }

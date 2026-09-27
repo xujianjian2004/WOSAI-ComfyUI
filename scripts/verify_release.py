@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path, PurePosixPath
 
@@ -25,6 +26,10 @@ FORBIDDEN_PARTS = {
     "scripts",
     "tests",
 }
+FORBIDDEN_PATHS = {
+    "presets/preset_library.json",
+    "presets/preset_library.backup.json",
+}
 REQUIRED_PATHS = {
     "__init__.py",
     "VERSION",
@@ -38,6 +43,7 @@ REQUIRED_PATHS = {
     "web/common-color.js",
     "web/styles/wosai-variables.css",
     "presets/color_presets.json",
+    "presets/preset_prompt_catalog.json",
     "workflows/WOSAI_frontend_compat_test.json",
     "docs/RELEASE_CHECKLIST.md",
 }
@@ -65,9 +71,11 @@ def validate_members(archive: zipfile.ZipFile) -> list[str]:
         if not pure.parts or pure.parts[0] != ARCHIVE_ROOT:
             raise AssertionError(f"archive member is outside {ARCHIVE_ROOT}: {name}")
         relative = PurePosixPath(*pure.parts[1:])
+        if relative.as_posix() in FORBIDDEN_PATHS:
+            raise AssertionError(f"runtime user state included: {relative}")
         if any(part in FORBIDDEN_PARTS for part in relative.parts):
             raise AssertionError(f"development-only path included: {relative}")
-        if relative.name.endswith((".pyc", ".pyo", ".test.mjs", "._chk.mjs")):
+        if relative.name.endswith((".pyc", ".pyo", ".test.mjs", "._chk.mjs", ".zip")):
             raise AssertionError(f"generated/test file included: {relative}")
         relative_paths.append(relative.as_posix())
     missing = sorted(REQUIRED_PATHS.difference(relative_paths))
@@ -146,6 +154,24 @@ def validate_python_install(plugin_root: Path) -> None:
         sys.modules.pop("wosai_core", None)
 
 
+def remove_tree(path: Path, attempts: int = 12, delay: float = 0.25) -> None:
+    """Best-effort recursive delete.
+
+    ``compileall`` writes ``__pycache__`` into the staging directory; on Windows a
+    virus scanner or the search indexer can briefly hold those fresh ``.pyc``
+    files, so a single ``rmtree`` intermittently leaves the tree behind. Retry
+    until the directory is gone (or the attempts run out) so a release check can
+    never pollute the repository root with a ``.wosai-release-*`` leftover.
+    """
+    for _ in range(attempts):
+        if not path.exists():
+            return
+        shutil.rmtree(path, ignore_errors=True)
+        if not path.exists():
+            return
+        time.sleep(delay)
+
+
 def main() -> int:
     archive_path = (
         Path(sys.argv[1]).resolve()
@@ -153,16 +179,19 @@ def main() -> int:
         else ROOT / "dist" / f"WOSAI-ComfyUI-{version()}.zip"
     )
     validate_checksum(archive_path)
-    with zipfile.ZipFile(archive_path) as archive:
-        relative_paths = validate_members(archive)
-        with tempfile.TemporaryDirectory(prefix=".wosai-release-", dir=ROOT) as temp:
-            custom_nodes = Path(temp) / "ComfyUI" / "custom_nodes"
+    staging = Path(tempfile.mkdtemp(prefix=".wosai-release-", dir=ROOT))
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            relative_paths = validate_members(archive)
+            custom_nodes = staging / "ComfyUI" / "custom_nodes"
             custom_nodes.mkdir(parents=True)
             archive.extractall(custom_nodes)
             plugin_root = custom_nodes / ARCHIVE_ROOT
             json_count = validate_json(plugin_root)
             resource_count = validate_frontend_entries(plugin_root)
             validate_python_install(plugin_root)
+    finally:
+        remove_tree(staging)
     print(
         f"Verified {archive_path.name}: {len(relative_paths)} files, "
         f"{json_count} JSON documents, {resource_count} extension resources",

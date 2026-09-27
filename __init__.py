@@ -32,6 +32,13 @@ try:
 except Exception as e:
     print(f"[WOSAI-ComfyUI] size probe API unavailable: {e}")
 
+# Preset Manager keeps its full reusable library under ``presets`` while each
+# workflow only stores the selected display snapshot.
+try:
+    from .wosai_core import preset_library  # noqa: F401
+except Exception as e:
+    print(f"[WOSAI-ComfyUI] preset library API unavailable: {e}")
+
 # Device information API (``/wosai/device_info``).  The collector is isolated
 # so a missing optional system dependency never prevents the extension loading.
 try:

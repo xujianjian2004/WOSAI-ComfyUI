@@ -28,6 +28,7 @@ const PATCH_KEY = "__wosaiSelectorPatch";
 const nodeCleanup = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
+let selectorMenuProvider = null;
 const SELECTOR_STYLES = [
     ["wosai-selector-style", new URL("./styles/selector.css?v=5", import.meta.url).href],
 ];
@@ -381,8 +382,8 @@ function openSelectorSettings(node) {
     const gapField = createRangeField(controlsSection, {
         name: "gap",
         labelText: t("nodes.selector.labelGap", "Label gap"),
-        min: 0,
-        max: 20,
+        min: 5,
+        max: 10,
         value: initialSettings.gap,
     });
     const renameSection = createDialogSection(t("nodes.selector.renameLabels", "Rename labels"));
@@ -530,12 +531,35 @@ function openSelectorSettings(node) {
     labelsContainer.querySelector("input")?.focus();
 }
 
+function getSelectorNodeMenuItems(node) {
+    if (!SELECTOR_TYPES.has(node?.type)) return [];
+    return [{
+        content: t("nodes.selector.settingsMenu", "Selector settings"),
+        callback: () => openSelectorSettings(node),
+    }];
+}
+
+function registerSelectorMenuProvider() {
+    if (selectorMenuProvider) return;
+    selectorMenuProvider = getSelectorNodeMenuItems;
+    const providers = window.__wosaiNodeMenuItemProviders || (window.__wosaiNodeMenuItemProviders = []);
+    if (!providers.includes(selectorMenuProvider)) providers.push(selectorMenuProvider);
+}
+
+function unregisterSelectorMenuProvider() {
+    const providers = window.__wosaiNodeMenuItemProviders;
+    if (Array.isArray(providers) && selectorMenuProvider) {
+        const index = providers.indexOf(selectorMenuProvider);
+        if (index >= 0) providers.splice(index, 1);
+    }
+    selectorMenuProvider = null;
+}
+
 function patchNodeType(nodeType, nodeData) {
     if (nodeType.prototype[PATCH_KEY]) return;
     const originalCreated = nodeType.prototype.onNodeCreated;
     const originalConfigure = nodeType.prototype.onConfigure;
     const originalRemoved = nodeType.prototype.onRemoved;
-    const originalMenu = nodeType.prototype.getExtraMenuOptions;
 
     const attach = function () {
         queueMicrotask(() => {
@@ -560,21 +584,12 @@ function patchNodeType(nodeType, nodeData) {
         nodeCleanup.delete(this);
         return originalRemoved?.apply(this, arguments);
     };
-    const menu = function (_, options) {
-        const result = originalMenu?.apply(this, arguments);
-        options.push({
-            content: t("nodes.selector.settingsMenu", "Selector settings"),
-            callback: () => openSelectorSettings(this),
-        });
-        return result;
-    };
     nodeType.prototype.onNodeCreated = created;
     nodeType.prototype.onConfigure = configured;
     nodeType.prototype.onRemoved = removed;
-    nodeType.prototype.getExtraMenuOptions = menu;
     nodeType.prototype[PATCH_KEY] = {
-        originalCreated, originalConfigure, originalRemoved, originalMenu,
-        created, configured, removed, menu,
+        originalCreated, originalConfigure, originalRemoved,
+        created, configured, removed,
     };
     patchedNodeTypes.add(nodeType);
 }
@@ -589,6 +604,7 @@ app.registerExtension({
     },
     setup() {
         ensureWosaiStyles(SELECTOR_STYLES);
+        registerSelectorMenuProvider();
         offLanguage ??= onLangChange(() => {
             app.graph?._nodes?.forEach((node) => {
                 if (SELECTOR_TYPES.has(node.type)) node.__wosaiSelectorRender?.();
@@ -596,6 +612,7 @@ app.registerExtension({
         });
     },
     remove() {
+        unregisterSelectorMenuProvider();
         offLanguage?.();
         offLanguage = null;
         document.querySelector(".wosai-selector-dialog-overlay")?.remove();
@@ -610,7 +627,6 @@ app.registerExtension({
             if (proto.onNodeCreated === patch.created) proto.onNodeCreated = patch.originalCreated;
             if (proto.onConfigure === patch.configured) proto.onConfigure = patch.originalConfigure;
             if (proto.onRemoved === patch.removed) proto.onRemoved = patch.originalRemoved;
-            if (proto.getExtraMenuOptions === patch.menu) proto.getExtraMenuOptions = patch.originalMenu;
             delete proto[PATCH_KEY];
         }
         patchedNodeTypes.clear();

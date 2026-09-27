@@ -163,13 +163,12 @@
   "WOSAI_PresetPromptSelector": {
     "display_name": "预设管理",
     "category": "🟠 WOSAI Studio / 提示词",
-    "description": "管理提示词预设；单击标签切换，可选择单条或全部输出。",
+    "description": "管理双语提示词预设；单击标签输出选中的提示词。",
     "inputs": {
       "active_index": { "name": "当前预设", "tooltip": "当前选中的提示词预设序号" },
       "presets_data": { "name": "预设数据", "tooltip": "由标签编辑器维护的序列化提示词预设数据" },
       "prompt_cn": { "name": "中文提示词", "tooltip": "随当前预设标签自动同步的中文提示词" },
-      "prompt_en": { "name": "英文提示词", "tooltip": "随当前预设标签自动同步的英文提示词" },
-      "batch_output": { "name": "输出模式", "tooltip": "关闭时输出当前预设，开启时输出全部预设" }
+      "prompt_en": { "name": "英文提示词", "tooltip": "随当前预设标签自动同步的英文提示词" }
     },
     "outputs": {
       "prompt_cn": { "name": "中文提示词" },

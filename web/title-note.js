@@ -13,12 +13,20 @@ import { bindTip } from "./shared/tooltip.js";
 import { patchMethod } from "./shared/method-patch.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
 
+// 共享离屏 2D 上下文：文本测量处于按键/每帧热点路径上，
+// 复用同一个 canvas context 可避免反复创建临时 canvas 对象。
+let _measureContext = null;
+function getMeasureContext() {
+    if (!_measureContext) _measureContext = document.createElement("canvas").getContext("2d");
+    return _measureContext;
+}
+
 /* ════════════════════════════════════════════════════════════════
    CSS 注入（确保样式表加载）
    ════════════════════════════════════════════════════════════════ */
 (function ensureTitleNoteCSS() {
     ensureWosaiStyles([
-        ["wosai-title-note-css", new URL("./styles/title-note.css?v=4", import.meta.url).href]
+        ["wosai-title-note-css", new URL("./styles/title-note.css?v=5", import.meta.url).href]
     ]);
 })();
 
@@ -94,6 +102,35 @@ function _contrastTextColor(bgHex) {
     const { r, g, b } = _hexToRgb(bgHex);
     const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
     return getWOSAIVar(luminance > 0.5 ? '--ws-tn-contrast-dark' : '--ws-tn-default-text');
+}
+
+function _relativeLuminance(hex) {
+    const { r, g, b } = _hexToRgb(hex);
+    const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function _darkenHex(hex, factor = 0.42) {
+    const { r, g, b } = _hexToRgb(hex);
+    const channel = (value) => Math.max(0, Math.min(255, Math.round(value * factor)));
+    return `rgb(${channel(r)}, ${channel(g)}, ${channel(b)})`;
+}
+
+function getAutoTitleBorderColor(properties) {
+    const alpha = Number(properties?.backgroundAlpha);
+    if (Number.isFinite(alpha) && alpha > 0.01) {
+        const background = properties?.backgroundColor || getWOSAIVar('--ws-tn-default-bg');
+        // A color-derived darker edge keeps the border coherent with colored
+        // TitleNote backgrounds instead of turning every note into a black box.
+        if (_relativeLuminance(background) > 0.035) return _darkenHex(background);
+    }
+    const themeBackground = getWOSAIVar('--ws-bg');
+    return _relativeLuminance(themeBackground) > 0.5
+        ? getWOSAIVar('--ws-tn-contrast-dark')
+        : getWOSAIVar('--ws-tn-default-text');
 }
 
 function _hslToRgb(h, s, l) {
@@ -294,6 +331,7 @@ class TitleNoteNode extends TitleNoteBaseNode {
             text:             t('nodes.titleNote.defaultText'),
             fontSize:         50,
             fontColor:        getWOSAIVar('--ws-tn-default-text'),
+            strokeEnabled:    false,
             backgroundColor:  getWOSAIVar('--ws-tn-default-bg'),
             backgroundAlpha:  0,
             borderRadius:     55,
@@ -645,7 +683,6 @@ class TitleNoteNode extends TitleNoteBaseNode {
             btn.type = "button";
             btn.className = "wosai-btn wosai-btn--sm";
             btn.textContent = o.label;
-            bindTip(btn, () => `${o.label} · ${t('nodes.titleNote.rainbowToggleTooltip')}`);
             Object.assign(btn.style, { fontSize:"var(--ws-text-sm)", padding:"var(--ws-tn-style-btn-padding)", minWidth:"0", boxSizing:"border-box" });
             const _active = this.properties.rainbowEnabled && this.properties.rainbowStyle === o.key;
             btn.style.background = _active ? "var(--ws-accent)" : "var(--ws-surface-3)";
@@ -708,7 +745,6 @@ class TitleNoteNode extends TitleNoteBaseNode {
 
         const _pairedPresets = [
             { text: getWOSAIVar('--ws-tn-default-text'), bg: getWOSAIVar('--ws-tn-preset-blue'), label: t("nodes.titleNote.presetBlue") },
-            { text: getWOSAIVar('--ws-tn-default-text'), bg: getWOSAIVar('--ws-tn-preset-red'), label: t("nodes.titleNote.presetRed") },
             { text: getWOSAIVar('--ws-tn-default-text'), bg: getWOSAIVar('--ws-tn-preset-green'), label: t("nodes.titleNote.presetGreen") },
             { text: getWOSAIVar('--ws-tn-default-text'), bg: getWOSAIVar('--ws-tn-preset-brown'), label: t("nodes.titleNote.presetBrown") },
             { text: getWOSAIVar('--ws-tn-default-text'), bg: getWOSAIVar('--ws-tn-preset-purple'), label: t("nodes.titleNote.presetPurple") },
@@ -787,6 +823,28 @@ class TitleNoteNode extends TitleNoteBaseNode {
         bindTip(bgTarget.btn, () => t('nodes.titleNote.backgroundColorBtnTooltip'));
         const _syncTargetBtnBg = () => { textTarget.sync(); bgTarget.sync(); };
 
+        const strokeBtn = document.createElement("button");
+        strokeBtn.type = "button";
+        strokeBtn.className = "wosai-btn wosai-btn--sm";
+        strokeBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><rect x="3.5" y="5" width="17" height="14" rx="4"/><path d="M7 9h10M7 15h10" opacity=".55"/></svg>`;
+        strokeBtn.title = t("nodes.titleNote.strokeToggleTooltip");
+        bindTip(strokeBtn, () => t("nodes.titleNote.strokeToggleTooltip"));
+        Object.assign(strokeBtn.style, { padding: "var(--ws-tn-reset-btn-padding)", minWidth: "0", boxSizing: "border-box" });
+        const syncStrokeBtn = () => {
+            const enabled = !!this.properties.strokeEnabled;
+            strokeBtn.style.background = enabled ? "var(--ws-accent)" : "var(--ws-surface-3)";
+            strokeBtn.style.color = enabled ? "var(--ws-text-on-accent)" : "var(--ws-text-secondary)";
+        };
+        syncStrokeBtn();
+        strokeBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        strokeBtn.addEventListener("click", () => {
+            this.properties.strokeEnabled = !this.properties.strokeEnabled;
+            syncStrokeBtn();
+            this.updateTextareaStyle();
+            this.setDirtyCanvas(true, true);
+            app.graph.setDirtyCanvas(true);
+        });
+
         const resetBtn = document.createElement("button");
         resetBtn.type = "button";
         resetBtn.className = "wosai-btn wosai-btn--sm";
@@ -799,7 +857,9 @@ class TitleNoteNode extends TitleNoteBaseNode {
             this.properties.fontColor = getWOSAIVar('--ws-tn-default-text');
             this.properties.backgroundColor = getWOSAIVar('--ws-tn-default-bg');
             this.properties.backgroundAlpha = 0;
+            this.properties.strokeEnabled = false;
             this.properties.rainbowEnabled = false;
+            syncStrokeBtn();
             if (this._colorPicker) this._colorPicker.setColor(this._colorTarget === "text" ? this.properties.fontColor : this.properties.backgroundColor);
             this.updateTextareaStyle();
             this.setDirtyCanvas(true, true);
@@ -815,6 +875,7 @@ class TitleNoteNode extends TitleNoteBaseNode {
         btnGroup6.appendChild(textTarget.btn);
         btnGroup6.appendChild(bgTarget.btn);
         btnGroup6.appendChild(_presetBtnGroup);
+        btnGroup6.appendChild(strokeBtn);
         btnGroup6.appendChild(resetBtn);
         row6.appendChild(btnGroup6);
         ctrlCol.appendChild(row6);
@@ -868,11 +929,18 @@ class TitleNoteNode extends TitleNoteBaseNode {
                 this.updateEditorsPosition();
             });
         };
-        this._origCanvasChanged = canvas.onCanvasChanged;
-        canvas.onCanvasChanged = (evt) => {
-            this._origCanvasChanged && this._origCanvasChanged.call(canvas, evt);
-            scheduleEditorPosition();
-        };
+        // 多节点共享同一画布：用可组合补丁叠加 onCanvasChanged。
+        // 旧实现直接赋值 + 按引用还原，节点 A 关闭时会顶掉节点 B 已安装的包装，
+        // 最终在画布上残留持有已删除节点闭包的包装函数。
+        this._canvasChangedDispose = _patchTitleNoteMethod(
+            canvas,
+            "onCanvasChanged",
+            `WOSAI.TitleNote.canvasChanged.${this.id}`,
+            (next) => (evt) => {
+                next?.call(canvas, evt);
+                scheduleEditorPosition();
+            },
+        );
         this._editorViewportHandler = scheduleEditorPosition;
         window.addEventListener("resize", this._editorViewportHandler, { passive: true });
         scheduleEditorPosition();
@@ -927,6 +995,9 @@ class TitleNoteNode extends TitleNoteBaseNode {
         this.editTextarea = document.createElement("textarea");
         this.editTextarea.className = "titlenote-textarea";
         this.editTextarea.setAttribute("data-wosai-panel", "");
+        // The node grows to its pasted content; do not let the browser insert
+        // visual soft wraps before that measurement has completed.
+        this.editTextarea.wrap = "off";
         this.editTextarea.value = this.properties.text;
         Object.assign(this.editTextarea.style, {
             position: "absolute",
@@ -959,7 +1030,7 @@ class TitleNoteNode extends TitleNoteBaseNode {
             const lineIdx = Math.max(0, Math.min(lines.length - 1, Math.floor(relY / lineH)));
             const lineText = lines[lineIdx] || "";
             let charIdx = 0;
-            const measure = document.createElement("canvas").getContext("2d");
+            const measure = getMeasureContext();
             measure.font = style.font;
             for (let i = 1; i <= lineText.length; i++) {
                 if (measure.measureText(lineText.substring(0, i)).width >= relX) { charIdx = i; break; }
@@ -974,10 +1045,26 @@ class TitleNoteNode extends TitleNoteBaseNode {
 
         const saveAndClose = () => {
             this.properties.text = this.editTextarea.value;
+            this.fitToContent();
             this.removeTextEditor();
             this.setDirtyCanvas(true, true);
             app.graph.setDirtyCanvas(true);
         };
+
+        let textFitRAF = null;
+        const syncTextSize = () => {
+            if (!this.editTextarea) return;
+            this.properties.text = this.editTextarea.value;
+            if (textFitRAF) return;
+            textFitRAF = requestAnimationFrame(() => {
+                textFitRAF = null;
+                if (!this.editTextarea) return;
+                this.fitToContent();
+                this.setDirtyCanvas(true, true);
+                app.graph.setDirtyCanvas(true);
+            });
+        };
+        this.editTextarea.addEventListener("input", syncTextSize);
 
         this.editTextarea.addEventListener("keydown", (e) => {
             if ("Escape" === e.key) {
@@ -1056,13 +1143,16 @@ class TitleNoteNode extends TitleNoteBaseNode {
             lineHeight:   this.properties.lineHeight,
             letterSpacing: this.properties.letterSpacing * (LGraphCanvas.active_canvas?.ds?.scale || 1) + "px",
             whiteSpace:    "pre",
-            overflow:      "hidden",
+            overflowX:     "auto",
+            overflowY:     "hidden",
             textShadow:    "none",
         });
         this.editTextarea.style.setProperty("background", editorBackground, "important");
         this.editTextarea.style.setProperty("border", "none", "important");
         this.editTextarea.style.setProperty("outline", "none", "important");
         this.editTextarea.style.setProperty("box-shadow", "none", "important");
+        this.editTextarea.style.webkitTextStroke = "";
+        this.editTextarea.style.removeProperty("paint-order");
         this._updateRainbowPreview();
         this.fitToContent();
     }
@@ -1223,7 +1313,7 @@ class TitleNoteNode extends TitleNoteBaseNode {
 
         const neededH = Math.max(lh, lines.length * lh + 20);
 
-        const measureCtx = document.createElement('canvas').getContext('2d');
+        const measureCtx = getMeasureContext();
         measureCtx.font = this.properties.fontSize + "px " + getComfyUIFont();
         let maxW = 0;
         for (const ln of lines) {
@@ -1253,7 +1343,9 @@ class TitleNoteNode extends TitleNoteBaseNode {
     }
 
     _flashPreview (ms = 600) {
-        if (this.isEditing) return;
+        // editTextarea 仅在编辑态存在，因此这里必须在 isEditing 为真时执行；
+        // 原条件 `if (this.isEditing) return` 使整段逻辑永远不可达。
+        if (!this.isEditing) return;
         if (!this.editTextarea) return;
         if (this._flashRAF) { cancelAnimationFrame(this._flashRAF); this._flashRAF = null; }
         if (this._flashTimer) { clearTimeout(this._flashTimer); this._flashTimer = null; }
@@ -1278,11 +1370,8 @@ class TitleNoteNode extends TitleNoteBaseNode {
         if (this._freezeEditorTimeout) { clearTimeout(this._freezeEditorTimeout); this._freezeEditorTimeout = null; }
         this._freezeEditorPosition = false;
         this._stopRainbowPreview();
-        const canvas = LGraphCanvas.active_canvas;
-        if (this._origCanvasChanged && canvas) {
-            canvas.onCanvasChanged = this._origCanvasChanged;
-            this._origCanvasChanged = null;
-        }
+        this._canvasChangedDispose?.();
+        this._canvasChangedDispose = null;
         this.isEditing = false;
     }
 
@@ -1296,6 +1385,14 @@ class TitleNoteNode extends TitleNoteBaseNode {
         canvasRoundRect(ctx, 0, 0, this.size[0], this.size[1], r);
         ctx.fillStyle = this.hexToRGBA(this.properties.backgroundColor, this.properties.backgroundAlpha);
         ctx.fill();
+
+        if (this.properties.strokeEnabled) {
+            ctx.beginPath();
+            canvasRoundRect(ctx, 0, 0, this.size[0], this.size[1], r);
+            ctx.strokeStyle = getAutoTitleBorderColor(this.properties);
+            ctx.lineWidth = getWOSAIVarNum('--ws-tn-border-stroke-width', 2);
+            ctx.stroke();
+        }
 
         if (this.isEditing) {
             ctx.beginPath();
@@ -1370,12 +1467,6 @@ class TitleNoteNode extends TitleNoteBaseNode {
         }
         this.setDirtyCanvas(true, true);
         app.graph.setDirtyCanvas(true);
-    }
-
-    onSelected () {
-    }
-
-    onDeselected () {
     }
 
     onMouseDown (evt, pos) {
@@ -1535,6 +1626,7 @@ TitleNoteNode.collapsable     = false;
 TitleNoteNode["@text"]             = localizedProp({ type:"string", default: t('nodes.titleNote.defaultText'), multiline:true }, 'nodes.titleNote.textProperty');
 TitleNoteNode["@fontSize"]         = localizedProp({ type:"number", default:50,  min:8,   max:200, step:1 }, 'nodes.titleNote.fontSizeProperty');
 TitleNoteNode["@fontColor"]        = localizedProp({ type:"color",  default:getWOSAIVar('--ws-tn-default-text') }, 'nodes.titleNote.textColorProperty');
+TitleNoteNode["@strokeEnabled"]    = localizedProp({ type:"boolean", default:false }, 'nodes.titleNote.strokeProperty');
 TitleNoteNode["@backgroundColor"]  = localizedProp({ type:"color",  default:getWOSAIVar('--ws-tn-default-bg') }, 'nodes.titleNote.backgroundColorProperty');
 TitleNoteNode["@backgroundAlpha"]  = localizedProp({ type:"number", default:0,   min:0, max:1,   step:0.05 }, 'nodes.titleNote.backgroundAlphaProperty');
 TitleNoteNode["@borderRadius"]     = localizedProp({ type:"number", default:55, min:0, max:100, step:1 }, 'nodes.titleNote.borderRadius');
@@ -1663,7 +1755,13 @@ function _uninstallTitleNote () {
     document.removeEventListener("mousedown", _onDocMouseDown, true);
     document.removeEventListener("mouseup", _onDocMouseUp, true);
     document.removeEventListener("dblclick", _onDocDblClick, true);
-    app.graph?._nodes?.forEach(n => { if (n instanceof TitleNoteNode) n.removeTextEditor(); });
+    app.graph?._nodes?.forEach(n => {
+        if (!(n instanceof TitleNoteNode)) return;
+        n.removeTextEditor();
+        // 每个节点注入的 <style id="wosai-tn-vue-{id}"> 也要回收，
+        // 否则扩展卸载后 head 中残留样式，节点 id 复用时命中陈旧规则。
+        _tnCleanupNodeStyle(n);
+    });
 }
 
 /* ════════════════════════════════════════════════════════════════

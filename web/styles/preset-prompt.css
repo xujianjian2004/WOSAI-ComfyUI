@@ -4,32 +4,354 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
+  align-items: start;
   align-content: start;
-  gap: var(--ws-pp-gap);
+  grid-template-columns: minmax(var(--ws-pp-category-width), 0.28fr) minmax(0, 1fr);
+  gap: var(--ws-gap);
   overflow: hidden;
   padding: var(--ws-pp-padding);
   color: var(--ws-text);
   font-family: var(--ws-font-family);
 }
 
-.wosai-pp__hint {
-  min-width: 0;
-  flex: 1 1 var(--ws-pp-hint-min-width);
-  overflow: hidden;
-  color: var(--ws-text-muted);
-  font-size: var(--ws-text-xs);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.wosai-pp,
+.wosai-pp * {
+  font-weight: 400;
 }
 
 .wosai-pp__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   min-width: 0;
   max-width: 100%;
-  flex-wrap: wrap;
+  min-height: var(--ws-pp-header-min-height);
+  padding-bottom: var(--ws-gap-xs);
+  border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted);
   gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__search {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 var(--ws-pp-hint-min-width);
+  gap: var(--ws-gap-2xs);
+  height: var(--ws-pp-settings-min-height);
+  padding: 0 var(--ws-gap-xs);
+  border: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  transition: border-color var(--ws-transition-fast), background var(--ws-transition-fast);
+}
+
+.wosai-pp__search:focus-within {
+  border-color: var(--ws-border-muted);
+  background: var(--ws-surface-raised);
+  box-shadow: none;
+}
+
+.wosai-pp__search-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--ws-text-muted);
+}
+
+.wosai-pp__search-input {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: none;
+  background: transparent;
+  color: var(--ws-text);
+  font: inherit;
+  font-size: var(--ws-text-xs);
+  outline: none;
+  box-shadow: none;
+}
+
+.wosai-pp__search-input:focus,
+.wosai-pp__search-input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.wosai-pp__search-input::placeholder {
+  color: var(--ws-text-muted);
+}
+
+.wosai-pp__preview {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--ws-gap-2xs);
+  margin: var(--ws-gap-xs) 0;
+  padding: var(--ws-gap-2xs) var(--ws-gap-xs);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-surface-raised);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-xs);
+}
+
+.wosai-pp__preview-icon {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  color: var(--ws-text-muted);
+}
+
+.wosai-pp__preview-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp__tabs-empty {
+  grid-column: 1 / -1;
+  padding: var(--ws-gap-lg) 0;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+  text-align: center;
+}
+
+.wosai-pp__prompts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__prompt {
+  box-sizing: border-box;
+  height: var(--ws-pp-prompt-fixed-height, 96px);
+  min-height: var(--ws-pp-prompt-fixed-height, 96px);
+  max-height: var(--ws-pp-prompt-fixed-height, 96px);
+  overflow: auto;
+  padding: var(--ws-pp-tab-padding);
+  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-surface-2);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-xs);
+  line-height: 1.5;
+  outline: none;
+  white-space: pre-wrap;
+}
+
+.wosai-pp__prompt:focus {
+  border-color: var(--ws-accent);
+  box-shadow: 0 0 0 var(--ws-border-width) var(--ws-accent);
+}
+
+.wosai-pp__placeholder {
+  color: var(--ws-success, #3fb950);
+  font-weight: 700;
+}
+
+.wosai-pp__categories {
+  display: grid;
+  grid-column: 1;
+  grid-row: 1;
+  height: var(--ws-pp-manager-height);
+  max-height: var(--ws-pp-manager-height);
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: var(--ws-gap-xs);
+  padding: 0 var(--ws-gap) 0 0;
+  border: 0;
+  border-right: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-radius: 0;
+  background: transparent;
+  overscroll-behavior: contain;
+}
+
+.wosai-pp.has-pager .wosai-pp__categories {
+  height: var(--ws-pp-manager-paged-height);
+  max-height: var(--ws-pp-manager-paged-height);
+}
+
+.wosai-pp__category-title {
+  padding: 0 var(--ws-gap-xs);
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-3xs);
+  letter-spacing: var(--ws-letter-spacing-wide);
+  line-height: var(--ws-pp-category-title-height);
+  text-transform: uppercase;
+}
+
+.wosai-pp__category-list {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: var(--ws-pp-category-height);
+  gap: var(--ws-gap-2xs);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--ws-gap-xs) 0 0;
+}
+
+/* The node displays at most six categories. Distribute them across the same
+   visual height as the 3×3 preset grid instead of leaving a dense stack at
+   the top of the left column. */
+.wosai-pp.wosai-pp--six-categories .wosai-pp__category-list {
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  grid-auto-rows: unset;
+  gap: var(--ws-gap-sm);
+  overflow-y: hidden;
+}
+
+.wosai-pp.wosai-pp--six-categories .wosai-pp__category {
+  min-height: 0;
+}
+
+/* Below the breakpoint the label/count no longer fit legibly next to the
+   icon; collapse to an icon-only rail and keep the full name in a native
+   tooltip instead of truncating mid-word. */
+.wosai-pp.wosai-pp--narrow {
+  grid-template-columns: minmax(0, var(--ws-pp-category-icon-rail-width, 40px)) minmax(0, 1fr);
+}
+
+.wosai-pp.wosai-pp--narrow .wosai-pp__category-label,
+.wosai-pp.wosai-pp--narrow .wosai-pp__category-meta {
+  display: none;
+}
+
+.wosai-pp.wosai-pp--narrow .wosai-pp__category {
+  justify-content: center;
+  padding: var(--ws-gap-2xs);
+}
+
+.wosai-pp.wosai-pp--narrow .wosai-pp__category-icon {
+  position: static;
+}
+
+.wosai-pp__content {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  grid-template-rows: auto auto;
+  gap: var(--ws-pp-gap);
+}
+
+.wosai-pp__content.has-pager {
+  grid-template-rows: auto auto auto;
+}
+
+.wosai-pp__category {
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--ws-pp-category-height);
+  height: 100%;
+  padding: var(--ws-btn-padding);
+  border: var(--ws-border-width-thin) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-sm);
+  text-align: left;
+  transition: background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp__category-icon {
+  position: absolute;
+  left: var(--ws-gap-sm);
+  width: var(--ws-pp-category-icon-size);
+  height: var(--ws-pp-category-icon-size);
+  flex: 0 0 auto;
+}
+
+.wosai-pp__category-label {
+  min-width: 0;
+  max-width: calc(100% - var(--ws-gap-lg));
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
+.wosai-pp__category-meta {
+  position: absolute;
+  right: var(--ws-gap-sm);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.wosai-pp__category-count {
+  grid-area: 1 / 1;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+  line-height: 1;
+  transition: opacity var(--ws-transition-fast);
+}
+
+.wosai-pp__category-edit {
+  grid-area: 1 / 1;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--ws-radius-full);
+  color: var(--ws-text-secondary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--ws-transition-fast);
+}
+
+.wosai-pp__category-edit-icon {
+  width: 11px;
+  height: 11px;
+}
+
+.wosai-pp__category:hover .wosai-pp__category-count,
+.wosai-pp__category:focus-within .wosai-pp__category-count {
+  opacity: 0;
+}
+
+.wosai-pp__category:hover .wosai-pp__category-edit,
+.wosai-pp__category:focus-within .wosai-pp__category-edit,
+.wosai-pp__category-edit:focus-visible {
+  opacity: 1;
+}
+
+.wosai-pp__category:hover,
+.wosai-pp__category:focus-visible {
+  border-color: var(--ws-tag-off-hover-border);
+  background: var(--ws-tag-off-hover-bg);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp__category.is-active {
+  border-color: var(--ws-accent);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text);
+}
+
+.wosai-pp__category.is-editing {
+  padding: var(--ws-gap-2xs);
+}
+
+.wosai-pp__category-input {
+  width: 100%;
+  min-width: 0;
+  padding: var(--ws-gap-2xs) var(--ws-gap-xs);
+  border: var(--ws-border-width-thin) dashed var(--ws-accent);
+  border-radius: var(--ws-radius-xs);
+  background: var(--ws-surface-2);
+  color: var(--ws-text);
+  font: inherit;
+  outline: none;
 }
 
 .wosai-pp__actions {
@@ -37,15 +359,15 @@
   align-items: center;
   min-width: 0;
   max-width: 100%;
-  flex: 0 1 auto;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: var(--ws-pp-gap);
 }
 
 .wosai-pp__actions > button {
-  min-width: 0;
-  flex: 1 1 auto;
+  min-width: var(--ws-pp-action-min-width);
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -53,7 +375,7 @@
 .wosai-pp__settings {
   min-height: var(--ws-pp-settings-min-height);
   padding: var(--ws-pp-settings-padding);
-  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border: var(--ws-border-width-thin) solid var(--ws-border-muted);
   border-radius: var(--ws-radius-sm);
   background: var(--ws-tag-off-bg);
   color: var(--ws-text-secondary);
@@ -65,35 +387,10 @@
 
 .wosai-pp__settings:hover,
 .wosai-pp__settings:focus-visible {
-  border-color: var(--ws-accent-hover);
+  border-color: var(--ws-tag-off-hover-border);
+  background: var(--ws-tag-off-hover-bg);
   color: var(--ws-text);
   outline: none;
-}
-
-.wosai-pp__mode {
-  min-height: var(--ws-pp-settings-min-height);
-  padding: var(--ws-pp-settings-padding);
-  border: var(--ws-border-width) solid var(--ws-tag-off-border);
-  border-radius: var(--ws-radius-sm);
-  background: var(--ws-tag-off-bg);
-  color: var(--ws-text-secondary);
-  cursor: pointer;
-  font: inherit;
-  font-size: var(--ws-text-xs);
-  white-space: nowrap;
-}
-
-.wosai-pp__mode:hover,
-.wosai-pp__mode:focus-visible {
-  border-color: var(--ws-accent-hover);
-  color: var(--ws-text);
-  outline: none;
-}
-
-.wosai-pp__mode.is-active {
-  border-color: var(--ws-accent);
-  background: var(--ws-accent);
-  color: var(--ws-text-on-accent);
 }
 
 .wosai-pp-clear-menu {
@@ -113,21 +410,22 @@
 .wosai-pp-clear-menu__button {
   min-height: var(--ws-pp-tab-min-height);
   padding: var(--ws-pp-tab-padding);
-  border: var(--ws-border-width) solid var(--ws-tag-off-border);
+  border: var(--ws-border-width-thin) solid var(--ws-tag-off-border);
   border-radius: var(--ws-radius-sm);
   background: var(--ws-tag-off-bg);
   color: var(--ws-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--ws-text-sm);
+  font-size: var(--ws-text-md);
   text-align: center;
-  transition: background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast);
+  transition: transform var(--ws-transition-fast), background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast), box-shadow var(--ws-transition-fast);
   white-space: nowrap;
 }
 
 .wosai-pp-clear-menu__button:hover,
 .wosai-pp-clear-menu__button:focus-visible {
-  border-color: var(--ws-accent-hover);
+  border-color: var(--ws-tag-off-hover-border);
+  background: var(--ws-tag-off-hover-bg);
   color: var(--ws-text);
   outline: none;
 }
@@ -138,13 +436,41 @@
   color: var(--ws-text-on-accent);
 }
 
+.wosai-pp-clear-menu__hint {
+  margin: 0;
+  padding: var(--ws-gap-2xs) var(--ws-gap-xs);
+  color: var(--ws-text-secondary);
+  font-size: var(--ws-text-xs);
+  line-height: 1.4;
+  text-align: center;
+}
+
+.wosai-pp-clear-menu__button--danger {
+  border-color: var(--ws-danger);
+  color: var(--ws-danger);
+}
+
+.wosai-pp-clear-menu__button--danger:hover,
+.wosai-pp-clear-menu__button--danger:focus-visible {
+  border-color: var(--ws-danger);
+  background: var(--ws-danger-bg);
+  color: var(--ws-danger);
+}
+
+.wosai-pp-clear-menu__button--danger:active {
+  border-color: var(--ws-danger);
+  background: var(--ws-danger);
+  color: var(--ws-text-on-accent);
+}
+
 .wosai-pp__tabs {
   display: grid;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--ws-pp-gap);
+  grid-auto-rows: var(--ws-pp-tab-height);
+  gap: var(--ws-gap-sm);
 }
 
 .wosai-pp__pager {
@@ -196,38 +522,213 @@
 }
 
 .wosai-pp__tab {
+  position: relative;
+  display: grid;
+  grid-template-rows: var(--ws-pp-card-cover-height) auto;
+  align-content: center;
+  gap: var(--ws-gap-xs);
   width: 100%;
   min-width: 0;
-  min-height: var(--ws-pp-tab-min-height);
+  min-height: var(--ws-pp-tab-height);
+  height: 100%;
   overflow: hidden;
-  padding: var(--ws-pp-tab-padding);
-  border: var(--ws-border-width) solid var(--ws-tag-off-border);
-  border-radius: var(--ws-radius-sm);
-  background: var(--ws-tag-off-bg);
-  color: var(--ws-tag-off-text);
+  padding: var(--ws-gap-xs);
+  border: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-raised);
+  color: var(--ws-text-secondary);
   cursor: pointer;
   font: inherit;
   font-size: var(--ws-text-sm);
   text-align: center;
+  transition: transform var(--ws-transition-fast), background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast), box-shadow var(--ws-transition-fast);
+  white-space: normal;
+}
+
+.wosai-pp__tab-cover {
+  position: relative;
+  display: grid;
+  height: var(--ws-pp-card-cover-height);
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--ws-radius-sm);
+  background: var(--wosai-pp-cover);
+  color: color-mix(in srgb, var(--ws-text) 60%, transparent);
+}
+
+.wosai-pp__tab-cover::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.10), transparent 45%);
+  content: "";
+}
+
+.wosai-pp__tab-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wosai-pp__tab-cover-icon {
+  z-index: 1;
+  width: var(--ws-pp-cover-icon-size);
+  height: var(--ws-pp-cover-icon-size);
+  opacity: 0.75;
+}
+
+.wosai-pp__tab-cover.has-image .wosai-pp__tab-cover-icon {
+  display: none;
+}
+
+.wosai-pp__tab-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--ws-text-xs);
+  line-height: var(--ws-pp-card-label-line-height);
   text-overflow: ellipsis;
-  transition: background var(--ws-transition-fast), border-color var(--ws-transition-fast), color var(--ws-transition-fast);
   white-space: nowrap;
 }
 
 .wosai-pp__tab:hover,
 .wosai-pp__tab:focus-visible {
-  border-color: var(--ws-accent-hover);
+  border-color: var(--ws-border);
+  background: var(--ws-surface-raised-2);
   color: var(--ws-text);
   outline: none;
 }
 
 .wosai-pp__tab.is-active {
   border-color: var(--ws-accent);
-  background: var(--ws-accent);
-  color: var(--ws-text-on-accent);
+  background: var(--ws-surface-raised);
+  box-shadow: inset 0 0 0 var(--ws-border-width-thin) var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.wosai-pp__tab.is-active .wosai-pp__tab-label {
+  color: var(--ws-accent-hover);
+}
+
+.wosai-pp__tab.is-empty {
+  border-style: dashed;
+  background: transparent;
+}
+
+.wosai-pp__tab.is-empty .wosai-pp__tab-cover {
+  background: transparent;
+  border: var(--ws-border-width-thin) dashed var(--ws-border-muted);
+}
+
+.wosai-pp__tab.is-empty .wosai-pp__tab-cover::after {
+  display: none;
+}
+
+.wosai-pp__tab.is-empty .wosai-pp__tab-cover-icon {
+  opacity: 0.4;
+}
+
+.wosai-pp__tab.is-empty .wosai-pp__tab-label {
+  color: var(--ws-text-muted);
+}
+
+.wosai-pp__tab-edit {
+  position: absolute;
+  top: var(--ws-gap-2xs);
+  right: var(--ws-gap-2xs);
+  z-index: 1;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: var(--ws-radius-full);
+  background: color-mix(in srgb, var(--ws-surface-2) 85%, transparent);
+  color: var(--ws-text-secondary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--ws-transition-fast);
+}
+
+.wosai-pp__tab-edit-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.wosai-pp__tab-thumb {
+  position: absolute;
+  top: var(--ws-gap-2xs);
+  right: calc(var(--ws-gap-2xs) + 20px);
+  z-index: 1;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: var(--ws-radius-full);
+  background: color-mix(in srgb, var(--ws-surface-2) 85%, transparent);
+  color: var(--ws-text-secondary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--ws-transition-fast);
+}
+
+.wosai-pp__tab-thumb-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.wosai-pp__tab-pin {
+  position: absolute;
+  top: var(--ws-gap-2xs);
+  left: var(--ws-gap-2xs);
+  z-index: 1;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: var(--ws-radius-full);
+  background: color-mix(in srgb, var(--ws-surface-2) 85%, transparent);
+  color: var(--ws-text-secondary);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity var(--ws-transition-fast), color var(--ws-transition-fast);
+}
+
+.wosai-pp__tab-pin-icon {
+  width: 10px;
+  height: 10px;
+}
+
+.wosai-pp__tab-pin.is-pinned {
+  opacity: 1;
+  color: var(--ws-accent-hover);
+  background: color-mix(in srgb, var(--ws-accent) 20%, var(--ws-surface-2) 80%);
+}
+
+.wosai-pp__tab-tag {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp__tab:hover .wosai-pp__tab-edit,
+.wosai-pp__tab:focus-within .wosai-pp__tab-edit,
+.wosai-pp__tab-edit:focus-visible,
+.wosai-pp__tab:hover .wosai-pp__tab-thumb,
+.wosai-pp__tab:focus-within .wosai-pp__tab-thumb,
+.wosai-pp__tab-thumb:focus-visible,
+.wosai-pp__tab:hover .wosai-pp__tab-pin,
+.wosai-pp__tab:focus-within .wosai-pp__tab-pin,
+.wosai-pp__tab-pin:focus-visible {
+  opacity: 1;
 }
 
 .wosai-pp__tab.is-editing {
+  grid-template-rows: 1fr;
   padding: var(--ws-gap-2xs);
   cursor: text;
 }
@@ -248,93 +749,394 @@
   outline: none;
 }
 
-[data-testid^="node-body-"].wosai-pp-node-body textarea {
-  min-height: var(--ws-pp-prompt-min-height) !important;
-  height: var(--ws-pp-prompt-min-height) !important;
-  max-height: none !important;
-}
-
-[data-testid^="node-body-"].wosai-pp-node-body {
-  padding-bottom: 0 !important;
-}
-
-/* Nodes 2.0 (Vue): also strip bottom padding from the ComfyUI node container
-   to prevent a blank strip between pager and node bottom edge. */
-[data-testid^="node-body-"].wosai-pp-node-body > .comfyui-node-content,
-.wosai-pp-node-body > [class*="node-content"],
-.wosai-pp-node-body > [class*="node-body"] {
-  padding-bottom: 0 !important;
-  margin-bottom: 0 !important;
-}
-
 [data-testid^="node-body-"].wosai-pp-node-body > .wosai-pp__host-brand-footer {
   display: none !important;
 }
 
-.wosai-pp-editor {
+[data-testid^="node-body-"].wosai-pp-node-body textarea {
+  box-sizing: border-box;
+  min-height: var(--ws-pp-native-prompt-min-height) !important;
+  max-height: var(--ws-pp-native-prompt-max-height) !important;
+  padding: var(--ws-input-padding) !important;
+  border: var(--ws-border-width-thin) solid var(--ws-input-border) !important;
+  border-radius: var(--ws-radius) !important;
+  background: var(--ws-input-bg) !important;
+  color: var(--ws-input-text) !important;
+  font-family: var(--ws-font-family) !important;
+  line-height: 1.45 !important;
+  resize: vertical !important;
+  transition: border-color var(--ws-transition-fast), box-shadow var(--ws-transition-fast) !important;
+}
+
+[data-testid^="node-body-"].wosai-pp-node-body textarea:focus {
+  border-color: var(--ws-accent) !important;
+  box-shadow: var(--ws-input-focus-ring) !important;
+}
+
+.wosai-pp-library-backdrop {
   position: fixed;
-  z-index: var(--ws-z-panel);
+  z-index: calc(var(--ws-z-panel) + 2);
+  inset: 0;
   display: grid;
-  width: var(--ws-pp-editor-width);
-  max-height: var(--ws-pp-editor-max-height);
-  gap: var(--ws-pp-editor-gap);
-  padding: var(--ws-pp-editor-padding);
+  place-items: center;
+  padding: var(--ws-gap-lg);
+  background: color-mix(in srgb, var(--ws-bg, #121212) 45%, transparent);
+}
+
+.wosai-pp-library,
+.wosai-pp-library * {
+  box-sizing: border-box;
+  font-family: var(--ws-font-family);
+  font-weight: 400;
+}
+
+.wosai-pp-library {
+  position: fixed;
+  display: grid;
+  --wosai-pp-library-font-scale: 1;
+  --wosai-pp-library-control-scale: 1;
+  width: min(520px, calc(100vw - var(--ws-gap-lg) * 2));
+  min-height: 0;
+  max-height: min(620px, calc(100vh - var(--ws-gap-lg) * 2));
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   border: var(--ws-border-width) solid var(--ws-border);
-  border-radius: var(--ws-radius-md);
+  border-radius: var(--ws-radius);
   background: var(--ws-surface);
   box-shadow: var(--ws-shadow-panel);
   color: var(--ws-text);
-  font-family: var(--ws-font-family);
 }
 
-.wosai-pp-editor__title {
-  margin: 0;
-  font-size: var(--ws-text-md);
+.wosai-pp-library__header,
+.wosai-pp-library__footer {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: var(--ws-gap-sm) var(--ws-gap);
+  border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  gap: var(--ws-gap-sm);
 }
 
-.wosai-pp-editor__title-row {
+.wosai-pp-library__header {
+  cursor: grab;
+  user-select: none;
+}
+
+.wosai-pp-library__header:active {
+  cursor: grabbing;
+}
+
+.wosai-pp-library__footer {
+  justify-content: flex-end;
+  border-top: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-bottom: 0;
+}
+
+.wosai-pp-library__sync-status {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--ws-text-muted);
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__title {
   display: flex;
   align-items: baseline;
-  gap: var(--ws-gap-2xs);
+  min-width: 0;
+  flex: 1;
+  font-size: calc(var(--ws-text-md) * var(--wosai-pp-library-font-scale));
+  gap: var(--ws-gap-xs);
 }
 
-.wosai-pp-editor__hint {
-  margin: 0;
+.wosai-pp-library__title-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__title-meta {
+  flex: 0 0 auto;
   color: var(--ws-text-muted);
-  font-size: var(--ws-text-xs);
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+  white-space: nowrap;
 }
 
-.wosai-pp-editor__count-grid {
-  display: grid;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
-  gap: var(--ws-pp-gap);
-}
-
-.wosai-pp-editor__count-button {
-  display: grid;
-  width: 100%;
-  min-height: 0;
-  aspect-ratio: 1;
-  place-items: center;
-  border: var(--ws-border-width) solid var(--ws-tag-off-border);
-  border-radius: var(--ws-radius-full);
-  background: var(--ws-tag-off-bg);
+.wosai-pp-library__close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ws-radius-sm);
+  background: transparent;
   color: var(--ws-text-secondary);
   cursor: pointer;
   font: inherit;
-  font-size: var(--ws-text-sm);
-  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  line-height: 1;
 }
 
-.wosai-pp-editor__count-button:hover,
-.wosai-pp-editor__count-button:focus-visible {
-  border-color: var(--ws-accent-hover);
+.wosai-pp-library__dock {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ws-radius-sm);
+  background: transparent;
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--ws-text-md);
+  line-height: 1;
+}
+
+.wosai-pp-library__dock:hover,
+.wosai-pp-library__dock:focus-visible {
+  background: var(--ws-tag-off-hover-bg);
   color: var(--ws-text);
   outline: none;
 }
 
-.wosai-pp-editor__count-button.is-active {
+.wosai-pp-library__close:hover,
+.wosai-pp-library__close:focus-visible {
+  background: var(--ws-tag-off-hover-bg);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-library__body {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(150px, 0.24fr) minmax(0, 1fr);
+}
+
+.wosai-pp-library__categories,
+.wosai-pp-library__presets {
+  display: grid;
+  min-height: 0;
+  padding: var(--ws-gap);
+}
+
+.wosai-pp-library__categories {
+  align-content: start;
+  grid-auto-rows: calc(var(--ws-pp-category-height) * var(--wosai-pp-library-control-scale));
+  overflow-y: auto;
+  gap: calc(var(--ws-gap-2xs) * var(--wosai-pp-library-control-scale));
+}
+
+.wosai-pp-library__presets {
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  gap: var(--ws-gap);
+}
+
+.wosai-pp-library__categories {
+  border-right: var(--ws-border-width-thin) solid var(--ws-border-muted);
+}
+
+.wosai-pp-library__category {
+  display: flex;
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  padding: var(--ws-btn-padding);
+  border: var(--ws-border-width-thin) solid var(--ws-tag-off-border);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  font: inherit;
+  font-size: calc(var(--ws-text-sm) * var(--wosai-pp-library-font-scale));
+  text-align: left;
+}
+
+.wosai-pp-library__category {
+  overflow: hidden;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__category-icon {
+  position: absolute;
+  left: var(--ws-gap-sm);
+  width: calc(var(--ws-pp-category-icon-size) * var(--wosai-pp-library-control-scale));
+  height: calc(var(--ws-pp-category-icon-size) * var(--wosai-pp-library-control-scale));
+  flex: 0 0 auto;
+  margin-right: var(--ws-gap-sm);
+}
+
+.wosai-pp-library__category-label {
+  min-width: 0;
+  max-width: calc(100% - var(--ws-gap-lg));
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
+.wosai-pp-library__category-meta {
+  flex: 0 0 auto;
+  margin-left: var(--ws-gap-xs);
+  color: var(--ws-text-muted);
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+}
+
+.wosai-pp-library__category:hover,
+.wosai-pp-library__category:focus-visible,
+.wosai-pp-library__category.is-active {
   border-color: var(--ws-accent);
+  background: var(--ws-tag-off-hover-bg);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-library__preset-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: var(--ws-gap-xs) 0;
+  color: var(--ws-text);
+  font-size: calc(var(--ws-text-md) * var(--wosai-pp-library-font-scale));
+}
+
+.wosai-pp-library__preset-heading-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__preset-heading-info {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  flex: 1;
+  gap: var(--ws-gap-xs);
+}
+
+.wosai-pp-library__preset-heading-meta {
+  flex: 0 0 auto;
+  color: var(--ws-text-muted);
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__select-all {
+  flex: 0 0 auto;
+  min-height: var(--ws-pp-settings-min-height);
+  padding: var(--ws-pp-settings-padding);
+  border: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-radius: var(--ws-radius-sm);
+  background: var(--ws-tag-off-bg);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+}
+
+.wosai-pp-library__select-all:hover,
+.wosai-pp-library__select-all:focus-visible {
+  border-color: var(--ws-accent);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-library__card-grid {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: var(--ws-pp-tab-height);
+  align-content: start;
+  overflow: auto;
+  gap: var(--ws-gap-sm);
+  padding-right: var(--ws-gap-2xs);
+}
+
+.wosai-pp-library__card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-rows: var(--ws-pp-card-cover-height) auto;
+  align-content: center;
+  gap: var(--ws-gap-xs);
+  overflow: hidden;
+  padding: var(--ws-gap-xs);
+  border: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  border-radius: var(--ws-radius);
+  background: var(--ws-surface-raised);
+  color: var(--ws-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+
+.wosai-pp-library__card .wosai-pp__tab-cover {
+  height: var(--ws-pp-card-cover-height);
+}
+
+.wosai-pp-library__card-label {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(var(--ws-text-sm) * var(--wosai-pp-library-font-scale));
+  line-height: var(--ws-pp-card-label-line-height);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wosai-pp-library__card-check {
+  position: absolute;
+  top: var(--ws-gap-xs);
+  right: var(--ws-gap-xs);
+  display: none;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: var(--ws-radius-full);
   background: var(--ws-accent);
   color: var(--ws-text-on-accent);
+  font-size: var(--ws-text-2xs);
+  line-height: 1;
+}
+
+.wosai-pp-library__card:hover,
+.wosai-pp-library__card:focus-visible {
+  border-color: var(--ws-border);
+  background: var(--ws-surface-raised-2);
+  color: var(--ws-text);
+  outline: none;
+}
+
+.wosai-pp-library__card.is-selected {
+  border-color: var(--ws-accent);
+  box-shadow: inset 0 0 0 var(--ws-border-width-thin) var(--ws-accent);
+  color: var(--ws-text);
+}
+
+.wosai-pp-library__card.is-selected .wosai-pp-library__card-label {
+  color: var(--ws-accent-hover);
+}
+
+.wosai-pp-library__card.is-selected .wosai-pp-library__card-check {
+  display: grid;
+}
+
+.wosai-pp-library__apply {
+  border-color: var(--ws-accent);
+  color: var(--ws-accent-hover);
+}
+
+.wosai-pp-library__footer .wosai-pp__settings {
+  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
+}
+
+@media (max-width: 560px) {
+  .wosai-pp-library__body { grid-template-columns: minmax(124px, 0.30fr) minmax(0, 1fr); }
+  .wosai-pp-library__card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

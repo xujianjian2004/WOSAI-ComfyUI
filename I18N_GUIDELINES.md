@@ -29,7 +29,7 @@ web/locales/zh/<layer>.json
 web/locales/en/<layer>.json
 ```
 
-层级选择：`common` 公共按钮，`menus` 菜单/HUD，`settings` 设置，`nodes` 节点面板，`widgets` 控件，`saveNode`/`saveText` 专用面板。
+层级选择：`common` 公共按钮，`main` 设置分类标题，`menus` 菜单/HUD，`settings` 设置项，`nodes` 节点面板，`nodeDefs` 节点元数据（见第 2 节），`widgets` 控件，`saveNode`/`saveText` 专用面板。
 
 ## 2. 节点元数据
 
