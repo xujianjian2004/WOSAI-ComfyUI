@@ -1,8 +1,8 @@
 import { createHiddenObserver, ghostWidget } from "./nodes2-hide.js";
 
 const BASE_STYLES = [
-    ["wosai-vars-link", new URL("../styles/wosai-variables.css?v=21", import.meta.url).href],
-    ["wosai-theme-css", new URL("../styles/wosai-theme.css?v=3", import.meta.url).href],
+    ["wosai-vars-link", new URL("../styles/wosai-variables.css?v=22", import.meta.url).href],
+    ["wosai-theme-css", new URL("../styles/wosai-theme.css?v=4", import.meta.url).href],
 ];
 
 function resolveMetric(value, fallback = 0) {

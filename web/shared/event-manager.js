@@ -28,11 +28,6 @@ function _dispatch(eventType, e) {
     }
 }
 
-function _matchesNamespace(v, namespace) {
-    if (!namespace) return true;
-    return v.namespace === namespace;
-}
-
 /**
  * 注册键盘/指针事件监听器
  * @param {string} name - 唯一标识（面板名 + 事件类型）

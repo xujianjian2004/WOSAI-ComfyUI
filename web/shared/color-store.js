@@ -170,10 +170,3 @@ export function persist() {
     pushServer();
 }
 
-// 取色历史：去重置顶，最多 12 条
-export function addRecent(hex) {
-    store.recent = store.recent.filter(p => p.hex !== hex);
-    store.recent.unshift({ hex });
-    if (store.recent.length > 12) store.recent.pop();
-    persist();
-}

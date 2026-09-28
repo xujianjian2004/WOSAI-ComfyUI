@@ -90,13 +90,7 @@
 }
 
 /* 底部控制行：单组 − / + */
-.os-ctrl-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--ws-os-ctrl-row-gap);
-  margin-top: var(--ws-gap-2xs);
-}
+
 .os-ctrl-btn {
   width: var(--ws-icon-btn-size);
   height: var(--ws-btn-h-xs);
@@ -133,8 +127,6 @@
 
 /* Fill slider mode: no outer ring, styling handled internally */
 .os-track-wrap[data-style="fill"] { box-shadow: none !important; }
-
-
 
 /* ── Fill slider in-node UI layout ── */
 /* HUB 栏等浮动 DOM 可能遮挡滑条；提升 z-index 确保拖拽事件可穿透到达 */
@@ -325,15 +317,7 @@
 }
 
 /* === 定格点位标记 === */
-.os-snap-wrap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  pointer-events: none;
-  z-index: 2;
-}
+
 .os-snap-dot {
   position: absolute;
   top: 50%;

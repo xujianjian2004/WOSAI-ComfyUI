@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { compareDisplayPair, normalizeSplitPercent } from "./media-preview.js";
+import {
+    COMPARE_STAGE_RATIO_BOUNDS,
+    COMPARE_VIEW_MODES,
+    compareDisplayPair,
+    formatMediaBadgeLabel,
+    formatMediaSize,
+    mediaSourceRatio,
+    normalizeSplitPercent,
+    normalizeViewMode,
+    resolveViewMode,
+    stageAspectRatio,
+} from "./media-preview.js";
 
 test("normalizeSplitPercent preserves both comparison endpoints", () => {
     assert.equal(normalizeSplitPercent("0"), 0);
@@ -23,4 +34,124 @@ test("compareDisplayPair swaps display roles without mutating the payload", () =
     });
     assert.equal(payload.a.filename, "a.png");
     assert.equal(payload.b.filename, "b.png");
+});
+
+test("COMPARE_VIEW_MODES keeps slide as the first and default mode", () => {
+    assert.deepEqual([...COMPARE_VIEW_MODES], ["slide", "side", "stack", "auto"]);
+});
+
+test("normalizeViewMode accepts known modes and falls back for anything else", () => {
+    for (const mode of COMPARE_VIEW_MODES) {
+        assert.equal(normalizeViewMode(mode), mode);
+    }
+    // 老工作流没有这个属性，或手工改坏了持久化数据
+    assert.equal(normalizeViewMode(undefined), "slide");
+    assert.equal(normalizeViewMode(null), "slide");
+    assert.equal(normalizeViewMode(""), "slide");
+    assert.equal(normalizeViewMode("SLIDE"), "slide");
+    assert.equal(normalizeViewMode(0), "slide");
+    assert.equal(normalizeViewMode({ mode: "side" }), "slide");
+    assert.equal(normalizeViewMode("bogus", "stack"), "stack");
+});
+
+test("resolveViewMode passes concrete modes through untouched", () => {
+    assert.equal(resolveViewMode("slide", 0.1), "slide");
+    assert.equal(resolveViewMode("side", 3), "side");
+    assert.equal(resolveViewMode("stack", 3), "stack");
+});
+
+test("resolveViewMode picks the direction that keeps panels at the source ratio", () => {
+    // 横图：左右并排会把每一半压成细缝，应选上下并排
+    assert.equal(resolveViewMode("auto", 16 / 9), "stack");
+    assert.equal(resolveViewMode("auto", 1), "stack");
+    assert.equal(resolveViewMode("auto", 1.0000001), "stack");
+    // 竖图：上下并排会得到超高的舞台，应选左右并排
+    assert.equal(resolveViewMode("auto", 1 / 2), "side");
+    assert.equal(resolveViewMode("auto", 0.999), "side");
+});
+
+test("resolveViewMode treats a missing ratio as square", () => {
+    for (const ratio of [undefined, null, "", "abc", 0, -3, NaN, Infinity]) {
+        assert.equal(resolveViewMode("auto", ratio), "stack", `ratio=${String(ratio)}`);
+    }
+});
+
+test("stageAspectRatio keeps the source ratio for the slide view", () => {
+    assert.equal(stageAspectRatio("slide", 16 / 9), 16 / 9);
+    assert.equal(stageAspectRatio("slide", 0.5), 0.5);
+    assert.equal(stageAspectRatio("slide", 3), 3);
+    // 滑动视图不夹取：竖图的舞台本来就该是高的
+    assert.equal(stageAspectRatio("slide", 0.2), 0.2);
+});
+
+test("stageAspectRatio doubles / halves the stage so each panel matches the source", () => {
+    // 用正方形：2 与 0.5 都落在夹取区间内，能直接验证「半幅 == 原图比例」
+    const ratio = 1;
+    assert.equal(stageAspectRatio("side", ratio), ratio * 2);
+    assert.equal(stageAspectRatio("stack", ratio), ratio / 2);
+
+    // 校验「面板比例 == 原图比例」这一不变量：仅在夹取区间内成立
+    // （左右要求 source×2 ≤ 3，上下要求 source÷2 ≥ 0.5，两者交集是 source ∈ [1, 1.5]）
+    for (const source of [1, 1.25, 1.5]) {
+        const sidePanels = stageAspectRatio("side", source) / 2;
+        const stackPanels = stageAspectRatio("stack", source) * 2;
+        assert.ok(Math.abs(sidePanels - source) < 1e-9, `side panels for ${source}`);
+        assert.ok(Math.abs(stackPanels - source) < 1e-9, `stack panels for ${source}`);
+    }
+
+    // 超出区间时宁可留白也不让节点失真：面板比例被夹到边界
+    assert.equal(stageAspectRatio("side", 2) / 2, COMPARE_STAGE_RATIO_BOUNDS.max / 2);
+    assert.equal(stageAspectRatio("stack", 0.5) * 2, COMPARE_STAGE_RATIO_BOUNDS.min * 2);
+});
+
+test("stageAspectRatio clamps only the split views", () => {
+    const { min, max } = COMPARE_STAGE_RATIO_BOUNDS;
+    // 竖图上下并排 → 理想值 0.25，夹到下限
+    assert.equal(stageAspectRatio("stack", 0.5), min);
+    // 横图左右并排 → 理想值 3.56，夹到上限
+    assert.equal(max, 3);
+    assert.equal(stageAspectRatio("side", 16 / 9), max);
+    // 夹取区间内的值原样保留
+    assert.equal(stageAspectRatio("stack", 16 / 9), 8 / 9);
+    assert.equal(stageAspectRatio("side", 1), 2);
+});
+
+test("stageAspectRatio falls back to 16:9 for unusable ratios", () => {
+    const { min, max } = COMPARE_STAGE_RATIO_BOUNDS;
+    const clamp = (value) => Math.min(max, Math.max(min, value));
+    for (const ratio of [undefined, null, "abc", 0, -1, NaN]) {
+        assert.equal(stageAspectRatio("slide", ratio), 16 / 9);
+        assert.equal(stageAspectRatio("side", ratio), clamp((16 / 9) * 2));
+        assert.equal(stageAspectRatio("stack", ratio), clamp((16 / 9) / 2));
+    }
+});
+
+test("mediaSourceRatio reads payload dimensions and rejects unusable ones", () => {
+    assert.equal(mediaSourceRatio({ width: 1024, height: 512 }), 2);
+    assert.equal(mediaSourceRatio({ width: 512, height: 1024 }), 0.5);
+    assert.equal(mediaSourceRatio({ width: "800", height: "600" }), 800 / 600);
+    for (const media of [undefined, null, {}, { width: 800 }, { width: 0, height: 600 }]) {
+        assert.equal(mediaSourceRatio(media), 0);
+    }
+});
+
+test("formatMediaSize renders a W×H readout with the multiplication sign", () => {
+    assert.equal(formatMediaSize({ width: 1024, height: 1024 }), "1024\u00d71024");
+    assert.equal(formatMediaSize({ width: 1920.4, height: 1080.2 }), "1920\u00d71080");
+    assert.equal(formatMediaSize({ width: "800", height: "600" }), "800\u00d7600");
+    for (const media of [undefined, null, {}, { width: 0, height: 0 }, { width: "x", height: 2 }]) {
+        assert.equal(formatMediaSize(media), "");
+    }
+});
+
+test("formatMediaBadgeLabel degrades to the bare letter when the size is unknown", () => {
+    assert.equal(formatMediaBadgeLabel({ width: 1024, height: 768 }, "A"), "A 1024\u00d7768");
+    assert.equal(formatMediaBadgeLabel({ width: 1024, height: 768 }, "B"), "B 1024\u00d7768");
+    // 尺寸缺失时保持历史外观，不加多余空格
+    assert.equal(formatMediaBadgeLabel(null, "A"), "A");
+    assert.equal(formatMediaBadgeLabel({}, "B"), "B");
+    assert.equal(formatMediaBadgeLabel({ width: 10, height: 0 }, "A"), "A");
+    // 字母缺失时用占位符，避免出现 "undefined 800×600"
+    assert.equal(formatMediaBadgeLabel({ width: 800, height: 600 }), "? 800\u00d7600");
+    assert.equal(formatMediaBadgeLabel(null, ""), "?");
 });

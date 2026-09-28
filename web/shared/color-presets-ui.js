@@ -50,20 +50,6 @@ export function renderBuiltinPresets(area, S, _grayMode, { saveAndSync, refresh,
 }
 
 /**
- * 将当前面板状态保存为自定义预设（始终按三色渐变保存）
- */
-export function saveCurrentAsCustom(S, renderCustomPresets) {
-    const entry = { type: 'grad3', dir: S.dir, stops: S.stops.map(s => ({ hex: hsv2hex(s.h, s.s, s.v).toLowerCase(), p: s.p })) };
-    const key = JSON.stringify(entry);
-    const filtered = store.customGrad3.filter(p => JSON.stringify(p) !== key);
-    filtered.unshift(entry);
-    if (filtered.length > 16) filtered.length = 16;
-    store.customGrad3 = filtered;
-    persist();
-    renderCustomPresets();
-}
-
-/**
  * 渲染自定义预设区域（始终按三色渐变渲染和应用）
  */
 export function renderCustomPresets(S, { saveAndSync, refresh, rebuildPins, updateGradVisibility }) {

@@ -16,6 +16,8 @@ ROOT_FILES = (
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "LICENSE-GPL-3.0",
+    "THIRD-PARTY-NOTICES.md",
     "extension.json",
     "requirements.txt",
     "package.json",

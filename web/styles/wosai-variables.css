@@ -81,7 +81,6 @@
   /* ── 按钮内边距 ── */
   --ws-btn-padding:       4px 8px;
   --ws-btn-padding-sm:    2px 6px;
-  --ws-btn-padding-lg:    6px 12px;
 
   /* ── 字号尺规 ── */
   --ws-text-3xs:          9px;
@@ -106,13 +105,6 @@
   --ws-syntax-mark-bg:    rgba(255, 220, 0, 0.35);
   --ws-syntax-fail:       #9F7AEA;
   --ws-syntax-complete:   #4ADE80;
-  --ws-sh-keyword:        #C678DD;
-  --ws-sh-string:         #98C379;
-  --ws-sh-number:         #D19A66;
-  --ws-sh-comment:        #5C6370;
-  --ws-sh-function:       #61AFEF;
-  --ws-sh-operator:       #56B6C2;
-  --ws-sh-variable:       #E06C75;
   --ws-sh-icon-sun:       #EF9F27;
   --ws-sh-icon-moon:      #FAC775;
   --ws-sh-accent-fill:    rgba(221,111,74,.25);
@@ -144,8 +136,6 @@
   --ws-panel-radius:      14px;
   --ws-panel-radius-md:   18px;
   --ws-panel-border-width: 1px;
-  --ws-panel-edge-width: 2px;
-  --ws-panel-edge-radius: 0 1px 1px 0;
   --ws-panel-glow-w:     200px;
   --ws-panel-glow-h:     150px;
 
@@ -189,7 +179,6 @@
   --ws-tag-on-text:       var(--ws-text);
   --ws-tag-off-bg:        #181818;
   --ws-tag-off-border:    #333;
-  --ws-tag-off-text:      #777;
   --ws-tag-off-hover-bg:  #202020;
   --ws-tag-off-hover-border: #3a3a3a;
 
@@ -232,15 +221,12 @@
   /* 内容驱动高度（由 preset-prompt.js 的 measurePresetContentHeight 动态计算）；
      此值仅作为退化保底，不再硬编码为固定最小高度。 */
   --ws-pp-node-height: 0px;
-  --ws-pp-prompt-min-height: 112px;
   --ws-pp-prompt-fixed-height: 96px;
   --ws-pp-native-prompt-min-height: 104px;
   --ws-pp-native-prompt-max-height: 260px;
   --ws-pp-category-height: 30px;
-  --ws-pp-category-max-height: 282px;
   --ws-pp-manager-height: 282px;
   --ws-pp-manager-paged-height: 330px;
-  --ws-pp-card-min-width: 112px;
   --ws-pp-tab-height: 78px;
   --ws-pp-card-cover-height: 46px;
   --ws-pp-card-label-line-height: 16px;
@@ -248,18 +234,12 @@
   --ws-pp-widget-base-height: 46px;
   --ws-pp-clear-menu-min-width: 160px;
   --ws-pp-pager-size: 24px;
-  --ws-pp-pager-label-width: 36px;
-  --ws-pp-editor-width: 360px;
-  --ws-pp-editor-max-height: 70vh;
-  --ws-pp-editor-gap: var(--ws-gap);
-  --ws-pp-editor-padding: var(--ws-panel-padding);
 
   /* ── 焦点环 ── */
   --ws-focus-ring:        0 0 0 2px var(--ws-accent);
   --ws-focus-ring-width:  2px;
 
   /* ── 视觉签名（品牌识别） ── */
-  --ws-brand-edge:        linear-gradient(to bottom, var(--ws-accent), transparent 60%);  /* 左边笔触 */
   --ws-brand-glow:        radial-gradient(ellipse at 0% 0%, rgba(221, 111, 74, 0.04) 0%, transparent 70%);  /* 顶角橙光 */
 
   /* ── text-2xs 兼容别名（同值 text-xs 10px，向后兼容旧引用） ── */
@@ -319,7 +299,6 @@
   --ws-os-tooltip-bg: rgba(0, 0, 0, 0.88);
   --ws-os-tooltip-padding: 1px 5px;
   --ws-os-tooltip-line-height: 1.4;
-  --ws-os-ctrl-row-gap: 20px;
   --ws-os-ctrl-btn-font-size: 20px;
   --ws-os-dim-opacity: 0.35;
   --ws-os-fill-rail-h: 10px;
@@ -350,7 +329,6 @@
   --ws-os-input-focus-ring: 0 0 0 1px var(--ws-accent);
   --ws-os-num-inline-w: 52px;
   --ws-os-num-inline-padding: 3px 2px;
-  --ws-os-num-sep-padding: 0 1px 8px;
   --ws-os-range-h: 12px;
   --ws-os-range-track-h: 4px;
   --ws-os-range-thumb-size: 12px;
@@ -454,7 +432,6 @@
   --ws-tn-default-text:        #FFFFFF;
   --ws-tn-default-bg:          #2B5BA1;
   --ws-tn-preset-blue:         var(--ws-tn-default-bg);
-  --ws-tn-preset-red:          #F44336;
   --ws-tn-preset-green:        #4CAF50;
   --ws-tn-preset-brown:        #4E342E;
   --ws-tn-preset-purple:       #7B1FA2;
@@ -533,7 +510,6 @@
   --ws-nc-ts-label-width:         66px;
   --ws-nc-ts-num-margin-left:     4px;
   --ws-nc-color-btn-size:         22px;
-  --ws-nc-align-wrap-gap:         4px;
   --ws-nc-cr-padding:             12px 0 0;
   --ws-nc-cr-font-size:           10px;
   --ws-nc-cr-letter-spacing:      0.5px;
@@ -546,8 +522,6 @@
   --ws-nc-ts-range-thumb-margin-top: -6px;
   --ws-nc-sti-chip-padding-y:     6px;
   --ws-nc-sti-tri-size:           7px;
-  --ws-nc-sti-swatch-size:        14px;
-  --ws-nc-sti-swatch-radius:      3px;
   --ws-nc-ts-num-width:           34px;
   --ws-nc-ts-num-padding-y:       3px;
   --ws-nc-ts-num-padding-x:       4px;
@@ -602,7 +576,6 @@
   --ws-selector-range-value-width: 36px;
   --ws-selector-label-index-width: 56px;
   --ws-selector-label-list-max-height: 260px;
-  --ws-media-preview-min-height: 240px;
   --ws-media-node-min-width: 420px;
   --ws-media-preview-min-width: 240px;
   --ws-media-toolbar-height: 34px;
@@ -616,6 +589,9 @@
   --ws-compare-badge-size: 24px;
   --ws-compare-swap-size: 34px;
   --ws-compare-range-size: 1px;
+  /* 对比视图切换分段控件的按钮与图标尺寸 */
+  --ws-compare-view-size: 24px;
+  --ws-compare-view-icon-size: 14px;
   --ws-get-widget-node-min-width: 300px;
   --ws-get-widget-node-min-height: 132px;
   --ws-get-widget-control-height: 92px;
@@ -801,7 +777,6 @@
   --ws-ln-face-mask-fill:      #e3f1fb;
   --ws-ln-face-mask-stroke:    #a9c9dc;
 
-
   --ws-rh-color-input-width: 120px;
   --ws-rh-breathing-color: #B388FF;
   --ws-rh-time-color: #ff4d00;
@@ -906,22 +881,16 @@
   --ws-lt-btn-height: 40px;
   --ws-lt-btn-padding-x: 14px;
   --ws-lt-icon-slot-width: 18px;
-  --ws-lt-foot-margin-top: 2px;
   --ws-lt-search-width: 560px;
   --ws-lt-search-top: 80px;
   --ws-lt-search-radius: 20px;
   --ws-lt-search-input-height: 34px;
-  --ws-lt-seg-gap: 2px;
-  --ws-lt-seg-padding: 3px;
   --ws-lt-seg-btn-padding: 4px 9px;
   --ws-lt-seg-btn-radius: 5px;
   --ws-lt-list-max-height: 320px;
   --ws-lt-item-padding: 7px 9px;
   --ws-lt-toast-top: 64px;
   --ws-lt-flash-color: #FFC83D;
-  --ws-lt-spacing-input-width: 30px;
-  --ws-lt-more-btn-size: 32px;
-  --ws-lt-letter-spacing-tight: 0.3px;
   --ws-lt-quick-grid-height: 164px;
   --ws-lt-quick-icon-size: 17px;
   /* ── GlassTheme ── */

@@ -1,3 +1,13 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * 本文件是 ComfyUI-KJNodes 的衍生作品，按 GNU GPL v3.0 或更新版本授权，
+ * 不适用本项目根 LICENSE 的 MIT 条款。
+ *   原始项目：ComfyUI-KJNodes
+ *   原始作者：kijai
+ *   原始文件：web/js/shake_to_disconnect.js
+ *   原始仓库：https://github.com/kijai/ComfyUI-KJNodes
+ * 完整条款见项目根 LICENSE-GPL-3.0；完整署名见 THIRD-PARTY-NOTICES.md。
+ */
 // WOSAI 摇断连接（移植自 ComfyUI-KJNodes shake_to_disconnect.js）
 // 拖动节点时快速来回抖动可断开其外部连线；被断开的上游会做绕过（bypass）重连，
 // 多节点选中时节点之间的内部连线保留并向下游传播绕过。

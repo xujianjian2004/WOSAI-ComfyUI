@@ -274,13 +274,6 @@
     color: var(--ws-text-muted);
 }
 
-.ws-count-label {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 .ws-count-badge {
     background: var(--ws-surface-2);
     padding: var(--ws-border-width-thin) var(--ws-gap-sm);

@@ -19,3 +19,28 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## 许可证例外说明 / License Exception
+
+本项目**主体**（除下列文件外）按上述 MIT 许可证授权。
+
+下列文件是 GPL-3.0 许可作品的衍生作品，按 **GNU General Public License v3.0
+或更新版本（GPL-3.0-or-later）** 授权，**不适用**上述 MIT 条款：
+
+```text
+web/auto-connect.js          衍生自 ComfyUI-KJNodes (kijai)          web/js/fillconnect.js
+web/shake-disconnect.js      衍生自 ComfyUI-KJNodes (kijai)          web/js/shake_to_disconnect.js
+web/performance-mode.js      衍生自 ComfyUI-KJNodes (kijai)          web/js/performance.js
+web/shared/graph-utils.js    衍生自 ComfyUI-KJNodes (kijai)          web/js/utility.js
+web/ignore-groups.js         衍生自 Goohaitools-comfyui (goohai)     web/js/nodes pass.js
+```
+
+完整 GPL-3.0 条款见同目录 `LICENSE-GPL-3.0`。
+完整署名、出处与审计记录见 `THIRD-PARTY-NOTICES.md`。
+
+This project is licensed under the MIT License, EXCEPT for the five files listed
+above, which are derivative works of GPL-3.0 licensed projects and are therefore
+licensed under GPL-3.0-or-later. See `LICENSE-GPL-3.0` for the full terms and
+`THIRD-PARTY-NOTICES.md` for attribution.

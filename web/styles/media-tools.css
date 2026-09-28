@@ -200,6 +200,10 @@
   left: var(--wosai-compare-split, 50%);
   width: var(--ws-compare-handle-size);
   transform: translateX(-50%);
+}
+
+/* 只有滑动视图提供分割拖拽：拖拽光标与交互能力同时开启 / 关闭 */
+.wosai-image-compare-stage.is-view-slide .wosai-image-compare-grab {
   cursor: ew-resize;
 }
 
@@ -258,9 +262,141 @@
   stroke: none;
 }
 
+/* 交换 / 切换视图时把图像整体压暗，掩盖图层换位的瞬时跳变 */
 .wosai-image-compare-stage.is-swapping > img,
-.wosai-image-compare-stage.is-swapping .wosai-image-compare-top {
+.wosai-image-compare-stage.is-swapping .wosai-image-compare-top,
+.wosai-image-compare-stage.is-switching > img,
+.wosai-image-compare-stage.is-switching .wosai-image-compare-top {
   opacity: 0.35;
+}
+
+/* ── 双拼视图：把舞台一分为二，两张图各占半幅 ─────────────────────
+   舞台宽高比由 JS 按「半幅还原原图比例」算出（见 shared/media-preview.js 的
+   stageAspectRatio），因此每半幅的宽高比恰好等于素材原比例，零留白。
+   这里只负责把两个图层各自放进半幅并补上外侧圆角。 */
+/* 两个图层共享 .wosai-image-compare-stage > img / .wosai-image-compare-top 的
+   `inset: 0 + width/height: 100%`，切半时必须同时改写主轴尺寸，
+   否则 left/top 偏移与 100% 尺寸叠加会把面板推出舞台边界。 */
+.wosai-image-compare-stage.is-view-side > img {
+  right: auto;
+  width: 50%;
+  border-radius: var(--ws-radius-lg) 0 0 var(--ws-radius-lg);
+}
+
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-top {
+  left: 50%;
+  width: 50%;
+  border-radius: 0 var(--ws-radius-lg) var(--ws-radius-lg) 0;
+}
+
+.wosai-image-compare-stage.is-view-stack > img {
+  bottom: auto;
+  height: 50%;
+  border-radius: var(--ws-radius-lg) var(--ws-radius-lg) 0 0;
+}
+
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-top {
+  top: 50%;
+  height: 50%;
+  border-radius: 0 0 var(--ws-radius-lg) var(--ws-radius-lg);
+}
+
+/* 面板分隔缝：只在双拼视图出现，滑动视图由分割线承担视觉分隔 */
+.wosai-image-compare-divider {
+  position: absolute;
+  z-index: 1;
+  display: none;
+  background: var(--ws-border);
+  pointer-events: none;
+}
+
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-divider {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  display: block;
+  width: var(--ws-border-width);
+  transform: translateX(-50%);
+}
+
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-divider {
+  top: 50%;
+  right: 0;
+  left: 0;
+  display: block;
+  height: var(--ws-border-width);
+  transform: translateY(-50%);
+}
+
+/* 双拼视图没有「分割位置」这个概念，隐藏分割线、热区与十字手柄，
+   避免出现一条拖不动、也说不清含义的线 */
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-line,
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-grab,
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-handle,
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-line,
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-grab,
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-handle {
+  display: none;
+}
+
+/* ── 视图切换分段控件：图像区顶部居中的浮层 ───────────────────── */
+.wosai-image-compare-views {
+  position: absolute;
+  top: var(--ws-gap-sm);
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: var(--ws-gap-2xs);
+  border: var(--ws-glass-border);
+  border-radius: var(--ws-radius-pill);
+  background: var(--ws-glass-bg);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
+  transform: translateX(-50%);
+  transition: opacity var(--ws-transition);
+}
+
+.wosai-image-compare-view {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--ws-compare-view-size);
+  height: var(--ws-compare-view-size);
+  border: 0;
+  border-radius: var(--ws-radius-pill);
+  padding: 0;
+  background: none;
+  color: var(--ws-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--ws-transition),
+    color var(--ws-transition);
+}
+
+.wosai-image-compare-view:hover {
+  color: var(--ws-text);
+}
+
+.wosai-image-compare-view.is-active {
+  background: var(--ws-accent-dim);
+  color: var(--ws-accent);
+}
+
+.wosai-image-compare-view:focus-visible {
+  outline: none;
+  box-shadow: var(--ws-input-focus-ring);
+}
+
+.wosai-image-compare-view svg {
+  width: var(--ws-compare-view-icon-size);
+  height: var(--ws-compare-view-icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* A/B 角标：浮在图像区下角，与居中的交换按钮构成 A ⇄ B 一行 */
@@ -295,6 +431,20 @@
 
 .wosai-image-compare-label.is-end {
   right: var(--ws-gap-sm);
+}
+
+/* 双拼视图里角标要跟着面板走：左右并排时 A/B 各占一侧顶角，
+   上下并排时 A 在顶、B 在底（左对齐），保证角标始终贴着它描述的半幅 */
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-label.is-start,
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-label.is-start,
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-label.is-end {
+  top: var(--ws-gap-sm);
+  bottom: auto;
+}
+
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-label.is-end {
+  right: auto;
+  left: var(--ws-gap-sm);
 }
 
 /* 交换按钮：水平居中于图像区，与 A/B 角标同处一行 */
@@ -354,11 +504,34 @@
   cursor: not-allowed;
 }
 
-/* 无图时不显示角标与交换按钮，避免压在空状态提示上 */
+/* 无图时不显示角标、交换按钮与视图切换，避免压在空状态提示上 */
 .wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-label,
-.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-swap {
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-swap,
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-views {
   opacity: 0;
   pointer-events: none;
+}
+
+/* ── 闲置自动淡出：指针离开或在图内静止后隐去控件，让图片回到纯净状态 ──
+   控件都是压在图片上的浮层，顶部条正落在水平居中处（主体的构图重心），底部一行
+   横跨图片过半宽度，常驻会持续打断观看。这里只隐藏「控件」：分割线保持可见——
+   它是「这是一张对比图」的语义表达而不是操作项，隐藏后节点会退化成普通图片。
+   必须同时关掉命中：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到
+   看不见的按钮。opacity 不改变 a11y 树，屏幕阅读器仍能读到角标里的尺寸。 */
+.wosai-image-compare-stage.is-idle .wosai-image-compare-views,
+.wosai-image-compare-stage.is-idle .wosai-image-compare-label,
+.wosai-image-compare-stage.is-idle .wosai-image-compare-swap {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 键盘 Tab 进控件时必须可见，否则焦点会落在一个看不见的按钮上（焦点环画得出来，
+   控件本体却是透明的）。pointer-events 不参与 tab 序列，所以键盘始终能走到按钮。
+   :not(:disabled) 是必需的：disabled 的交换按钮要保留自己的降级透明度。 */
+.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-views,
+.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-swap:not(:disabled) {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .wosai-media-range {
@@ -394,7 +567,10 @@
 @media (prefers-reduced-motion: reduce) {
   .wosai-image-compare-stage > img,
   .wosai-image-compare-top,
-  .wosai-image-compare-handle {
+  .wosai-image-compare-handle,
+  .wosai-image-compare-views,
+  .wosai-image-compare-label,
+  .wosai-image-compare-swap {
     transition: none;
   }
 }

@@ -25,7 +25,6 @@ let _origOnDrawBackground = null;   // 原 canvas.onDrawBackground
 let _origDrawGroups = null;         // 原 canvas.drawGroups
 let _fxUninstalled = false;         // 标记是否已卸载
 const _keyHandler = null;             // Escape 监听
-const _pointerHandler = null;         // pointerdown 监听
 const _offGlassChange = null;         // onGlassChange 退订
 
 // 预处理离屏画布（模糊/亮度一次性烘焙，避免每帧 ctx.filter 重算造成卡顿）

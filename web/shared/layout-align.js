@@ -4,8 +4,7 @@
 import { t } from "./i18n.js";
 import { app } from "../../../../scripts/app.js";
 import { compute, resize, stretch, ALIGN_COMMANDS } from "./align-engine.js";
-import { glassT, getGlassTheme } from "./glass-theme.js";
-import { mkBtn as hudMkBtn, mkDivider as hudDivider } from "./hud-kit.js";
+import { getGlassTheme } from "./glass-theme.js";
 import { bindTip } from "./tooltip.js";
 import { quickToast } from "./toast.js";
 import { makeDraggable } from "../panel-drag.js";
@@ -216,19 +215,6 @@ const LABELS = {
     select_same: t('menus.layoutToolkit.selectSameNodes'),
 };
 
-const BAR_LABELS = {
-    dist_h: t('menus.layoutToolkit.barDistHorizontal'),
-    dist_v: t('menus.layoutToolkit.barDistVertical'),
-    "dist_h+top": t('menus.layoutToolkit.barDistHAlignTop'),
-    "dist_h+v_center": t('menus.layoutToolkit.barDistHAlignCenter'),
-    "dist_h+bottom": t('menus.layoutToolkit.barDistHAlignBottom'),
-    "dist_v+left": t('menus.layoutToolkit.barDistVAlignLeft'),
-    "dist_v+h_center": t('menus.layoutToolkit.barDistVAlignCenter'),
-    "dist_v+right": t('menus.layoutToolkit.barDistVAlignRight'),
-};
-
-const barLabel = (c) => BAR_LABELS[c] || LABELS[c];
-
 // ── 面板 ───────────────────────────────────────────────────────────────
 let _panel = null;
 let _panelFollowCleanup = null;
@@ -405,108 +391,4 @@ export function togglePanel() { (_panel && _panel.style.display !== "none") ? cl
 export { _panel };
 
 // ── 自定义间距输入状态 ──
-let _spacingGap = 20;
-function _ensureGapCSS() {
-    if (document.getElementById('wosai-gap-css')) return;
-    const s = document.createElement('style');
-    s.id = 'wosai-gap-css';
-    s.textContent = '.wosai-gap-in::-webkit-outer-spin-button,.wosai-gap-in::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}.wosai-gap-in{-moz-appearance:textfield}.wosai-gap-in:focus,.wosai-gap-in:focus-visible{box-shadow:none!important;outline:none!important}';
-    document.head.appendChild(s);
-}
-function _buildSpacingGapInput() {
-    _ensureGapCSS();
-    const T = glassT();
-    const border = T.border;
-    const muted = T.textMuted;
-    const wrap = document.createElement('div');
-    wrap.style.cssText = `display:inline-flex;align-items:center;gap:var(--ws-gap-2xs);height:var(--ws-lf-btn-height);padding:0 var(--ws-gap);border-radius:var(--ws-radius);border:var(--ws-border-width-thin) solid ${border};background:${T.btnBg};box-sizing:border-box;transition:border-color .15s;flex-shrink:0;cursor:text`;
-    const MIN_GAP = 10, MAX_GAP = 500;
-    const inp = document.createElement('input');
-    inp.className = 'wosai-gap-in';
-    inp.type = 'number'; inp.min = String(MIN_GAP); inp.max = String(MAX_GAP); inp.step = '5';
-    inp.placeholder = t('menus.layoutToolkit.gapPlaceholder');
-    inp.title = t('menus.layoutToolkit.gapTitle').replace('{min}', MIN_GAP).replace('{max}', MAX_GAP);
-    if (_spacingGap != null) inp.value = _spacingGap;
-    inp.style.cssText = `width:var(--ws-lt-spacing-input-width);height:100%;border:none;background:transparent;color:${T.text};font-size:var(--ws-text-base);text-align:center;outline:none;padding:0`;
-    const unit = document.createElement('span');
-    unit.textContent = 'px';
-    unit.style.cssText = `font-size:var(--ws-text-sm);color:${muted};user-select:none;pointer-events:none;letter-spacing:var(--ws-lt-letter-spacing-tight)`;
-    inp.addEventListener('input', () => {
-        const v = parseInt(inp.value, 10);
-        _spacingGap = (!isNaN(v) && v >= MIN_GAP) ? Math.min(v, MAX_GAP) : null;
-        unit.style.color = inp.value ? T.iconAccent : muted;
-    });
-    inp.addEventListener('blur', () => {
-        let v = parseInt(inp.value, 10);
-        if (isNaN(v) || v <= 0) { inp.value = ''; _spacingGap = null; unit.style.color = muted; return; }
-        v = Math.max(MIN_GAP, Math.min(MAX_GAP, v));
-        inp.value = v; _spacingGap = v; unit.style.color = T.iconAccent;
-    });
-    inp.addEventListener('pointerdown', e => e.stopPropagation());
-    wrap.addEventListener('pointerdown', () => inp.focus());
-    if (_spacingGap != null) unit.style.color = T.iconAccent;
-    wrap.appendChild(inp);
-    wrap.appendChild(unit);
-    return { wrap, inp };
-}
-
-export function buildAlignItems(orient = "h") {
-    const out = [];
-    ALIGN_COMMANDS.basic.forEach((c, i) => {
-        out.push(_alignBtn(c));
-        if (i === 2) out.push(hudDivider(orient));
-    });
-    out.push(hudDivider(orient));
-    // 悬浮条只保留最常用的“等尺寸”；等宽/等高放入“更多”面板，
-    // 完整工具仍由快捷对齐面板承载，避免三处同时铺开。
-    out.push(_resizeBtn("eq_both"));
-    out.push(hudDivider(orient));
-    const gapCtl = _buildSpacingGapInput();
-    const distHBtn = hudMkBtn(cmdIcon("dist_h"), LABELS["dist_h"], barLabel("dist_h"));
-    distHBtn.onclick = () => applyAlign("dist_h", _spacingGap);
-    out.push(distHBtn);
-    const distVBtn = hudMkBtn(cmdIcon("dist_v"), LABELS["dist_v"], barLabel("dist_v"));
-    distVBtn.onclick = () => applyAlign("dist_v", _spacingGap);
-    out.push(distVBtn);
-    out.push(gapCtl.wrap);
-    out.push(hudDivider(orient));
-    { const b = hudMkBtn(ICONS.reset_size, LABELS.reset_size, LABELS.reset_size); b.onclick = () => applyResetSize(); out.push(b); }
-    // 折叠组：低频复合分布 / 单侧拉伸 / 选同类
-    const low = [];
-    const addLow = (el) => { el.style.display = "none"; low.push(el); out.push(el); };
-    ["eq_w", "eq_h"].forEach(c => addLow(_resizeBtn(c)));
-    ALIGN_COMMANDS.distribute.filter(c => c !== "dist_h" && c !== "dist_v").forEach(c => {
-        const b = hudMkBtn(cmdIcon(c), LABELS[c], barLabel(c)); b.onclick = () => applyAlign(c, _spacingGap); addLow(b);
-    });
-    addLow(hudDivider(orient));
-    ALIGN_COMMANDS.stretch.forEach(c => { const b = hudMkBtn(cmdIcon(c), LABELS[c], LABELS[c]); b.onclick = () => applyStretch(c); addLow(b); });
-    { const b = hudMkBtn(ICONS.select_same, LABELS.select_same, t('menus.layoutToolkit.selectSameNodes')); b.onclick = () => selectSameNodes(); addLow(b); }
-    addLow(hudDivider(orient));
-
-    const T_ = glassT();
-    const moreVis = document.createElement('div');
-    moreVis.textContent = '▶';
-    moreVis.style.cssText = `width:var(--ws-lt-more-btn-size);height:var(--ws-lt-more-btn-size);display:flex;align-items:center;justify-content:center;border-radius:50%;background:${T_.btnBg};color:${T_.iconColor};padding:0;font-size:var(--ws-text-xs);font-weight:600;letter-spacing:var(--ws-lt-letter-spacing-tight);transition:color .15s,background .15s,filter .15s,transform .12s;pointer-events:none;white-space:nowrap;overflow:hidden`;
-    const moreBtn = (() => { const w = document.createElement('div'); w.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:var(--ws-gap-xs);cursor:pointer;user-select:none;flex-shrink:0'; w.appendChild(moreVis); w._tip = t('menus.layoutToolkit.moreTip'); return w; })();
-    moreBtn.addEventListener('mouseenter', () => { moreVis.style.transform = 'scale(1.1)'; moreVis.style.background = T_.rowHover; moreVis.style.color = T_.iconAccent; });
-    moreBtn.addEventListener('mouseleave', () => { moreVis.style.transform = ''; moreVis.style.background = T_.btnBg; moreVis.style.color = T_.iconColor; });
-    bindTip(moreBtn, t('menus.layoutToolkit.moreTip'));
-    moreBtn.addEventListener('mousedown', e => e.preventDefault());
-    let expanded = false;
-    moreBtn.onclick = (e) => {
-        e.stopPropagation();
-        expanded = !expanded;
-        low.forEach(el => { el.style.display = expanded ? "" : "none"; });
-        moreVis.textContent = expanded ? '◀' : '▶';
-        moreBtn._tip = expanded ? t('menus.layoutToolkit.collapseTip') : t('menus.layoutToolkit.moreAlignTip');
-    };
-    out.push(moreBtn);
-    return out;
-}
-
-const _alignBtn = (c) => { const b = hudMkBtn(cmdIcon(c), LABELS[c], barLabel(c)); b.onclick = () => applyAlign(c); return b; };
-const _resizeBtn = (c) => {
-    const b = hudMkBtn(cmdIcon(c), LABELS[c], barLabel(c));
-    b.onclick = (e) => applyResize(c, e.altKey ? "anchor" : "max");
-    return b;
-};
+const _spacingGap = 20;

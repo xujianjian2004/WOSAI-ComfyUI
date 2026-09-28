@@ -187,9 +187,6 @@
 }
 
 /* ── 链接鼠标手势 ───────────────────────────────────────────────── */
-.titlenote-link-cursor [data-testid^="node-body-"] {
-    cursor: pointer !important;
-}
 
 /* ── 可访问性：减弱动态效果 ── */
 @media (prefers-reduced-motion: reduce) {

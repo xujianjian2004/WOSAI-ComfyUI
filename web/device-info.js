@@ -22,7 +22,7 @@ const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=4", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=5", import.meta.url).href],
     ]);
 }
 

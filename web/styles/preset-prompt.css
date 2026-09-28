@@ -116,12 +116,6 @@
   text-align: center;
 }
 
-.wosai-pp__prompts {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--ws-pp-gap);
-}
-
 .wosai-pp__prompt {
   box-sizing: border-box;
   height: var(--ws-pp-prompt-fixed-height, 96px);
@@ -142,11 +136,6 @@
 .wosai-pp__prompt:focus {
   border-color: var(--ws-accent);
   box-shadow: 0 0 0 var(--ws-border-width) var(--ws-accent);
-}
-
-.wosai-pp__placeholder {
-  color: var(--ws-success, #3fb950);
-  font-weight: 700;
 }
 
 .wosai-pp__categories {
@@ -512,13 +501,6 @@
 .wosai-pp__pager-button:disabled {
   cursor: default;
   opacity: var(--ws-disabled-opacity);
-}
-
-.wosai-pp__pager-label {
-  min-width: var(--ws-pp-pager-label-width);
-  color: var(--ws-text-muted);
-  font-size: var(--ws-text-2xs);
-  text-align: center;
 }
 
 .wosai-pp__tab {
@@ -976,13 +958,6 @@
   overflow: hidden;
   text-align: center;
   text-overflow: ellipsis;
-}
-
-.wosai-pp-library__category-meta {
-  flex: 0 0 auto;
-  margin-left: var(--ws-gap-xs);
-  color: var(--ws-text-muted);
-  font-size: calc(var(--ws-text-xs) * var(--wosai-pp-library-font-scale));
 }
 
 .wosai-pp-library__category:hover,

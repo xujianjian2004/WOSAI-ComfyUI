@@ -93,7 +93,6 @@
 .ws-di-pill.is-warning { background: color-mix(in srgb, var(--ws-warning) 14%, transparent); color: var(--ws-warning); }
 .ws-di-pill.is-danger { background: var(--ws-danger-bg); color: var(--ws-danger); }
 
-.ws-di-summary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--ws-border-width-thin); background: var(--ws-border-muted); }
 .ws-di-metric { min-width: 0; padding: var(--ws-gap-md) var(--ws-gap-lg); background: var(--ws-surface); }
 .ws-di-metric span { display: block; margin-bottom: var(--ws-gap-xs); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
 .ws-di-metric strong { display: block; overflow-wrap: anywhere; color: var(--ws-text-secondary); font-size: var(--ws-text-base); font-weight: 500; }

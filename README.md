@@ -159,6 +159,7 @@ WOSAI-ComfyUI/
 │   ├── locales/           # 中英文翻译
 │   └── data/              # 调色板数据
 ├── scripts/               # Lint 与 ComfyUI 宿主回归脚本
+├── dev/                   # 未接入运行时的前端地基与内部审计（不随发布包分发）
 ├── tests/                 # Python、aiohttp 与 Playwright 宿主测试
 ├── workflows/             # 示例工作流
 ├── docs/                  # 技术报告与发布清单
@@ -168,6 +169,20 @@ WOSAI-ComfyUI/
 ## 许可证
 
 [MIT License](LICENSE) · 作者：穿山阅海
+
+本项目**主体**按 MIT 授权。其中 5 个前端文件是 GPL-3.0 许可项目的衍生作品，
+按 **GPL-3.0-or-later** 授权，**不适用** MIT 条款：
+
+| 文件 | 来源项目（许可） |
+| --- | --- |
+| `web/auto-connect.js` | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)（GPL-3.0，kijai） |
+| `web/shake-disconnect.js` | 同上 |
+| `web/performance-mode.js` | 同上 |
+| `web/shared/graph-utils.js` | 同上 |
+| `web/ignore-groups.js` | [Goohaitools-comfyui](https://github.com/goohai/Goohaitools-comfyui)（GPL-3.0，goohai） |
+
+完整条款见 [LICENSE-GPL-3.0](LICENSE-GPL-3.0)；完整署名、出处与审计记录见
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
 ## 发布维护
 

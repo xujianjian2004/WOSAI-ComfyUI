@@ -258,69 +258,6 @@ function buildAvatarPanel() {
 }
 function _syncAvatar() { if (_avatarPanel && _avatarPanel._sync) _avatarPanel._sync(); }
 
-// 供统一设置面板复用：只提供参数区，不再创建第二层悬浮窗。
-export function buildAvatarSection() {
-    const root = document.createElement('div');
-    root.className = 'wosai-avatar-section wosai-control-section';
-    root.style.cssText = 'display:flex;flex-direction:column;gap:var(--ws-gap-md);';
-
-    const animRow = document.createElement('label');
-    animRow.style.cssText = 'display:flex;align-items:center;gap:var(--ws-gap-md);cursor:pointer;';
-    const anim = document.createElement('input');
-    anim.type = 'checkbox'; anim.checked = getBallAnim();
-    anim.style.cssText = 'width:var(--ws-ln-checkbox-size);height:var(--ws-ln-checkbox-size);accent-color:var(--ws-accent);';
-    anim.onchange = () => setBallAnim(anim.checked);
-    const animLabel = document.createElement('span');
-    animLabel.textContent = t('menus.launcher.enableAnimation');
-    animRow.append(anim, animLabel); root.appendChild(animRow);
-
-    root.appendChild(_avSec(t('menus.launcher.defaultExpression')));
-    const grid = document.createElement('div');
-    grid.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--ws-gap);';
-    const buttons = new Map();
-    const sync = () => {
-        buttons.forEach((button, id) => {
-            const active = getBallExp() === id;
-            button.style.borderColor = active ? 'var(--ws-accent)' : 'transparent';
-            button.style.background = active ? 'var(--ws-surface-raised)' : 'var(--ws-surface-2)';
-            button.style.color = active ? 'var(--ws-accent)' : 'var(--ws-text)';
-        });
-    };
-    BALL_EXPS.forEach((expression) => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.style.cssText = 'display:flex;align-items:center;gap:var(--ws-gap-sm);padding:var(--ws-ln-exp-btn-padding);border-radius:var(--ws-ln-exp-btn-radius);border:var(--ws-ln-exp-btn-border-width) solid transparent;background:var(--ws-surface-2);color:var(--ws-text);cursor:pointer;';
-        button.innerHTML = `<span style="line-height:0;flex:none">${expression.ico}</span><span>${t(expression.labelKey)}</span>`;
-        button.onclick = () => { setExpression(expression.id); sync(); _syncAvatar(); };
-        buttons.set(expression.id, button);
-        grid.appendChild(button);
-    });
-    root.appendChild(grid);
-
-    const cycleRow = document.createElement('label');
-    cycleRow.style.cssText = 'display:flex;align-items:center;gap:var(--ws-gap-md);cursor:pointer;';
-    const cycle = document.createElement('input');
-    cycle.type = 'checkbox'; cycle.checked = getBallExpMode() === 'cycle';
-    cycle.style.cssText = 'width:var(--ws-ln-checkbox-size);height:var(--ws-ln-checkbox-size);accent-color:var(--ws-accent);';
-    cycle.onchange = () => setBallExpMode(cycle.checked ? 'cycle' : 'fixed');
-    const cycleLabel = document.createElement('span');
-    cycleLabel.textContent = t('menus.launcher.cycleExpression');
-    cycleRow.append(cycle, cycleLabel); root.appendChild(cycleRow);
-
-    root.appendChild(_avSec(t('menus.launcher.ballSize')));
-    const sizeRow = document.createElement('div');
-    sizeRow.style.cssText = 'display:flex;align-items:center;gap:var(--ws-gap-md);';
-    const slider = document.createElement('input');
-    slider.type = 'range'; slider.min = '44'; slider.max = '96'; slider.step = '2'; slider.value = String(getBallSize());
-    slider.style.cssText = 'flex:1;accent-color:var(--ws-accent);';
-    const value = document.createElement('span');
-    value.textContent = `${getBallSize()}px`; value.style.cssText = 'min-width:var(--ws-ln-size-value-width);text-align:right;color:var(--ws-accent);';
-    slider.oninput = () => { applyBallSize(+slider.value); value.textContent = `${slider.value}px`; };
-    sizeRow.append(slider, value); root.appendChild(sizeRow);
-    root._sync = sync;
-    sync();
-    return root;
-}
 export function closeAvatarPanel() {
     if (_avatarPanel) _avatarPanel.style.display = 'none';
     if (_launcher) _launcher.style.pointerEvents = '';
@@ -530,15 +467,6 @@ let _orbsFromKeyboard = false;   // 子球是否由快捷键呼出（决定 HUD 
 let _hoveredOrb = null;   // 当前悬停的子球，避免跨球闪烁
 export function orbsFromKeyboard() { return _orbsFromKeyboard; }
 let _dashLine = null;     // 悬浮球到子球的虚线连接
-const _ORB_DESC = {
-    color: t('menus.launcher.orbTipColor'),
-    align: t('menus.launcher.orbTipAlign'),
-    node: t('menus.launcher.orbTipNode'),
-    fx: t('menus.launcher.orbTipFx'),
-    bg: t('menus.launcher.orbTipBg'),
-    settings: t('menus.launcher.orbTipSettings'),
-    avatar: t('menus.launcher.orbTipAvatar'),
-};
 const _ORB_DEFBG = 'conic-gradient(from 210deg,var(--ws-ln-orb-def-c1),var(--ws-ln-orb-def-c2),var(--ws-ln-orb-def-c3),var(--ws-ln-orb-def-c4),var(--ws-ln-orb-def-c5),var(--ws-ln-orb-def-c6),var(--ws-ln-orb-def-c1))';
 const _ORB_SKIN = {
     color:    { bg: 'radial-gradient(circle at 40% 36%,var(--ws-ln-orb-color-start) 0%,var(--ws-ln-orb-color-mid1) 42%,var(--ws-ln-orb-color-mid2) 74%,var(--ws-ln-orb-color-end) 100%)', glow: 'var(--ws-ln-orb-color-glow)', halo: 'var(--ws-ln-orb-color-halo)', tip: 'var(--ws-ln-orb-color-tip)' },   // 配色 → 鲜明品红
@@ -565,14 +493,12 @@ const _ORB_TABS = [
 ];
 // 左键扇形菜单：仅高频四项（从上到下：收藏 / 配色 / 对齐 / 节点）
 const _FAN_IDS = ['favorite', 'color', 'align', 'node'];
-export function getOrbTabs() { return _ORB_TABS; }
 const _ORB_SHORTCUT = Object.fromEntries(_ORB_TABS.map(t => [t.id, t.shortcut]));
 
 // ── 8 方向智能扇面方向（根据悬浮球在视口中的位置自动选择最优展开方向） ──
 function _smartBaseAng(cx, cy) {
     return smartFanAngle(cx, cy, window.innerWidth, window.innerHeight);
 }
-const _ORB_EN     = Object.fromEntries(_ORB_TABS.map(t => [t.id, t.en]));
 const _ORB_SMALL  = new Set(_ORB_TABS.filter(t => t.small).map(t => t.id));
 
 function _ensureDashLine() {
@@ -784,8 +710,6 @@ function _showOrbs() {
     });
     requestAnimationFrame(() => { _orbs.forEach((o, i) => { o.el.style.transition = _ORB_POP_TRANS; o.el.style.transitionDelay = (i * 35) + 'ms'; o.el.style.opacity = '1'; o.el.style.transform = 'translate(0,0) scale(1)'; }); setTimeout(() => _orbs.forEach(o => { o.el.style.transition = _ORB_HOVER_TRANS; o.el.style.transitionDelay = '0ms'; }), 350 + 35 * _orbs.length + 80); });
 }
-export function hideOrbsIfOpen() { if (_wingsOpen) _hideOrbs(); }
-
 // ── 获取最顶部子球位置（供 HUB 栏定位锚定用） ─────────
 export function getTopOrbPosition() {
     if (!_orbs.length || !_orbs[0].el) return null;
@@ -1069,16 +993,12 @@ let _launcherContextMenu = null;
 
 // ── 画布缩放同步（已禁用）────────────────────────────────
 let _zoomScale = 1;
-const _zoomTickId = null;
 let _zoomVisHandler = null;
 function _effectiveBall() { return BALL; }
 function _effectiveOrb(sz) { return sz; }
-function _needsZoomTick() { return false; }
 function _startZoomTick() {}
 function _stopZoomTick() {}
 function _ensureZoomVisListener() {}
-function _zoomTick() {}
-function _applyZoom() {}
 // 重新计算子球位置（等角度环绕主球）
 function _recalcOrbs(cx, cy) {
     if (!_launcher || !_orbs.length) return;
@@ -1114,8 +1034,6 @@ function _recalcOrbs(cx, cy) {
 export function getLauncherEl() { return _launcher; }
 export function setLauncherSkinFn(fn) { _launcher_skin = fn; }
 export function callLauncherSkin() { if (_launcher_skin) _launcher_skin(); }
-export function isSnapped() { return _isSideSnapped; }
-
 export function createLauncher() {
     if (_launcher) return;
     BALL = getBallSize(); _recalcOrbSizes();

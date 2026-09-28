@@ -147,14 +147,6 @@
 .os-num-inline::-webkit-inner-spin-button,
 .os-num-inline::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .os-num-inline:focus { border-color: var(--ws-accent); }
-.os-num-sep {
-  color: var(--ws-text-muted);
-  font-size: var(--ws-text-xs);
-  flex-shrink: 0;
-  padding: var(--ws-os-num-sep-padding);
-  pointer-events: none;
-  align-self: flex-end;
-}
 
 /* 偏移量/手柄大小行 */
 .os-panel .os-scale-row,
@@ -217,16 +209,6 @@
 .os-panel .os-scale-range::-moz-range-thumb:hover { transform: scale(1.15); }
 .os-panel .os-scale-range::-moz-range-thumb:active { transform: scale(1.3); }
 
-.os-ch-fill {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  border-radius: var(--ws-radius-full) 0 0 var(--ws-radius-full);
-  background: var(--ws-accent);
-  pointer-events: none;
-  transition: width .15s ease-out;
-}
 .os-ch-thumb {
   position: absolute;
   top: 50%;

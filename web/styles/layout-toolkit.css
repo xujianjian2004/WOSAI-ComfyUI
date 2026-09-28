@@ -281,13 +281,6 @@
 .wosai-al-btn:hover .wosai-al-lb { color: var(--ws-accent); }
 .wosai-al-lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 
-.wosai-al-foot {
-  font-size: var(--ws-text-base);
-  color: var(--ws-text-muted);
-  text-align: center;
-  margin-top: var(--ws-lt-foot-margin-top);
-}
-
 /* ── 节点工具栏扩展按钮激活态（自动连点 / 摇断 / 重建）── */
 .wosai-node-tool-active > div:first-child {
   background: var(--ws-accent) !important;
@@ -342,7 +335,7 @@
   outline: none;
 }
 .wosai-sb-in:focus { border-color: var(--ws-accent); }
-.wosai-sb-seg { display: flex; gap: var(--ws-lt-seg-gap); padding: var(--ws-lt-seg-padding); border-radius: var(--ws-radius); background: var(--ws-surface-2); flex-shrink: 0; }
+
 .wosai-sb-m {
   padding: var(--ws-lt-seg-btn-padding);
   border: none;
@@ -356,13 +349,7 @@
 }
 .wosai-sb-m:hover:not(.on) { color: var(--ws-accent); }
 .wosai-sb-m.on { background: var(--ws-accent); color: var(--ws-text-on-accent); }
-.wosai-sb-m--mode {
-  min-width: var(--ws-btn-h-xs);
-  padding-inline: var(--ws-gap-sm);
-  font-family: var(--ws-font-mono);
-  font-weight: 700;
-  line-height: 1;
-}
+
 .wosai-sr-list { margin-top: var(--ws-gap); max-height: var(--ws-lt-list-max-height); overflow-y: auto; overscroll-behavior: contain; }
 .wosai-sr-item {
   display: flex;
@@ -378,7 +365,7 @@
 .wosai-sr-item.sel { background: var(--ws-accent-dim); box-shadow: inset 0 0 0 var(--ws-border-width-thin) var(--ws-accent); }
 .wosai-sr-t { font-weight: 500; color: var(--ws-text); overflow: hidden; text-overflow: ellipsis; }
 .wosai-sr-ty { font-size: var(--ws-text-base); color: var(--ws-text-secondary); overflow: hidden; text-overflow: ellipsis; }
-.wosai-sr-id { margin-left: auto; font-size: var(--ws-text-sm); color: var(--ws-text-muted); flex-shrink: 0; }
+
 .wosai-sr-empty { padding: var(--ws-gap-lg); text-align: center; color: var(--ws-text-muted); font-style: italic; }
 
 /* ── 可访问性：减弱动态效果 ── */

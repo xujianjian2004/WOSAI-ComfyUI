@@ -72,11 +72,3 @@ export function closeIcon(size = 18) {
     return s;
 }
 
-/**
- * 创建橙色 WOSAI 品牌圆点 (替代 🟠)
- * @param {number} [size=14]
- * @returns {SVGElement}
- */
-export function orangeDotIcon(size = 14) {
-    return iconEl('orangeDot', size, { block: false });
-}

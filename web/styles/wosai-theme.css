@@ -236,12 +236,6 @@
   padding: var(--ws-btn-padding-sm);
 }
 
-.wosai-btn--lg {
-  height: var(--ws-btn-h);
-  font-size: var(--ws-text-md);
-  padding: var(--ws-btn-padding-lg);
-}
-
 /* ═══════════════════════════════════════════════════════════════════
    标签按钮 (Tag / Chip)
    ═══════════════════════════════════════════════════════════════════ */
@@ -482,22 +476,6 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   分割线
-   ═══════════════════════════════════════════════════════════════════ */
-.wosai-divider {
-  border: none;
-  border-top: var(--ws-divider-width) solid var(--ws-border-muted);
-  margin: var(--ws-gap) 0;
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   颜色选择器叠加层 (全局 z-index 容器)
-   ═══════════════════════════════════════════════════════════════════ */
-.wosai-cp-z {
-  font-family: var(--ws-font-family);
-}
-
-/* ═══════════════════════════════════════════════════════════════════
    行控件 (Row control) — label + 输入组合
    ═══════════════════════════════════════════════════════════════════ */
 .wosai-row {
@@ -505,21 +483,6 @@
   grid-template-columns: auto 1fr;
   gap: var(--ws-row-gap);
   align-items: center;
-}
-
-.wosai-row__label {
-  font-size: var(--ws-text-sm);
-  color: var(--ws-text-secondary);
-  text-align: left;
-  white-space: nowrap;
-  min-width: 0;
-}
-
-.wosai-row__control {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--ws-gap);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -533,10 +496,6 @@
   border: var(--ws-swatch-border-width) solid var(--ws-border);
   flex-shrink: 0;
   cursor: pointer;
-}
-
-.wosai-swatch--circle {
-  border-radius: var(--ws-radius-full);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

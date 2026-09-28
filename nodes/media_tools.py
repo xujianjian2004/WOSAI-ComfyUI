@@ -9,6 +9,7 @@ from typing import Any
 import torch
 
 from wosai_core.config import CATEGORY_PREFIX
+from wosai_core.media_preview import build_compare_payload
 
 try:
     from nodes import PreviewImage
@@ -179,32 +180,24 @@ class WOSAI_ImageCompare(PreviewImage):
             },
             "hidden": {
                 "prompt": "PROMPT",
-                "extra_pnginfo": "EXTRA_PNGINFO",
+                "unique_id": "UNIQUE_ID",
             },
         }
 
-    def _save_preview(self, image, prefix, prompt, extra_pnginfo):
-        if image is None or int(image.shape[0]) == 0:
-            return None
-        result = super().save_images(
-            image[:1],
-            filename_prefix=prefix,
-            prompt=prompt,
-            extra_pnginfo=extra_pnginfo,
-        )
-        images = result.get("ui", {}).get("images", [])
-        return images[0] if images else None
-
-    def compare(self, image_a: "torch.Tensor | None" = None, image_b: "torch.Tensor | None" = None, prompt: object = None, extra_pnginfo: "dict | None" = None) -> dict:
-        first = self._save_preview(image_a, "wosai_compare_a", prompt, extra_pnginfo)
-        second = self._save_preview(image_b, "wosai_compare_b", prompt, extra_pnginfo)
+    def compare(
+        self,
+        image_a: Any = None,
+        image_b: Any = None,
+        prompt: object = None,
+        unique_id: object = None,
+    ) -> dict:
+        # 载荷构造全部下沉到 wosai_core.media_preview：它负责「能直引上游文件就
+        # 不落 temp 副本」「批次最多导出 10 帧」「两侧都未连接时保留上次预览」，
+        # 并保留 a/b 的 filename/type/subfolder 字段以兼容既有前端。
         return {
             "ui": {
                 "wosai_compare": [
-                    {
-                        "a": first,
-                        "b": second,
-                    }
+                    build_compare_payload(image_a, image_b, prompt, unique_id),
                 ]
             }
         }

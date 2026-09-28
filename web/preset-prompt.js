@@ -62,7 +62,7 @@ function getDefaultPresetDefinition(index) {
 }
 
 function ensureStyle() {
-  const href = new URL("./styles/preset-prompt.css?v=51", import.meta.url).href;
+  const href = new URL("./styles/preset-prompt.css?v=52", import.meta.url).href;
   const existing = document.getElementById(STYLE_ID);
   if (existing) {
     if (existing.href !== href) existing.href = href;

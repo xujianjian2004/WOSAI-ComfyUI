@@ -1,3 +1,15 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * 本文件是 Goohaitools-comfyui 的衍生作品，按 GNU GPL v3.0 或更新版本授权，
+ * 不适用本项目根 LICENSE 的 MIT 条款。
+ *   原始项目：Goohaitools-comfyui（孤海工具箱）
+ *   原始作者：goohai
+ *   原始文件：web/js/nodes pass.js
+ *   原始仓库：https://github.com/goohai/Goohaitools-comfyui
+ * 本文件在原作品基础上由穿山阅海 / WOSAI Studio 做了大量修改与扩展
+ * （i18n、双主题、DOM Widget 尺寸契约、编组身份去重、原地重命名等）。
+ * 完整条款见项目根 LICENSE-GPL-3.0；完整署名见 THIRD-PARTY-NOTICES.md。
+ */
 /* WOSAI IgnoreGroups v1.0 | 作者：穿山阅海 | COPYRIGHT © WOSAI STUDIO */
 /**
  * IgnoreGroups — 忽略编组节点
@@ -388,8 +400,8 @@ function buildWosaiIgnoreGroupsUI(node) {
             }
         });
         return g._nodes.filter(n => {
-            /* 排除控制器自身及其它忽略编组节点，避免管理的分组把本节点一起旁路/禁用
-               （参照原始 gjj_group_bypasser：setGroupState 中 if(item===controllerNode)return） */
+            /* 排除控制器自身及其它忽略编组节点：否则被管理的编组会把本节点一并旁路/禁用，
+               使节点本身失去控制能力。 */
             if (n === node || n.type === "WOSAI_IgnoreGroups") return false;
             const titleHeight = (typeof LiteGraph !== "undefined" && LiteGraph.NODE_TITLE_HEIGHT) || 30;
             const nb = nodeBounds(n, { titleHeight });

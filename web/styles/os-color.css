@@ -190,7 +190,6 @@ html[data-theme="light"] .nc-dgi { border-color: var(--ws-nc-dgi-light-border); 
 }
 .nc-lr:hover { border-color: var(--ws-accent); }
 .nc-lr:active { background: var(--ws-surface-3); transition: none; }
-.nc-ll { font-size: var(--ws-text-sm); color: var(--ws-text-secondary); flex: 1; }
 
 /* ── Label toggle switch ── */
 .nc-lt {
@@ -435,7 +434,7 @@ html[data-theme="light"] .nc-dgi { border-color: var(--ws-nc-dgi-light-border); 
 .nc-ts-range::-moz-range-thumb:active { transform: scale(1.3); }
 
 /* ── Stop indicator chips ── */
-.nc-sti { display: flex; gap: var(--ws-gap); margin-bottom: var(--ws-gap-md); flex-wrap: wrap; }
+
 .nc-sti-chip {
   flex: 1;
   min-width: 0;
@@ -471,7 +470,6 @@ html[data-theme="light"] .nc-dgi { border-color: var(--ws-nc-dgi-light-border); 
   border-top: var(--ws-nc-sti-tri-size) solid var(--ws-accent);
 }
 .nc-sti-chip.on.nc-sti-no-tri::after { display: none; }
-.nc-sti-swatch { width: var(--ws-nc-sti-swatch-size); height: var(--ws-nc-sti-swatch-size); border-radius: var(--ws-nc-sti-swatch-radius); flex-shrink: 0; }
 
 /* ── Title style number input ── */
 .nc-ts-num {
@@ -659,23 +657,6 @@ html[data-theme="light"] .nc-dgi { border-color: var(--ws-nc-dgi-light-border); 
 }
 .nc-color-btn > svg,
 .nc-color-ico { pointer-events: none; }
-.nc-color-input {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-}
-.nc-align-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--ws-nc-align-wrap-gap);
-  margin-left: auto;
-}
 
 /* ── Copyright ── */
 .nc-cr {

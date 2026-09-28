@@ -14,7 +14,17 @@ import {
     hideSerializableWidget,
     mountNode2HiddenWidgets,
 } from "./shared/dom-widget.js";
-import { compareDisplayPair, normalizeSplitPercent } from "./shared/media-preview.js";
+import {
+    COMPARE_VIEW_DEFAULT,
+    COMPARE_VIEW_MODES,
+    compareDisplayPair,
+    formatMediaBadgeLabel,
+    mediaSourceRatio,
+    normalizeSplitPercent,
+    normalizeViewMode,
+    resolveViewMode,
+    stageAspectRatio,
+} from "./shared/media-preview.js";
 import { getWOSAIVarNum } from "./shared/shared-utils.js";
 
 const PATCH_KEY = "__wosaiMediaToolsPatch";
@@ -24,8 +34,39 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=10", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=13", import.meta.url).href],
 ];
+
+// 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
+// 四个图标都基于矩形：滑动 = 一条竖缝，左右 = 两块竖版，上下 = 两块横版，
+// 自动 = 斜缝（表示方向由素材比例决定）。尺寸统一由 CSS 令牌控制。
+const VIEW_ICONS = {
+    slide: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/>',
+    side: [
+        '<rect x="3" y="4" width="7.6" height="16" rx="2"/>',
+        '<rect x="13.4" y="4" width="7.6" height="16" rx="2"/>',
+    ].join(""),
+    stack: [
+        '<rect x="4" y="3" width="16" height="7.6" rx="2"/>',
+        '<rect x="4" y="13.4" width="16" height="7.6" rx="2"/>',
+    ].join(""),
+    auto: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M5.8 18.2 18.2 5.8"/>',
+};
+
+// 视图文案走静态字面量 key：i18n 覆盖率测试靠正则扫描 t("...")，动态拼接的 key
+// 既查不出缺失也查不出拼写错误
+function viewText(mode) {
+    switch (mode) {
+        case "side":
+            return t("nodes.imageCompare.viewSide", "Side by side");
+        case "stack":
+            return t("nodes.imageCompare.viewStack", "Stacked");
+        case "auto":
+            return t("nodes.imageCompare.viewAuto", "Auto layout");
+        default:
+            return t("nodes.imageCompare.viewSlide", "Slide");
+    }
+}
 
 function imageUrl(data) {
     if (!data?.filename) return "";
@@ -397,6 +438,10 @@ function createImageCompare(node) {
     secondWrap.className = "wosai-image-compare-top";
     const second = document.createElement("img");
     second.draggable = false;
+    // 双拼视图的面板分隔缝：滑动视图不需要（那里由分割线承担）
+    const divider = document.createElement("div");
+    divider.className = "wosai-image-compare-divider";
+    divider.setAttribute("aria-hidden", "true");
     const line = document.createElement("div");
     line.className = "wosai-image-compare-line";
     // 分割线悬停热区：把 2px 细线的可命中范围加宽，便于抓住分割线拖动
@@ -418,8 +463,27 @@ function createImageCompare(node) {
     empty.className = "wosai-media-empty";
     empty.textContent = t("nodes.imageCompare.empty", "Connect two images and execute");
     secondWrap.append(second);
-    // 图像区按顺序挂：图层 → 分割线交互层 → A/B 角标与交换按钮浮层 → 隐藏的原生滑块
-    stage.append(first, secondWrap, line, grab, handle);
+    // 视图切换浮层：置于图像区顶部居中，与底部的 A ⇄ B 一行上下呼应。
+    // 做成浮层而不是独立工具栏，新增视图不会改变节点高度契约。
+    const viewBar = document.createElement("div");
+    viewBar.className = "wosai-image-compare-views";
+    const viewButtons = new Map();
+    for (const mode of COMPARE_VIEW_MODES) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "wosai-image-compare-view";
+        button.dataset.view = mode;
+        button.innerHTML = [
+            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">',
+            VIEW_ICONS[mode],
+            "</svg>",
+        ].join("");
+        viewButtons.set(mode, button);
+        viewBar.append(button);
+    }
+    // 图像区按顺序挂：图层 → 面板分隔缝 → 分割线交互层 → 角标 / 交换 / 视图浮层
+    // → 隐藏的原生滑块
+    stage.append(first, secondWrap, divider, line, grab, handle);
     // 原生滑块不再单独占一行（视觉隐藏，1px）：只承担键盘操作与无障碍语义，
     // 分割位置完全由图像区内的拖拽 / 十字准心手柄控制
     const slider = document.createElement("input");
@@ -442,8 +506,77 @@ function createImageCompare(node) {
         '<path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
         "</svg>",
     ].join("");
-    stage.append(startLabel, endLabel, swap, slider, empty);
+    stage.append(startLabel, endLabel, swap, viewBar, slider, empty);
     root.append(stage);
+
+    // ── 闲置自动淡出 ──────────────────────────────────────────────
+    // 视图条 / A/B 角标 / 交换按钮都是压在图片上的浮层：顶部条落在水平居中处
+    // （正是主体的构图重心），底部一行横跨图片过半宽度。这里让它们在「指针离开」
+    // 或「在图内静止」后整体隐去，回到纯净画面；任何操作意图都会立刻把它们唤回。
+    // 契约：只切 stage 上的类名，完全不碰高度——getWidgetHeight() 与既有的高度
+    // 断言不受影响，控件的新增 / 删除也不会改变节点尺寸。
+    const IDLE_STILL_DELAY = 1800;  // 图内无动作多久算闲置
+    const IDLE_LEAVE_DELAY = 400;   // 离开 / 解锁后多久收起（容错掠过节点）
+    const IDLE_REVEAL_HOLD = 1500;  // 动作触发后的强制可见期
+    const IDLE_MOVE_THROTTLE = 200; // pointermove 节流窗口
+    let idleTimer = 0;
+    let holdUntil = 0;              // 强制可见期的截止时间戳
+    let idleLocked = false;         // 指针停在控件上 / 拖拽分割线期间不收起
+    let lastRevealStamp = 0;
+
+    const cancelIdle = () => {
+        if (idleTimer) {
+            clearTimeout(idleTimer);
+            idleTimer = 0;
+        }
+        stage.classList.remove("is-idle");
+    };
+    // 排闲置时把延迟推到强制可见期之后：否则「点完视图按钮 → 指针移开控件」
+    // 这条路径会用 400ms 的离开延迟把刚触发的 1.5s 强制可见期直接吞掉
+    const scheduleIdle = (delay) => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            idleTimer = 0;
+            if (!idleLocked) stage.classList.add("is-idle");
+        }, Math.max(delay, holdUntil - Date.now()));
+    };
+    /** 唤回控件；hold > 0 时开启强制可见期（用于刚刚发生的动作）。 */
+    const revealControls = (hold = 0) => {
+        if (hold > 0) holdUntil = Date.now() + hold;
+        cancelIdle();
+        scheduleIdle(IDLE_STILL_DELAY);
+    };
+    /** 锁定 / 解锁闲置：悬停在控件上或拖拽期间收起会把按钮从指针下抽走。 */
+    const lockIdle = (locked) => {
+        idleLocked = locked;
+        if (locked) cancelIdle();
+        else scheduleIdle(IDLE_LEAVE_DELAY);
+    };
+    stage.addEventListener("pointerenter", () => revealControls(), { signal });
+    // 闲置期控件是 pointer-events:none，指针移进它原来的矩形不会补发 pointerenter，
+    // 会陷入「唤回 → 1.8s 后又被收起 → 按钮点不到」的循环（重复点同一个视图按钮、
+    // 指针几乎不动时最容易踩到）。唤回是同步移掉 is-idle 的，所以这里 elementFromPoint
+    // 拿到的是恢复命中后的结果，可以据此补一次锁定。
+    const isOverControl = (x, y) => {
+        const el = document.elementFromPoint(x, y);
+        return Boolean(el && (viewBar.contains(el) || swap.contains(el)));
+    };
+    stage.addEventListener("pointermove", (event) => {
+        if (idleLocked) return;
+        // pointermove 可达 60Hz，不节流会持续重建定时器
+        if (event.timeStamp - lastRevealStamp < IDLE_MOVE_THROTTLE) return;
+        lastRevealStamp = event.timeStamp;
+        revealControls();
+        if (isOverControl(event.clientX, event.clientY)) lockIdle(true);
+    }, { signal });
+    stage.addEventListener("pointerleave", () => {
+        if (!idleLocked) scheduleIdle(IDLE_LEAVE_DELAY);
+    }, { signal });
+    // 指针停在控件上时收起会同时抽掉命中区（idle 会关 pointer-events），必须先锁住
+    for (const control of [viewBar, swap]) {
+        control.addEventListener("pointerenter", () => lockIdle(true), { signal });
+        control.addEventListener("pointerleave", () => lockIdle(false), { signal });
+    }
 
     node.properties ??= {};
     let payload = { a: null, b: null };
@@ -451,6 +584,61 @@ function createImageCompare(node) {
     const state = {
         aspectRatio: 16 / 9,
         normalizeSizeOnLoad: false,
+        // viewMode = 用户选择（可能是 auto）；resolvedView = 实际布局（永远具体）
+        viewMode: normalizeViewMode(node.properties.wosai_compare_view),
+        resolvedView: COMPARE_VIEW_DEFAULT,
+    };
+
+    const applyLayout = () => {
+        const resolved = resolveViewMode(state.viewMode, state.aspectRatio);
+        const changed = resolved !== state.resolvedView;
+        state.resolvedView = resolved;
+        // 视图类名挂在 stage 上（与 is-dragging / is-swapping / is-switching 一致），
+        // CSS 里的面板切分、分隔缝、角标归位全部以 .wosai-image-compare-stage.is-view-* 选择
+        stage.classList.toggle("is-view-slide", resolved === "slide");
+        stage.classList.toggle("is-view-side", resolved === "side");
+        stage.classList.toggle("is-view-stack", resolved === "stack");
+        for (const [mode, button] of viewButtons) {
+            const active = mode === state.viewMode;
+            button.classList.toggle("is-active", active);
+            button.setAttribute("aria-pressed", String(active));
+        }
+        // 只有滑动视图存在分割线；其余视图把隐藏滑块移出 tab 序列，避免键盘
+        // 焦点落到一个已失效、而且看不见的控件上
+        const splittable = resolved === COMPARE_VIEW_DEFAULT;
+        slider.disabled = !splittable;
+        slider.tabIndex = splittable ? 0 : -1;
+        return changed;
+    };
+
+    const applyStageRatio = () => {
+        // 双拼视图下舞台比例随视图变化（半幅还原原图比例），滑动视图保持原图比例
+        stage.style.setProperty(
+            "--wosai-compare-ratio",
+            `${stageAspectRatio(state.resolvedView, state.aspectRatio)} / 1`,
+        );
+    };
+
+    const commitLayout = (ratio) => {
+        const numeric = Number(ratio);
+        const next = Number.isFinite(numeric) && numeric > 0 ? numeric : state.aspectRatio;
+        const changed = Math.abs(state.aspectRatio - next) > 0.001;
+        state.aspectRatio = next;
+        const viewChanged = applyLayout();
+        applyStageRatio();
+        if (state.normalizeSizeOnLoad) {
+            state.normalizeSizeOnLoad = false;
+            const minWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
+            const minHeight = getWOSAIVarNum("--ws-compare-node-min-height", 280);
+            const computed = node.computeSize?.();
+            node.setSize?.([
+                Math.max(minWidth, Number(node.size?.[0]) || 0),
+                Math.max(minHeight, Number(computed?.[1]) || 0),
+            ]);
+            node.setDirtyCanvas?.(true, true);
+        } else if (changed || viewChanged) {
+            markChanged(node);
+        }
     };
 
     const updateAspectRatio = () => {
@@ -460,30 +648,17 @@ function createImageCompare(node) {
         const bRatio = second.naturalWidth && second.naturalHeight
             ? second.naturalWidth / second.naturalHeight
             : 0;
-        const ratio = aRatio || bRatio || (16 / 9);
-        const changed = Math.abs(state.aspectRatio - ratio) > 0.001;
-        if (changed) {
-            state.aspectRatio = ratio;
-            stage.style.setProperty("--wosai-compare-ratio", `${ratio} / 1`);
-        }
-        if (state.normalizeSizeOnLoad) {
-            state.normalizeSizeOnLoad = false;
-            const minWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
-            const minHeight = getWOSAIVarNum("--ws-compare-node-min-height", 320);
-            const computed = node.computeSize?.();
-            node.setSize?.([
-                Math.max(minWidth, Number(node.size?.[0]) || 0),
-                Math.max(minHeight, Number(computed?.[1]) || 0),
-            ]);
-            node.setDirtyCanvas?.(true, true);
-        } else if (changed) {
-            markChanged(node);
-        }
+        commitLayout(aRatio || bRatio || state.aspectRatio);
     };
 
     const updateSplit = () => {
         const value = normalizeSplitPercent(slider.value);
-        secondWrap.style.clipPath = `inset(0 ${100 - value}% 0 0)`;
+        // B 图层（上层）从分割线起向右侧裁剪出来，A 图层（底层）留在左侧：
+        // 这样图像内容与角标语义一致（左下角标 A 对应左侧的 A 图）。
+        // 双拼视图不裁剪图层：B 面板直接占右/下半幅，分割位置只对滑动视图有意义
+        secondWrap.style.clipPath = state.resolvedView === COMPARE_VIEW_DEFAULT
+            ? `inset(0 0 0 ${value}%)`
+            : "none";
         line.style.left = `${value}%`;
         // 写在 root 上：分割线、拖拽热区、十字手柄读同一个百分比，保证严格共线
         root.style.setProperty("--wosai-compare-split", `${value}%`);
@@ -498,8 +673,9 @@ function createImageCompare(node) {
         else second.removeAttribute("src");
         root.classList.toggle("has-first", Boolean(display.a));
         root.classList.toggle("has-second", Boolean(display.b));
-        startLabel.textContent = swapped ? "B" : "A";
-        endLabel.textContent = swapped ? "A" : "B";
+        // 尺寸标注直接读载荷里的原始尺寸：不必等图片解码，也不会被显示尺寸影响
+        startLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
+        endLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
         swap.disabled = !(payload.a && payload.b);
         swap.classList.toggle("is-active", swapped);
         swap.setAttribute("aria-pressed", String(swapped));
@@ -508,9 +684,15 @@ function createImageCompare(node) {
         empty.textContent = payload.a || payload.b
             ? t("nodes.imageCompare.incomplete", "Execute with both images connected")
             : t("nodes.imageCompare.empty", "Connect two images and execute");
+        // 载荷尺寸可以先于图片解码给出宽高比，避免首帧先按 16:9 兜底再跳一次
+        const sourceRatio = mediaSourceRatio(display.a) || mediaSourceRatio(display.b);
+        if (sourceRatio > 0) commitLayout(sourceRatio);
+        // 换图是「刚发生的动作」：控件先露出来，让新图的尺寸与当前视图状态可见
+        revealControls(IDLE_REVEAL_HOLD);
     };
     slider.addEventListener("input", updateSplit, { signal });
-    // 交换按钮位于图像区内，需拦住 pointerdown，避免触发 stage 的分割线拖拽
+    // 交换按钮与视图按钮都浮在图像区上，需拦住 pointerdown，
+    // 否则会被 stage 当成分割线拖拽的起点
     swap.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
     swap.addEventListener("click", () => {
         if (swap.disabled) return;
@@ -521,6 +703,23 @@ function createImageCompare(node) {
         requestAnimationFrame(() => stage.classList.remove("is-swapping"));
         markChanged(node);
     }, { signal });
+    const setView = (mode) => {
+        const next = normalizeViewMode(mode);
+        if (next === state.viewMode) return;
+        state.viewMode = next;
+        node.properties.wosai_compare_view = next;
+        stage.classList.add("is-switching");
+        commitLayout(state.aspectRatio);
+        updateSplit();
+        markChanged(node);
+        // 键盘触发时指针不在控件上，这里补上强制可见期，保证切换结果可被确认
+        revealControls(IDLE_REVEAL_HOLD);
+        requestAnimationFrame(() => stage.classList.remove("is-switching"));
+    };
+    for (const [mode, button] of viewButtons) {
+        button.addEventListener("pointerdown", (event) => event.stopPropagation(), { signal });
+        button.addEventListener("click", () => setView(mode), { signal });
+    }
     first.addEventListener("load", updateAspectRatio, { signal });
     second.addEventListener("load", updateAspectRatio, { signal });
     const setSplitFromPointer = (event) => {
@@ -529,32 +728,46 @@ function createImageCompare(node) {
         slider.value = String(value);
         updateSplit();
     };
+    // 分割拖拽只在滑动视图生效：双拼视图没有分割线，任意拖动都会变成「误触滑块」
+    const isSplittable = () => state.resolvedView === COMPARE_VIEW_DEFAULT;
     stage.addEventListener("pointerdown", (event) => {
+        if (!isSplittable()) return;
+        // 拖拽期间锁住闲置：分辨率低时拖到一半控件消失会让人以为操作中断了
+        lockIdle(true);
         stage.setPointerCapture?.(event.pointerId);
         stage.classList.add("is-dragging");
         event.preventDefault();
         setSplitFromPointer(event);
     }, { signal });
     stage.addEventListener("pointermove", (event) => {
+        if (!isSplittable()) return;
         if (event.buttons) setSplitFromPointer(event);
     }, { signal });
-    const endSplitDrag = () => stage.classList.remove("is-dragging");
+    const endSplitDrag = () => {
+        stage.classList.remove("is-dragging");
+        lockIdle(false);
+    };
     stage.addEventListener("pointerup", endSplitDrag, { signal });
     stage.addEventListener("pointercancel", endSplitDrag, { signal });
     stage.addEventListener("lostpointercapture", endSplitDrag, { signal });
     updateSplit();
 
     const getWidgetHeight = () => {
-        const gap = getWOSAIVarNum("--ws-gap-sm", 8);
-        // 控件高度 = 上下内边距 + 图像区高度；图像区高度严格等于 宽度 / 宽高比，
+        const gap = getWOSAIVarNum("--ws-gap-sm", 6);
+        // 控件高度 = 上下内边距 + 图像区高度；图像区高度严格等于 宽度 / 舞台宽高比，
         // 所以宽度优先取舞台实测值（首帧未挂载时按节点宽度扣除左右内边距估算）
-        const padInline = Math.max(gap, getWOSAIVarNum("--ws-compare-swap-size", 34) / 2);
+        // 这里必须与 CSS 的 padding-inline 完全同源（max(gap-sm, 手柄半径)），
+        // 否则首帧的估算宽度与实测宽度对不上，高度契约会差出几像素
+        const padInline = Math.max(
+            gap,
+            getWOSAIVarNum("--ws-compare-handle-size", 28) / 2,
+        );
         const contentWidth = Math.max(
             getWOSAIVarNum("--ws-media-preview-min-width", 240),
             stage.clientWidth || (Number(node.size?.[0]) || 420) - padInline * 2,
         );
-        const stageHeight = contentWidth / Math.max(0.1, state.aspectRatio);
-        return stageHeight + gap * 2;
+        const ratio = stageAspectRatio(state.resolvedView, state.aspectRatio);
+        return contentWidth / Math.max(0.1, ratio) + gap * 2;
     };
     addSizedDOMWidget(node, "wosai_compare_ui", "wosai_compare", root, {
         serialize: false,
@@ -574,7 +787,18 @@ function createImageCompare(node) {
     };
     node.__wosaiCompareSyncState = () => {
         swapped = Boolean(node.properties?.wosai_compare_swapped);
+        state.viewMode = normalizeViewMode(node.properties?.wosai_compare_view);
+        commitLayout(state.aspectRatio);
+        updateSplit();
         renderImages();
+    };
+    const refreshViewText = () => {
+        viewBar.setAttribute("aria-label", t("nodes.imageCompare.views", "Comparison view"));
+        for (const [mode, button] of viewButtons) {
+            const text = viewText(mode);
+            button.title = text;
+            button.setAttribute("aria-label", text);
+        }
     };
     node.__wosaiCompareRefreshText = () => {
         slider.setAttribute("aria-label", t(
@@ -584,6 +808,7 @@ function createImageCompare(node) {
         const swapText = t("nodes.imageCompare.swap", "Swap A/B");
         swap.title = swapText;
         swap.setAttribute("aria-label", swapText);
+        refreshViewText();
         if (!empty.hidden) {
             empty.textContent = root.classList.contains("has-first") || root.classList.contains("has-second")
                 ? t("nodes.imageCompare.incomplete", "Execute with both images connected")
@@ -591,19 +816,25 @@ function createImageCompare(node) {
         }
     };
     node.__wosaiCompareRefreshText();
+    applyLayout();
+    applyStageRatio();
     renderImages();
     ensureNodeMinSize(
         node,
         getWOSAIVarNum("--ws-media-node-min-width", 420),
-        getWOSAIVarNum("--ws-compare-node-min-height", 320),
+        getWOSAIVarNum("--ws-compare-node-min-height", 280),
     );
     compactNodeToContent(
         node,
         getWOSAIVarNum("--ws-media-node-min-width", 420),
-        getWOSAIVarNum("--ws-compare-node-min-height", 320),
+        getWOSAIVarNum("--ws-compare-node-min-height", 280),
     );
     cleanups.set(node, () => {
         controller.abort();
+        // 定时器不受 AbortController 管辖，节点销毁时必须手动清：
+        // 订阅闭包持有 stage / root，不清会阻止整棵子树被回收
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = 0;
         root.remove();
         delete node.__wosaiCompareRoot;
         delete node.__wosaiCompareSetImages;

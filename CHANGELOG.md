@@ -4,6 +4,74 @@
 
 ## [Unreleased]
 
+### License
+
+- **修复一处长期存在的 GPL-3.0 合规缺陷。** 本项目此前整体标注为 MIT，但其中 5 个前端文件实为 GPL-3.0 许可项目的衍生作品，被以 MIT 条款分发，构成许可证违规。经逐行比对量化后，现按 **GPL-3.0-or-later** 单独授权并补齐署名（本项目其余部分仍为 MIT）：
+
+  | 文件 | 上游（许可） | 逐字相同率 | 上游独创命名命中 |
+  | --- | --- | --- | --- |
+  | `web/auto-connect.js` | ComfyUI-KJNodes `web/js/fillconnect.js`（GPL-3.0，kijai） | 69.6% | 39 |
+  | `web/shake-disconnect.js` | ComfyUI-KJNodes `web/js/shake_to_disconnect.js`（GPL-3.0，kijai） | 67.7% | 58 |
+  | `web/performance-mode.js` | ComfyUI-KJNodes `web/js/performance.js`（GPL-3.0，kijai） | 51.7% | 35 |
+  | `web/shared/graph-utils.js` | ComfyUI-KJNodes `web/js/utility.js`（GPL-3.0，kijai） | 66.7% | 6 |
+  | `web/ignore-groups.js` | Goohaitools-comfyui `web/js/nodes pass.js`（GPL-3.0，goohai） | 22.7% | ~130 |
+
+- 新增 `LICENSE-GPL-3.0`（GPL v3 全文）与 `THIRD-PARTY-NOTICES.md`（完整署名、出处，含 MIT 来源与纯设计参考来源的区分）；`LICENSE` 增加「许可证例外说明」章节；README 增加许可证例外表。发布包现随附许可证全文与署名文件。
+- 上表 5 个文件均添加 `SPDX-License-Identifier: GPL-3.0-or-later` 文件头与上游项目／作者／原始文件路径注释。
+- 新增 `web/shared/licensing-consistency.test.mjs`（4 项断言）：锁定许可证文件齐备、SPDX 标识一致、署名完整，并**禁止 MIT 文件静态引用 GPL 文件**（防 GPL 反向传染）。已通过阴性验证。
+- 顺带澄清两条**不构成敞口**的来源：`logic-switch`（移植自 MIT 许可的 ComfyUI-OverrideSwitch，兼容）与 `color-theme.js` / `color-core.js`（参考 ComfyUI_GJJ_Nodes 的数据结构，逐字相同率 0%，颜色与实现均为独立设计）。
+- 完整审计记录见 `dev/licensing/PORTING-AUDIT.md`（该目录不随发布包分发）。
+
+### Added
+
+- 图像对比节点新增 4 种对比视图（图像区顶部居中的分段控件切换，状态持久化到 `wosai_compare_view`）：
+  - **滑动对比**（默认，原有行为）：单一舞台 + 可拖动分割线。
+  - **左右并排**：舞台一分为二，A 占左半、B 占右半。
+  - **上下并排**：A 占上半、B 占下半。
+  - **自动排布**：按素材宽高比择向——横图（比例 ≥ 1）走上下并排，竖图走左右并排，避免把横图压成细缝或把竖图拉成超高舞台。
+- 双拼视图的舞台宽高比按「半幅还原原图比例」动态计算（左右 ×2、上下 ÷2，并夹取到 `[0.5, 3]`），因此每半幅恰好等于素材原比例，图像零留白、零裁切；超出夹取区间时才退化为留白。
+- 图像对比节点新增 A/B 尺寸标注：角标直接读取后端载荷的 `width` / `height`，显示为 `A 1024×1024` 形式；载荷缺尺寸时自动退化为只显示字母 `A` / `B`，与旧行为外观一致。
+- 新增 `web/shared/compare-view-contract.test.mjs`（21 项）：把「视图类名的 JS 生产者 ↔ CSS 消费者」跨文件契约固化为回归测试（本轮即由它兜住一次类名挂错节点导致的整体布局失效）。其中 5 项覆盖闲置淡出契约：类名生产者/消费者一致、隐藏清单只含控件不含分割线、必须关掉命中、键盘聚焦兜底、闲置态不得进入高度计算且不得使用 `setInterval`。整组断言经阴性验证（逐项注入缺陷后按预期变红），并在**真实 Chrome** 中完成闲置态的渲染验收（加载真实 `media-tools.css` + 复刻节点 DOM，断言计算样式与命中测试结果）：控件 `opacity` 归零且 `pointer-events` 关闭、指针穿过控件后不再命中、分割线保持可见、键盘聚焦恢复可见、disabled 交换按钮不被误唤醒。
+- 新增 `wosai_core/media_preview.py`：图像对比节点的媒体载荷构造模块（独立实现）。负责输入类型判定（IMAGE / VIDEO 鸭子类型探测）、批次导出、上游磁盘文件直引、以及视频直引/拷贝/转码三级降级。
+- 新增 `tests/test_media_preview.py`（33 项）：覆盖媒体类型判定、托管目录路径解析、执行图反查、批次上限、视频 trim 回退、以及前端载荷字段契约。
+- 新增 `web/shared/frontend-reachability.test.mjs`（4 项）：把「发布体积」与「启动解析体积」永久对齐——以 `extension.json` 的 29 个 JS 入口为种子求静态 import 传递闭包，断言 `web/` 下每个 `.js` 都必须落入启动闭包或按需（动态 `import()`）闭包，`web/` 之外不得存在「随包发布但运行时永不加载」的模块。该测试在落地时经阴性验证（临时放入 stray 文件后按预期失败并指名该文件）。
+- 新增 `dev/frontend/README.md`：说明该目录收录「已写好、有单测、但尚未接入运行时」的前端纯函数地基（布局引擎 / 布局几何 / 功能注册表），约定不得被 `web/` 运行时模块静态 import，接线时移回 `web/shared/` 并同步本表。
+
+### Changed
+
+- `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
+- 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
+- `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。
+- 图像批次由「只取首帧」改为最多导出 10 帧（`MAX_BATCH_PREVIEWS`），载荷以 `batch` / `batch_size` / `batch_index` 描述，含每帧 `width` / `height`。
+- 载荷新增 `version`（当前为 2）与 `kind` 字段；`filename` / `subfolder` / `type` 三个旧字段保持不变，现有前端无需改动即可继续工作。
+- 两侧都未连接时返回 `preserve` 指令，前端可据此保留上一次预览；旧前端读到空值仍按原行为清空。
+- 两侧输入类型不一致（图像 + 视频混合）时明确抛出 `TypeError`，不再产出半截预览。
+- `WOSAI_ImageCompare` 移除已无用途的 `extra_pnginfo` 隐藏输入，改为声明 `unique_id`（用于沿执行图反查上游文件引用）。
+- 拖拽光标由分割热区的基础态移入滑动视图态：双拼视图不再出现「有 `ew-resize` 光标但拖不动」的误导。
+- 图像对比新增设计令牌 `--ws-compare-view-size`（24px）、`--ws-compare-view-icon-size`（14px）；i18n 新增 `nodes.imageCompare.views` / `viewSlide` / `viewSide` / `viewStack` / `viewAuto`。
+- **图像对比的浮层控件改为闲置自动淡出，解决图标遮挡图片的问题。** 视图切换条、A/B 尺寸角标与交换按钮都是压在图像区上的绝对定位浮层——顶部条落在水平居中处（正是主体的构图重心），底部一行横跨图片过半宽度，常驻显示会持续打断观看。现改为：指针离开节点 400ms、或在图像区内静止 1800ms 后，三组控件整体淡出，指针移入、键盘聚焦、拖拽分割线、切换视图、换图任一动作都立刻唤回（动作触发后另有 1500ms 的强制可见期，避免刚点完就消失）。要点：
+  - 淡出时**必须同时关闭命中**（`pointer-events: none`）：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到看不见的按钮。
+  - 分割线、拖拽热区与十字手柄**不参与**隐藏——它们是「这是一张对比图」的语义表达，不是操作项；一并隐掉会让节点退化成一张普通图片。
+  - 用 `opacity` 而非 `visibility` / `display`：`opacity: 0` 的元素仍留在无障碍树中，屏幕阅读器依旧能读到角标里的尺寸文本。键盘 Tab 到控件时由 `:focus-within` 恢复可见，选择器带 `:not(:disabled)` 以免把 disabled 交换按钮自身的降级透明度覆盖成 1。
+  - 闲置态只切 `stage` 上的 `.is-idle` 类名，**完全不进入 `getWidgetHeight()` 的高度计算**，因此节点尺寸与既有高度断言不受影响（控件增删不改变节点高度）。指针移入隐藏控件原位置时不会补发 `pointerenter`，另用一次 `elementFromPoint` 补判锁定，否则会陷入「唤回 → 收起 → 按钮点不到」的循环。
+  - 定时器用可重置的 `setTimeout`（不用 `setInterval`——门禁对其数量有预算），并在节点销毁时随 `cleanups` 一并清除（定时器不受 `AbortController` 管辖，不清会让订阅闭包持有整棵 DOM 子树）。
+
+### Performance
+
+- **前端体积优化（为 P3 视频传输控件 / P4 批次与缩放平移腾出预算余量）。** 主 JavaScript **1402.8 → 1346.9 KiB**（预算 1450 KiB，余量 13.2 → **103.1 KiB**），样式 **235.9 → 230.5 KiB**（预算 256 KiB，余量 14.1 → **25.5 KiB**）；发布包 **162 → 160 文件**（少 3 个迁出模块、多 1 个新增的 `wosai_core/media_preview.py`）。度量口径为 `web/` 下 `.js` / `.css` 的**原始磁盘字节**，构建压缩与注释压缩均不计入，因此措施全部是「真实删减或移出发布目录」。分三步：
+  1. **移出运行时零加载模块（−25.2 KiB）**：`layout-engine.js`（12.9 KiB）、`feature-registry.js`（8.8 KiB）、`layout-geometry.js`（3.6 KiB）三者均无任何 import、也未被 `extension.json` 引用，属「随包发布但启动时永不解析」的死重；`git mv` 至 `dev/frontend/` 后同时退出发布目录与体积预算。顺带把 `benchmark-frontend.mjs` 的 import 指向新路径（其布局性能预算仍需守住）。
+  2. **删除确定无引用的死声明（−30.7 KiB，11 文件 / 净删 568 行）**：以「整个仓库（`web/` + `dev/` + `scripts/` + `tests/`）文本语料中标识符出现次数 == 1（仅声明处）」为判据，并用行边界法逐块测量（按顶层声明起始行切分，避免前一声明函数体内出现下一声明字面量而误切）。批量删除后按 eslint 与独立死码扫描器**迭代四轮**至收敛，逐层处理连锁暴露（删 `buildAlignItems` → `_buildSpacingGapInput` / `_resizeBtn` / `_alignBtn` → `BAR_LABELS` / `barLabel` / `hudMkBtn` / `glassT` import）。刻意保留 382 B 的**有意保留 API 面**（`hub-bar.js` 的 `showHubBar()` / `hideHubBar()` / `positionHubBarAboveNode()` 等带 `/** Compatibility bridge … */` 注释的 HTMLOverlay 公开方法），与「功能已禁用」的空实现桩（`_zoomTick()` / `_needsZoomTick()`）区分对待后者的删除。
+  3. **CSS 死规则与死令牌回收（−5.4 KiB）**：采用**可证明安全**的判据——「该类名在**整个仓库**中仅出现于这一条 CSS 规则、其他任何文件（含其他 CSS 选择器）都零出现」⇒ 没有任何元素能带上该类 ⇒ 规则永不匹配。辅以两道守卫：①**选择器列表守卫**（`/* 统一禁态 */ .ws-disabled, [data-wosai-panel] [disabled], …` 这类混有纯属性选择器分支的规则整条保留）；②**动态类名排查**（确认全仓无 `classList.add(变量)` / `className = 变量` / `` `prefix-${x}` `` 形式的类名构造，故「非 CSS 语料零出现」是可靠判据）。删规则后连锁orphan的 **33 个 `--ws-*` 令牌**一并从 `wosai-variables.css` 删除（含 `--ws-sh-*` 语法高亮色、`--ws-os-*` 滑块控件尺寸、`--ws-pp-*` 预设面板尺寸等），并清理 2 处失去标注对象的分区横幅。
+- CSS 规范 lint 棘轮基线 **72 → 58**（`--update-baseline` 下调）：`未使用变量` 由 23 条归零、`硬编码颜色` 27 → 26、`硬编码尺寸` 32。此次下调同时**还清了上一轮 JS 死码删除所连带造成的欠账**（删除 `_syntaxColors` / `getSyntaxColors` / `_buildSpacingGapInput` 后，其消费的 `--ws-sh-*` / `--ws-lt-*` 令牌成为未使用变量，而当时只验证了 `lint:js`（eslint）未复跑 CSS 令牌 lint）。
+
+### Fixed
+
+- 修复 `preset-prompt.css` 的缓存破坏版本号**双源不一致**：`extension.json` 声明 `?v=18`、而 `web/preset-prompt.js` 以 `?v=51` 加载，同一文件被以两个 URL 各取一次。现统一为 `?v=52`。
+- 同步本轮改动文件的缓存破坏版本号：`wosai-variables.css` 21 → 22、`wosai-theme.css` 3 → 4（两处均在 `extension.json` 与 `web/shared/dom-widget.js` 成对更新，`check-frontend-performance.mjs` 会断言两者一致）、`layout-toolkit.css` 21 → 22、`title-note.css` 5 → 6、`device-info.css` 4 → 5、`media-tools.css` 11 → 12。
+- 修复图像对比节点**滑动视图的 A/B 图层与角标左右颠倒**：B 图层原先用 `inset(0 X% 0 0)` 从右侧裁剪，导致分割线以左显示的是 B、以右显示的是 A，而左下角角标标注的是 `A`（CHANGELOG 2.1.0 已明确约定「A 为左下角胶囊、B 为右下角胶囊」）。现改为 `inset(0 0 0 X%)` 从左侧裁剪，图像内容与角标语义一致，也与新增的双拼视图（A 恒在左/上）保持一致。此缺陷由本轮像素级验收发现（几何断言无法察觉）。
+- 修复图像对比节点 DOM 控件高度估算所用内边距与 CSS 不同源的问题：估算读的是 `--ws-compare-swap-size / 2`（17px），而 CSS 的 `padding-inline` 用的是 `--ws-compare-handle-size / 2`（14px），首帧按节点宽度估算时每侧偏 3px，高度契约在挂载前存在 6px 偏差。现统一读手柄令牌。
+- 修复图像对比节点视图类名与 CSS 选择器不一致的问题：视图状态类若挂在根容器上，而样式选择器写的是 `.wosai-image-compare-stage.is-view-*`，双拼布局会整体不生效且无任何报错。现已统一挂在 stage 上，并由 `compare-view-contract.test.mjs` 锁定。
+
 ## [2.1.0] - 2026-09-27
 
 ### Added

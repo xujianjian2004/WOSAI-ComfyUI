@@ -1,36 +1,10 @@
 // ========== WOSAI 共享工具 ==========
 // 由 canvas.js 和 renderer.js 共享
-// 字体解析与颜色转换
+// 设计令牌读取、字体缓存与通用等待/拖拽辅助
 
 import { app } from "../../../scripts/app.js";
 
-export const FONT_TTL = 3000;
-
 let _fontCache = null, _fontTime = 0;
-
-/**
- * 获取 ComfyUI 当前 UI 字体（带缓存，3秒 TTL）
- * @returns {string} CSS font-family 值
- */
-export function getUIFont() {
-    const now = Date.now();
-    if (_fontCache && now - _fontTime < FONT_TTL) return _fontCache;
-    const root = getComputedStyle(document.documentElement);
-    for (const v of ['--font-family','--fontFamily','--p-font-family','--ui-font-family','--body-font-family']) {
-        const val = root.getPropertyValue(v).trim();
-        if (val && val !== 'inherit' && val !== 'initial') { _fontCache = val; _fontTime = now; return val; }
-    }
-    for (const sel of ['.comfy-multiline-input','.p-button','.p-panelmenu','#vue-app','#app']) {
-        const el = document.querySelector(sel);
-        if (el) { const ff = getComputedStyle(el).fontFamily; if (ff && !/^["']?serif/i.test(ff.trim())) { _fontCache = ff; _fontTime = now; return ff; } }
-    }
-    for (const el of document.querySelectorAll('button,label,span,.p-component')) {
-        const ff = getComputedStyle(el).fontFamily;
-        if (ff) { const lo = ff.trim().toLowerCase(); if (lo && lo !== 'serif' && !lo.startsWith('serif,')) { _fontCache = ff; _fontTime = now; return ff; } }
-    }
-    _fontCache = '"PingFang SC","Microsoft YaHei","Noto Sans",BlinkMacSystemFont,"Segoe UI",sans-serif';
-    _fontTime = now; return _fontCache;
-}
 
 /** 清除字体缓存，主题切换后调用 */
 export function resetFontCache() { _fontCache = null; _fontTime = 0; }
@@ -66,48 +40,10 @@ export function getWOSAIVarNum(name, fallback) {
     return Number.isFinite(n) ? n : fallback;
 }
 
-/** 清除 WOSAI token 与语法高亮色缓存，主题切换后调用 */
+/** 清除 WOSAI token 与字体缓存，主题切换后调用 */
 export function resetWOSAICache() {
     _WOSAI_VAR_CACHE.clear();
-    _refreshSyntaxColors();
     resetFontCache();
-}
-
-/**
- * HEX 颜色转 rgba() 字符串
- * @param {string} hex - 6位 HEX 色值（如 '#C0392B'）
- * @param {number} alpha - 透明度 0~1
- * @returns {string} rgba() 字符串
- */
-export function hexToRgba(hex, alpha = 1) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-}
-
-// ── 语法高亮颜色缓存 ──
-let _syntaxColors = null;
-function _refreshSyntaxColors() {
-    _syntaxColors = {
-        keyword:  getWOSAIVar('--ws-sh-keyword'),
-        string:   getWOSAIVar('--ws-sh-string'),
-        number:   getWOSAIVar('--ws-sh-number'),
-        comment:  getWOSAIVar('--ws-sh-comment'),
-        function: getWOSAIVar('--ws-sh-function'),
-        operator: getWOSAIVar('--ws-sh-operator'),
-        variable: getWOSAIVar('--ws-sh-variable'),
-    };
-}
-_refreshSyntaxColors();
-
-/**
- * 获取 WOSAI 主题下的语法高亮色
- * @returns {{keyword:string, string:string, number:string, comment:string, function:string, operator:string, variable:string}}
- */
-export function getSyntaxColors() {
-    if (!_syntaxColors) _refreshSyntaxColors();
-    return _syntaxColors;
 }
 
 /**
@@ -226,10 +162,4 @@ export function makeDraggable(panel, opts = {}) {
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
     };
-}
-
-export function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
 }

@@ -26,7 +26,7 @@ function getMeasureContext() {
    ════════════════════════════════════════════════════════════════ */
 (function ensureTitleNoteCSS() {
     ensureWosaiStyles([
-        ["wosai-title-note-css", new URL("./styles/title-note.css?v=5", import.meta.url).href]
+        ["wosai-title-note-css", new URL("./styles/title-note.css?v=6", import.meta.url).href]
     ]);
 })();
 

@@ -452,7 +452,12 @@
     "empty": "Connect two images and execute",
     "incomplete": "Execute with both images connected",
     "position": "Comparison position",
-    "swap": "Swap A/B"
+    "swap": "Swap A/B",
+    "views": "Comparison view",
+    "viewSlide": "Slide",
+    "viewSide": "Side by side",
+    "viewStack": "Stacked",
+    "viewAuto": "Auto layout"
   },
   "getWidget": {
     "all": "All widgets",

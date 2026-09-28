@@ -12,9 +12,10 @@ const EXCLUDED_DIRECTORIES = new Set([
     "playwright-report",
     "playwright-results",
 ]);
-// 发布校验会在仓库根临时解压出 .wosai-release-<随机> 目录（正常会被清理）。
-// 一旦残留，其相对导入会解析到 staging 之外并被误判为"缺失文件"，故按前缀跳过。
-const EXCLUDED_DIRECTORY_PREFIXES = [".wosai-release-"];
+// 发布校验会在仓库根临时解压出 .wosai-release-<随机> 目录，发布工具的单测会在仓库根
+// 生成 .release-test-<随机> 目录（正常都会被清理，Windows 句柄未及时释放时会残留）。
+// 一旦残留，前者会把 staging 之外的文件算进统计，后者会被重复计入，故按前缀跳过。
+const EXCLUDED_DIRECTORY_PREFIXES = [".wosai-release-", ".release-test-"];
 
 function isExcludedDirectory(name) {
     return EXCLUDED_DIRECTORIES.has(name)

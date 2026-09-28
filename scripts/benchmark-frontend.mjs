@@ -1,7 +1,9 @@
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-import { computeLayout } from "../web/shared/layout-engine.js";
+// layout-engine 是尚未接入运行时的纯函数地基（见 dev/frontend/README.md），
+// 但它的性能预算仍需持续守住，故基准脚本从 dev/ 侧引用。
+import { computeLayout } from "../dev/frontend/layout-engine.js";
 import { sanitizeSaveNodeData } from "../web/shared/save-node-data.js";
 import { match } from "../web/shared/search-engine.js";
 

@@ -30,7 +30,7 @@
     "web/selector.js?v=12",
     "web/common-color.js?v=15",
     "web/route-switch.js",
-    "web/media-tools.js?v=10",
+    "web/media-tools.js?v=11",
     "web/get-widget.js?v=6",
     "web/size-select.js",
     "web/preset-prompt.js?v=12",
@@ -38,21 +38,21 @@
     "web/device-info.js?v=9"
   ],
   "css": [
-    "web/styles/wosai-variables.css?v=21",
-    "web/styles/wosai-theme.css?v=3",
+    "web/styles/wosai-variables.css?v=22",
+    "web/styles/wosai-theme.css?v=4",
     "web/styles/os-slider.css",
     "web/styles/os-slider-panel.css",
     "web/styles/os-slider-hide.css",
     "web/styles/os-color.css",
-    "web/styles/layout-toolkit.css?v=21",
-    "web/styles/title-note.css?v=5",
+    "web/styles/layout-toolkit.css?v=22",
+    "web/styles/title-note.css?v=6",
     "web/styles/ignore-groups.css?v=3",
     "web/styles/os-size.css",
     "web/styles/save-node.css",
     "web/styles/selector.css?v=5",
-    "web/styles/media-tools.css?v=10",
-    "web/styles/preset-prompt.css?v=18",
-    "web/styles/device-info.css?v=4"
+    "web/styles/media-tools.css?v=13",
+    "web/styles/preset-prompt.css?v=52",
+    "web/styles/device-info.css?v=5"
   ],
   "tags": ["canvas", "annotation", "size-selection", "node-color", "omni-slider", "theme", "align", "layout"],
   "min_comfyui_version": "0.2.0"
