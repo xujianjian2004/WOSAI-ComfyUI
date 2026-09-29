@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+import { stageAspectRatio } from "./media-preview.js";
 
 const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
 
@@ -204,4 +205,113 @@ test("闲置状态机不触碰高度契约，且只用 setTimeout", () => {
     assert.match(JS, /if \(idleTimer\) clearTimeout\(idleTimer\);/);
     // 门禁对 setInterval 有数量预算，闲置逻辑必须用可重置的 setTimeout
     assert.doesNotMatch(JS, /setInterval\(/);
+});
+
+// 切换视图改变的是舞台宽高比（左右 ×2 → 变矮、上下 ÷2 → 变高），但 node.size
+// 是持久化值：ComfyUI 不会因 DOM widget 的高度契约变化而自动调整节点，不重算
+// 就会出现「图像区被压扁」或「节点下方留一大块空白」。
+test("切换视图会重算节点尺寸", () => {
+    const setView = JS.match(/const setView = \(mode\) => \{[\s\S]*?\n {4}\};/);
+    assert.ok(setView, "未找到 setView");
+    assert.match(setView[0], /fitNodeToStage\(\);/, "切换视图后必须重算节点尺寸");
+});
+
+test("节点尺寸重算只有一处实现，且 setSize 与 setDirtyCanvas 成对", () => {
+    const fit = FIT_SRC;
+    assert.ok(fit, "未找到尺寸重算实现");
+    assert.match(fit, /node\.setSize\?\.\(/);
+    assert.match(fit, /node\.setDirtyCanvas\?\.\(true, true\)/);
+    // 宽度沿用节点当前宽度（用户拖出来的宽度是有意的），只重算高度
+    assert.match(fit, /--ws-media-node-min-width/);
+    assert.match(fit, /--ws-compare-node-min-height/);
+    // 首次载入的尺寸归一必须复用同一实现，否则两处会各自漂移
+    const commit = JS.match(/const commitLayout = \(ratio\) => \{[\s\S]*?\n {4}\};/);
+    assert.ok(commit, "未找到 commitLayout");
+    assert.match(commit[0], /fitNodeToStage\(\{/);
+    assert.doesNotMatch(commit[0], /node\.setSize\?\.\(/, "commitLayout 不得再自带一份尺寸计算");
+});
+
+// ── 行为验证：抽出高度契约与尺寸重算，在 stub 上真跑一遍 ──
+// media-tools.js 里有两份 getWidgetHeight（取点编辑器与图像对比各一份），
+// 必须按内容挑出对比节点这一份，否则会抽错函数
+function pickSource(re, marker) {
+    const candidates = [...JS.matchAll(re)].map((entry) => entry[0]);
+    return candidates.find((src) => src.includes(marker));
+}
+
+const HEIGHT_SRC = pickSource(/const getWidgetHeight = \(\) => \{[\s\S]*?\n {4}\};/g, "stage.clientWidth");
+const FIT_SRC = pickSource(/const (fitNodeToStage|syncNodeSize)\s*=\s*\([\s\S]*?\n {4}\};/g, "node.setSize");
+
+function loadCompareSizing(viewMode = "slide") {
+    assert.ok(HEIGHT_SRC, "未找到 getWidgetHeight");
+    assert.ok(FIT_SRC, "未找到 fitNodeToStage");
+    const factory = new Function(
+        "getWOSAIVarNum", "stage", "state", "stageAspectRatio", "root", "requestAnimationFrame",
+        `${HEIGHT_SRC}\n${FIT_SRC}\n`
+        // node.computeSize 要用到 widget 高度，故在同源作用域里造这个 stub
+        + "const node = {\n"
+        + "  size: [420, 520], dirty: false,\n"
+        + "  computeSize: () => [node.size[0], getWidgetHeight() + 60],\n"
+        + "  setSize(v) { node.size = v.slice(); },\n"
+        + "  setDirtyCanvas() { node.dirty = true; },\n"
+        + "};\n"
+        + "return { getWidgetHeight, fitNodeToStage, node };\n",
+    );
+    const vars = {
+        "--ws-gap-sm": 6,
+        "--ws-compare-handle-size": 28,
+        "--ws-media-preview-min-width": 240,
+        "--ws-media-node-min-width": 420,
+        "--ws-compare-node-min-height": 280,
+    };
+    return factory(
+        (name, fallback) => vars[name] ?? fallback,
+        { clientWidth: 400 },
+        { aspectRatio: 16 / 9, viewMode },
+        stageAspectRatio,
+        { isConnected: true },
+        (fn) => fn(), // 同步执行，测试里不引入真实帧延迟
+    );
+}
+
+test("切换视图确实改变节点高度（左右变矮、上下变高）", () => {
+    const heightOf = (mode) => {
+        const sizing = loadCompareSizing(mode);
+        sizing.fitNodeToStage();
+        return sizing.node.size[1];
+    };
+    const slide = heightOf("slide");
+    const side = heightOf("side");
+    const stack = heightOf("stack");
+    assert.ok(stack > slide, `上下排列必须比滑动高：stack=${stack} slide=${slide}`);
+    assert.ok(side < slide, `左右排列必须比滑动矮：side=${side} slide=${slide}`);
+});
+
+test("重算只改高度，不动用户拖出来的宽度", () => {
+    const sizing = loadCompareSizing("stack");
+    sizing.fitNodeToStage();
+    assert.equal(sizing.node.size[0], 420, "宽度必须沿用节点当前宽度");
+    assert.equal(sizing.node.dirty, true, "改完尺寸必须标脏，否则画布不重绘");
+});
+
+test("左右并排会把过窄的节点补宽（半幅不得小于最小预览宽）", () => {
+    const sizing = loadCompareSizing("side");
+    sizing.node.size[0] = 300; // 用户拖窄过
+    sizing.fitNodeToStage();
+    assert.ok(sizing.node.size[0] >= 480,
+        `左右并排的最小宽度应为两幅预览宽：实际 ${sizing.node.size[0]}`);
+    // 已经够宽的节点不该被改动
+    const wide = loadCompareSizing("side");
+    wide.node.size[0] = 900;
+    wide.fitNodeToStage();
+    assert.equal(wide.node.size[0], 900);
+});
+
+test("切换视图不夹初始最小高度（左右并排的舞台本就矮，夹了会留白）", () => {
+    const sizing = loadCompareSizing("side");
+    sizing.fitNodeToStage();
+    assert.ok(sizing.node.size[1] < 280,
+        `左右并排应收到内容高度而非初始最小高度：${sizing.node.size[1]}`);
+    // 但首次载入仍要夹，避免节点初始坍缩
+    assert.match(JS, /fitNodeToStage\(\{ clampMinHeight: true \}\)/);
 });

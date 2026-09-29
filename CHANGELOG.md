@@ -184,6 +184,8 @@
 - 清理 **33 个全仓零引用的 `common.*` 死键**（`wosaiNodeAlign` / `wosaiSelectSame` / `alignCenter` / `interfaceLanguage` …）：这些条目属于早期「通用词库」，随 UI 改版后已无任何消费者，`t()` 的兜底参数让缺失不会暴露。删除后 zh / en 两侧键数 1344 → 1311，并由新增的 i18n 反向检查防止再堆积。
 - 修复 **鼠标停在节点内 DOM 控件上时无法滚轮缩放画布**（图像对比节点即为此症状）。节点内 DOM widget 是覆盖在画布之上的兄弟元素，滚轮事件不会冒泡到 canvas —— LiteGraph 的缩放监听（`_mousewheel_callback` → `processMouseWheel`）绑在 canvas 元素自身，ComfyUI 只为多行输入框做过转发。现由 `web/shared/wheel-forward.js::forwardWheelToCanvas()` 把无法被内部滚动消费的滚轮原样派发给画布：`clientX/Y`、`deltaX/Y/Z`、`deltaMode` 与 ctrl/shift/alt/meta 全部透传（缩放中心因此与指针一致，ctrl+滚轮的「缩放 / 平移」分支也不会走错），并 `preventDefault` + `stopPropagation`，避免页面跟着滚与嵌套绑定重复处理。内部滚动优先：事件路径上若存在仍可纵向滚动的容器则让位，且判定只到控件根元素为止，不越过它（免得被外层容器误判成「内部还能滚」）。`addSizedDOMWidget()` 默认挂载（`forwardWheel: false` 可关闭），所有节点内 DOM widget 一并受益；`ignore-groups.js` 原先自带的同款实现（8 处绑定）改为复用共享实现，并以 `respectInnerScroll: false` 保持其「一律转发」的既有语义。新增 `wheel-forward-contract.test.mjs`（7 项：全仓唯一实现、默认挂载、内部让位、修饰键透传、无画布时静默放弃），并在**真实 Chrome** 中完成 7 项验收：画布收到一次 wheel 且增量 / 坐标一致、默认滚动被阻止（页面 `scrollY` 不变）、内部容器照常滚动、画布外滚轮作为对照仍会滚动页面、ctrl 修饰键透传。
 
+- 修复 **切换对比视图（滑动 / 左右 / 上下）后节点尺寸不跟随**的问题。切换视图改变的是舞台宽高比（左右 ×2 → 变矮、上下 ÷2 → 变高），但 `node.size` 是持久化值，ComfyUI 不会因 DOM widget 的高度契约变化而自动调整节点 ⇒ 切到左右排列时图像区下方留出一大块空白、切到上下排列时图像区被压缩。现新增 `fitNodeToStage()`：宽度沿用节点当前宽度（左右排列时若过窄则补到「两幅最小预览宽」，免得两张图都缩成缩略图），高度按 `node.computeSize()` 重算并标脏。三个易错点：①**宽度变化必须先落下去再取高度** —— 高度契约读的是 stage 实测宽度，同一帧里取到的还是旧宽度，故分两步（先落宽、下一帧取高）；②**切换视图不夹初始最小高度** `--ws-compare-node-min-height`，否则左右排列会被撑回 280 而继续留白，仅「首次载入」仍夹，避免节点初始坍缩；③延迟回调里确认 `root.isConnected`，节点在两帧之间被删除时不再改尺寸。新增 5 项契约断言（切换必调尺寸重算、实现单一、左右更矮 / 上下更高、只改高度不动宽度、过窄补宽），其中「左右 / 上下高度关系」是把 `getWidgetHeight` 与 `fitNodeToStage` 抽到 stub 上真跑得出的。
+
 ## [2.1.0] - 2026-09-27
 
 ### Added

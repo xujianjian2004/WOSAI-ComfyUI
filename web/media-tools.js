@@ -605,6 +605,46 @@ function createImageCompare(node) {
         );
     };
 
+    // 把节点尺寸重算到「当前视图 + 当前比例」所需的大小。
+    // node.size 是持久化值，ComfyUI 不会因为 DOM widget 的高度契约变了就自动
+    // 调整节点：切换视图改变的是舞台宽高比（左右 ×2 → 变矮、上下 ÷2 → 变高），
+    // 不重算就会出现「图像区被压扁」或「节点下方留一大块空白」。
+    // 宽度沿用节点当前宽度（用户拖出来的宽度是有意的），只重算高度。
+    // clampMinHeight：只有「首次载入」才夹到 --ws-compare-node-min-height。
+    // 切换视图时不夹——左右并排的舞台本来就矮，夹到初始最小高度会在图像区
+    // 下方留出一块空白，看起来就像「没跟着模式调整」。
+    const fitNodeToStage = ({ clampMinHeight = false } = {}) => {
+        const nodeMinWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
+        // 左右并排时每半幅只占节点宽的一半：沿用滑动视图的宽度会把两张图都
+        // 挤成缩略图，故该模式下把最小宽度抬到「两幅最小预览宽」
+        const minWidth = state.viewMode === "side"
+            ? Math.max(
+                nodeMinWidth,
+                getWOSAIVarNum("--ws-media-preview-min-width", 240) * 2,
+            )
+            : nodeMinWidth;
+        const targetWidth = Math.max(minWidth, Number(node.size?.[0]) || 0);
+        // 宽度变了必须先落下去：DOM widget 的高度契约读的是 stage 实测宽度，
+        // 同一帧里取到的还是旧宽度，据此算出的高度会差一截。故分两步。
+        if (targetWidth !== Number(node.size?.[0])) {
+            node.setSize?.([targetWidth, Number(node.size?.[1]) || 0]);
+        }
+        const applyHeight = () => {
+            // 节点可能在这一帧之间被删除，回调里必须再确认一次
+            if (!root.isConnected) return;
+            const computed = node.computeSize?.();
+            // 算不出内容高度时保持原高度，绝不把节点压成 0
+            const next = Number(computed?.[1]) || Number(node.size?.[1]) || 0;
+            const minHeight = clampMinHeight
+                ? getWOSAIVarNum("--ws-compare-node-min-height", 280)
+                : 0;
+            node.setSize?.([targetWidth, Math.max(minHeight, next)]);
+            node.setDirtyCanvas?.(true, true);
+        };
+        if (typeof requestAnimationFrame === "function") requestAnimationFrame(applyHeight);
+        else applyHeight();
+    };
+
     const commitLayout = (ratio) => {
         const numeric = Number(ratio);
         const next = Number.isFinite(numeric) && numeric > 0 ? numeric : state.aspectRatio;
@@ -614,14 +654,7 @@ function createImageCompare(node) {
         applyStageRatio();
         if (state.normalizeSizeOnLoad) {
             state.normalizeSizeOnLoad = false;
-            const minWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
-            const minHeight = getWOSAIVarNum("--ws-compare-node-min-height", 280);
-            const computed = node.computeSize?.();
-            node.setSize?.([
-                Math.max(minWidth, Number(node.size?.[0]) || 0),
-                Math.max(minHeight, Number(computed?.[1]) || 0),
-            ]);
-            node.setDirtyCanvas?.(true, true);
+            fitNodeToStage({ clampMinHeight: true });
         } else if (changed) {
             markChanged(node);
         }
@@ -697,6 +730,9 @@ function createImageCompare(node) {
         stage.classList.add("is-switching");
         commitLayout(state.aspectRatio);
         updateSplit();
+        // 视图换了 ⇒ 舞台宽高比换了 ⇒ 节点高度必须跟着重算，否则节点尺寸
+        // 还停在上一个视图的大小上（左右视图会留出空白、上下视图会被压扁）
+        fitNodeToStage();
         markChanged(node);
         // 键盘触发时指针不在控件上，这里补上强制可见期，保证切换结果可被确认
         revealControls(IDLE_REVEAL_HOLD);
