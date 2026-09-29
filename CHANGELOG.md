@@ -24,11 +24,10 @@
 
 ### Added
 
-- 图像对比节点新增 4 种对比视图（图像区顶部居中的分段控件切换，状态持久化到 `wosai_compare_view`）：
+- 图像对比节点新增 3 种对比视图（图像区顶部居中的分段控件切换，状态持久化到 `wosai_compare_view`）：
   - **滑动对比**（默认，原有行为）：单一舞台 + 可拖动分割线。
   - **左右并排**：舞台一分为二，A 占左半、B 占右半。
   - **上下并排**：A 占上半、B 占下半。
-  - **自动排布**：按素材宽高比择向——横图（比例 ≥ 1）走上下并排，竖图走左右并排，避免把横图压成细缝或把竖图拉成超高舞台。
 - 双拼视图的舞台宽高比按「半幅还原原图比例」动态计算（左右 ×2、上下 ÷2，并夹取到 `[0.5, 3]`），因此每半幅恰好等于素材原比例，图像零留白、零裁切；超出夹取区间时才退化为留白。
 - 新增 `web/shared/compare-view-contract.test.mjs`（21 项）：把「视图类名的 JS 生产者 ↔ CSS 消费者」跨文件契约固化为回归测试（本轮即由它兜住一次类名挂错节点导致的整体布局失效）。其中 5 项覆盖闲置淡出契约：类名生产者/消费者一致、隐藏清单只含控件不含分割线、必须关掉命中、键盘聚焦兜底、闲置态不得进入高度计算且不得使用 `setInterval`。整组断言经阴性验证（逐项注入缺陷后按预期变红），并在**真实 Chrome** 中完成闲置态的渲染验收（加载真实 `media-tools.css` + 复刻节点 DOM，断言计算样式与命中测试结果）：控件 `opacity` 归零且 `pointer-events` 关闭、指针穿过控件后不再命中、分割线保持可见、键盘聚焦恢复可见、disabled 交换按钮不被误唤醒。
 - 新增 `wosai_core/media_preview.py`：图像对比节点的媒体载荷构造模块（独立实现）。负责输入类型判定（IMAGE / VIDEO 鸭子类型探测）、批次导出、上游磁盘文件直引、以及视频直引/拷贝/转码三级降级。
@@ -116,7 +115,7 @@
   - 缓存破坏：`device-info.js` `?v=18 → 19`、`device-info.css` `?v=12 → 13`（双源）、`wosai-variables.css` `?v=25 → 26`（双源）。
   - 体积：主 JavaScript **1379.9 → 1373.0 KiB**（余 77.0 KiB）、样式 **238.1 → 236.0 KiB**（余 14.0 KiB），预算内。
 
-- `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
+- `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `stageAspectRatio` / `mediaSourceRatio`，配套单测由 3 项扩到 10 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。
 - 图像批次由「只取首帧」改为最多导出 10 帧（`MAX_BATCH_PREVIEWS`），载荷以 `batch` / `batch_size` / `batch_index` 描述，含每帧 `width` / `height`。
@@ -125,7 +124,7 @@
 - 两侧输入类型不一致（图像 + 视频混合）时明确抛出 `TypeError`，不再产出半截预览。
 - `WOSAI_ImageCompare` 移除已无用途的 `extra_pnginfo` 隐藏输入，改为声明 `unique_id`（用于沿执行图反查上游文件引用）。
 - 拖拽光标由分割热区的基础态移入滑动视图态：双拼视图不再出现「有 `ew-resize` 光标但拖不动」的误导。
-- 图像对比新增设计令牌 `--ws-compare-view-size`（24px）、`--ws-compare-view-icon-size`（14px）；i18n 新增 `nodes.imageCompare.views` / `viewSlide` / `viewSide` / `viewStack` / `viewAuto`。
+- 图像对比新增设计令牌 `--ws-compare-view-size`（24px）、`--ws-compare-view-icon-size`（14px）；i18n 新增 `nodes.imageCompare.views` / `viewSlide` / `viewSide` / `viewStack`。
 - **图像对比的浮层控件改为闲置自动淡出，解决图标遮挡图片的问题。** 视图切换条、A/B 尺寸角标与交换按钮都是压在图像区上的绝对定位浮层——顶部条落在水平居中处（正是主体的构图重心），底部一行横跨图片过半宽度，常驻显示会持续打断观看。现改为：指针离开节点 400ms、或在图像区内静止 1800ms 后，三组控件整体淡出，指针移入、键盘聚焦、拖拽分割线、切换视图、换图任一动作都立刻唤回（动作触发后另有 1500ms 的强制可见期，避免刚点完就消失）。要点：
   - 淡出时**必须同时关闭命中**（`pointer-events: none`）：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到看不见的按钮。
   - 分割线、拖拽热区与十字手柄**不参与**隐藏——它们是「这是一张对比图」的语义表达，不是操作项；一并隐掉会让节点退化成一张普通图片。
@@ -139,6 +138,11 @@
   - `compare-view-contract.test.mjs` 新增方向契约断言（底层 = `display.b`、上层 = `display.a`、双拼半幅与圆角归属），删除角标归位与尺寸标注两组断言，并加哨兵断言锁住「JS / CSS 中不得再出现 `wosai-image-compare-label`」（21 → 20 项）；**真实 Chrome** 命中测试验收：0% 整屏 A、50% 左 B 右 A、100% 整屏 B、`side` 左 A 右 B、`stack` 上 A 下 B。
   - 体积：主 JavaScript **1373.4 → 1372.0 KiB**、样式 **236.0 → 234.4 KiB**，预算内。
   - 缓存破坏：`media-tools.js` `?v=11 → 14`、`media-tools.css` `?v=13 → 15`、`wosai-variables.css` `?v=26 → 27`（后两者在 `extension.json` 与 `web/media-tools.js` / `web/get-widget.js` / `web/shared/dom-widget.js` 内成对递增）。
+- **移除「自动排布」对比视图，保留滑动 / 左右 / 上下三种。** 自动排布按素材宽高比在运行时择向，同一张图换个批次就可能换方向，用户无法预期也不好描述；三种显式视图已覆盖全部使用场景。
+  - `COMPARE_VIEW_MODES` 收缩为 `["slide", "side", "stack"]`，删除 `resolveViewMode()`（无 `auto` 后它就是 `normalizeViewMode()` 的别名）；`state.resolvedView` 这一「运行时解析结果」字段随之删除，视图模式即实际布局。
+  - 删除 `auto` 图标、`viewText()` 的 `auto` 分支与 `viewAuto` i18n 键（zh/en 同步）。**旧工作流里已存下的 `wosai_compare_view = "auto"` 由 `normalizeViewMode()` 自动回落为滑动视图**，不会退化成「没有任何视图类名」的裸状态（那样双拼 CSS 与分割线会同时失效）。
+  - `compare-view-contract.test.mjs` 新增哨兵断言：`viewAuto` 不得再出现、`COMPARE_VIEW_MODES` 不得再含 `"auto"`、`resolveViewMode` 不得复活；`media-preview.test.mjs` 删除 3 组 `resolveViewMode` 测试、新增「旧值 `auto` 回落 slide」（15 → 10 项）。
+  - 缓存破坏：`media-tools.js` `?v=14 → 15`（CSS 未改动，故不递增）。
 
 ### Performance
 

@@ -6,6 +6,7 @@ const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf
 
 const CSS = read("../styles/media-tools.css");
 const JS = read("../media-tools.js");
+const PREVIEW = read("./media-preview.js");
 
 const VIEW_CLASS_RE = /is-view-[a-z]+/g;
 const unique = (values) => [...new Set(values)].sort();
@@ -80,7 +81,7 @@ test("滑动视图用左内缩裁剪，保证底层留在分割线左侧", () =>
     // clip-path 的 inset(top right bottom left)：上层从左侧按分割位置裁掉，
     // 剩下的部分落在分割线右边；底层铺满 ⇒ 左侧露出的是底层。
     // 反过来（裁右侧）会把「拖到左端显示 A、右端显示 B」整体掉个方向
-    assert.match(JS, /secondWrap\.style\.clipPath = state\.resolvedView === COMPARE_VIEW_DEFAULT\s*\n\s*\? `inset\(0 0 0 \$\{value\}%\)`/);
+    assert.match(JS, /secondWrap\.style\.clipPath = state\.viewMode === COMPARE_VIEW_DEFAULT\s*\n\s*\? `inset\(0 0 0 \$\{value\}%\)`/);
     assert.doesNotMatch(JS, /inset\(0 \$\{100 - value\}% 0 0\)/);
 });
 
@@ -119,14 +120,21 @@ test("视图状态持久化到 node.properties 并可回读", () => {
 test("视图按钮由 COMPARE_VIEW_MODES 驱动，且文案走静态 i18n key", () => {
     assert.match(JS, /for \(const mode of COMPARE_VIEW_MODES\)/);
     assert.match(JS, /button\.dataset\.view = mode;/);
-    for (const key of ["viewSlide", "viewSide", "viewStack", "viewAuto"]) {
+    for (const key of ["viewSlide", "viewSide", "viewStack"]) {
         assert.ok(JS.includes(`nodes.imageCompare.${key}`), `缺少 i18n key nodes.imageCompare.${key}`);
     }
     assert.ok(JS.includes("nodes.imageCompare.views"));
+    // 自动排布已移除：图标表 / 文案分支 / i18n key 都不得再出现，
+    // 否则会渲染出一个点了没反应的按钮（normalizeViewMode 会把 auto 落成 slide）
+    assert.doesNotMatch(JS, /viewAuto/);
+    // 模式表里不能再有 auto，否则按钮会多渲染一个（且它会被归一成 slide 而永远
+    // 处于「选中 slide」的状态）
+    assert.doesNotMatch(PREVIEW, /COMPARE_VIEW_MODES = Object\.freeze\(\[[^\]]*"auto"/);
+    assert.doesNotMatch(PREVIEW, /export function resolveViewMode/);
 });
 
 test("分割拖拽只在滑动视图生效", () => {
-    assert.match(JS, /const isSplittable = \(\) => state\.resolvedView === COMPARE_VIEW_DEFAULT;/);
+    assert.match(JS, /const isSplittable = \(\) => state\.viewMode === COMPARE_VIEW_DEFAULT;/);
     const guards = JS.match(/if \(!isSplittable\(\)\) return;/g) ?? [];
     assert.equal(guards.length, 2, "pointerdown 与 pointermove 都要拦截");
 });
@@ -137,7 +145,7 @@ test("非滑动视图把隐藏滑块移出 tab 序列", () => {
 });
 
 test("控件高度按舞台宽高比换算，且内边距与 CSS 同源", () => {
-    assert.match(JS, /const ratio = stageAspectRatio\(state\.resolvedView, state\.aspectRatio\);/);
+    assert.match(JS, /const ratio = stageAspectRatio\(state\.viewMode, state\.aspectRatio\);/);
     // 内边距必须读 --ws-compare-handle-size（与 CSS 的 padding-inline 一致），
     // 读成 --ws-compare-swap-size 会让首帧估算宽度偏差 3px/侧
     assert.match(JS, /getWOSAIVarNum\("--ws-compare-handle-size", 28\) \/ 2/);

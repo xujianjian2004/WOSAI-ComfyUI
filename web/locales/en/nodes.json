@@ -456,8 +456,7 @@
     "views": "Comparison view",
     "viewSlide": "Slide",
     "viewSide": "Side by side",
-    "viewStack": "Stacked",
-    "viewAuto": "Auto layout"
+    "viewStack": "Stacked"
   },
   "getWidget": {
     "all": "All widgets",

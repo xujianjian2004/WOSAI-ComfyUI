@@ -2,11 +2,11 @@
  * 媒体对比节点的纯函数工具层。
  *
  * 这里只放「无 DOM、无副作用」的判定与换算，便于 node --test 直接覆盖：
- * 分割百分比归一、A/B 显示位互换、视图模式解析、舞台宽高比换算、尺寸标注文本。
+ * 分割百分比归一、A/B 显示位互换、视图模式归一、舞台宽高比换算。
  */
 
-/** 对比视图的可选模式。`auto` 会在运行时解析为 `side` 或 `stack`。 */
-export const COMPARE_VIEW_MODES = Object.freeze(["slide", "side", "stack", "auto"]);
+/** 对比视图的可选模式：滑动对比、左右并排、上下并排。 */
+export const COMPARE_VIEW_MODES = Object.freeze(["slide", "side", "stack"]);
 
 /** 滑动视图：单一舞台 + 可拖动的分割线。 */
 export const COMPARE_VIEW_DEFAULT = "slide";
@@ -38,21 +38,6 @@ export function compareDisplayPair(payload, swapped = false) {
 /** 把任意持久化值归一为合法视图模式，非法值回落到滑动视图。 */
 export function normalizeViewMode(value, fallback = COMPARE_VIEW_DEFAULT) {
     return COMPARE_VIEW_MODES.includes(value) ? value : fallback;
-}
-
-/**
- * 解析实际布局：`auto` 按素材宽高比择向。
- *
- * 横图（比值 ≥ 1）走上下并排：左右并排会把横图压成两条细缝。
- * 竖图（比值 < 1）走左右并排：上下并排会把竖图拉成超高的舞台。
- * 比值缺失或非法时按正方形（1）处理，与「≥ 1 走上下」保持自洽。
- */
-export function resolveViewMode(mode, ratio) {
-    const normalized = normalizeViewMode(mode);
-    if (normalized !== "auto") return normalized;
-    const numeric = Number(ratio);
-    const usable = Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
-    return usable >= 1 ? "stack" : "side";
 }
 
 function clampStageRatio(value) {

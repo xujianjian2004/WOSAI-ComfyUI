@@ -8,7 +8,6 @@ import {
     mediaSourceRatio,
     normalizeSplitPercent,
     normalizeViewMode,
-    resolveViewMode,
     stageAspectRatio,
 } from "./media-preview.js";
 
@@ -35,7 +34,7 @@ test("compareDisplayPair swaps display roles without mutating the payload", () =
 });
 
 test("COMPARE_VIEW_MODES keeps slide as the first and default mode", () => {
-    assert.deepEqual([...COMPARE_VIEW_MODES], ["slide", "side", "stack", "auto"]);
+    assert.deepEqual([...COMPARE_VIEW_MODES], ["slide", "side", "stack"]);
 });
 
 test("normalizeViewMode accepts known modes and falls back for anything else", () => {
@@ -50,28 +49,11 @@ test("normalizeViewMode accepts known modes and falls back for anything else", (
     assert.equal(normalizeViewMode(0), "slide");
     assert.equal(normalizeViewMode({ mode: "side" }), "slide");
     assert.equal(normalizeViewMode("bogus", "stack"), "stack");
-});
-
-test("resolveViewMode passes concrete modes through untouched", () => {
-    assert.equal(resolveViewMode("slide", 0.1), "slide");
-    assert.equal(resolveViewMode("side", 3), "side");
-    assert.equal(resolveViewMode("stack", 3), "stack");
-});
-
-test("resolveViewMode picks the direction that keeps panels at the source ratio", () => {
-    // 横图：左右并排会把每一半压成细缝，应选上下并排
-    assert.equal(resolveViewMode("auto", 16 / 9), "stack");
-    assert.equal(resolveViewMode("auto", 1), "stack");
-    assert.equal(resolveViewMode("auto", 1.0000001), "stack");
-    // 竖图：上下并排会得到超高的舞台，应选左右并排
-    assert.equal(resolveViewMode("auto", 1 / 2), "side");
-    assert.equal(resolveViewMode("auto", 0.999), "side");
-});
-
-test("resolveViewMode treats a missing ratio as square", () => {
-    for (const ratio of [undefined, null, "", "abc", 0, -3, NaN, Infinity]) {
-        assert.equal(resolveViewMode("auto", ratio), "stack", `ratio=${String(ratio)}`);
-    }
+    // 自动排布已移除：旧工作流里存下的 auto 必须回落到滑动视图，而不是变成
+    // 「没有视图类名」的裸状态（那样双拼 CSS 与分割线会同时失效）
+    assert.equal(normalizeViewMode("auto"), "slide");
+    assert.equal(normalizeViewMode("auto", "side"), "side");
+    assert.ok(!COMPARE_VIEW_MODES.includes("auto"));
 });
 
 test("stageAspectRatio keeps the source ratio for the slide view", () => {

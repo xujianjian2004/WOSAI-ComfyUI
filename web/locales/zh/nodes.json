@@ -456,8 +456,7 @@
     "views": "对比视图",
     "viewSlide": "滑动对比",
     "viewSide": "左右并排",
-    "viewStack": "上下并排",
-    "viewAuto": "自动排布"
+    "viewStack": "上下并排"
   },
   "getWidget": {
     "all": "全部控件",

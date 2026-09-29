@@ -21,7 +21,6 @@ import {
     mediaSourceRatio,
     normalizeSplitPercent,
     normalizeViewMode,
-    resolveViewMode,
     stageAspectRatio,
 } from "./shared/media-preview.js";
 import { getWOSAIVarNum } from "./shared/shared-utils.js";
@@ -37,8 +36,8 @@ const MEDIA_STYLES = [
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
-// 四个图标都基于矩形：滑动 = 一条竖缝，左右 = 两块竖版，上下 = 两块横版，
-// 自动 = 斜缝（表示方向由素材比例决定）。尺寸统一由 CSS 令牌控制。
+// 三个图标都基于矩形：滑动 = 一条竖缝，左右 = 两块竖版，上下 = 两块横版。
+// 尺寸统一由 CSS 令牌控制。
 const VIEW_ICONS = {
     slide: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M12 4v16"/>',
     side: [
@@ -49,7 +48,6 @@ const VIEW_ICONS = {
         '<rect x="4" y="3" width="16" height="7.6" rx="2"/>',
         '<rect x="4" y="13.4" width="16" height="7.6" rx="2"/>',
     ].join(""),
-    auto: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M5.8 18.2 18.2 5.8"/>',
 };
 
 // 视图文案走静态字面量 key：i18n 覆盖率测试靠正则扫描 t("...")，动态拼接的 key
@@ -60,8 +58,6 @@ function viewText(mode) {
             return t("nodes.imageCompare.viewSide", "Side by side");
         case "stack":
             return t("nodes.imageCompare.viewStack", "Stacked");
-        case "auto":
-            return t("nodes.imageCompare.viewAuto", "Auto layout");
         default:
             return t("nodes.imageCompare.viewSlide", "Slide");
     }
@@ -579,20 +575,16 @@ function createImageCompare(node) {
     const state = {
         aspectRatio: 16 / 9,
         normalizeSizeOnLoad: false,
-        // viewMode = 用户选择（可能是 auto）；resolvedView = 实际布局（永远具体）
+        // 视图模式即实际布局：三种模式各自对应一套 CSS 切分，不存在「运行时解析」
         viewMode: normalizeViewMode(node.properties.wosai_compare_view),
-        resolvedView: COMPARE_VIEW_DEFAULT,
     };
 
     const applyLayout = () => {
-        const resolved = resolveViewMode(state.viewMode, state.aspectRatio);
-        const changed = resolved !== state.resolvedView;
-        state.resolvedView = resolved;
         // 视图类名挂在 stage 上（与 is-dragging / is-swapping / is-switching 一致），
-        // CSS 里的面板切分、分隔缝、角标归位全部以 .wosai-image-compare-stage.is-view-* 选择
-        stage.classList.toggle("is-view-slide", resolved === "slide");
-        stage.classList.toggle("is-view-side", resolved === "side");
-        stage.classList.toggle("is-view-stack", resolved === "stack");
+        // CSS 里的面板切分、分隔缝全部以 .wosai-image-compare-stage.is-view-* 选择
+        stage.classList.toggle("is-view-slide", state.viewMode === "slide");
+        stage.classList.toggle("is-view-side", state.viewMode === "side");
+        stage.classList.toggle("is-view-stack", state.viewMode === "stack");
         for (const [mode, button] of viewButtons) {
             const active = mode === state.viewMode;
             button.classList.toggle("is-active", active);
@@ -600,17 +592,16 @@ function createImageCompare(node) {
         }
         // 只有滑动视图存在分割线；其余视图把隐藏滑块移出 tab 序列，避免键盘
         // 焦点落到一个已失效、而且看不见的控件上
-        const splittable = resolved === COMPARE_VIEW_DEFAULT;
+        const splittable = state.viewMode === COMPARE_VIEW_DEFAULT;
         slider.disabled = !splittable;
         slider.tabIndex = splittable ? 0 : -1;
-        return changed;
     };
 
     const applyStageRatio = () => {
         // 双拼视图下舞台比例随视图变化（半幅还原原图比例），滑动视图保持原图比例
         stage.style.setProperty(
             "--wosai-compare-ratio",
-            `${stageAspectRatio(state.resolvedView, state.aspectRatio)} / 1`,
+            `${stageAspectRatio(state.viewMode, state.aspectRatio)} / 1`,
         );
     };
 
@@ -619,7 +610,7 @@ function createImageCompare(node) {
         const next = Number.isFinite(numeric) && numeric > 0 ? numeric : state.aspectRatio;
         const changed = Math.abs(state.aspectRatio - next) > 0.001;
         state.aspectRatio = next;
-        const viewChanged = applyLayout();
+        applyLayout();
         applyStageRatio();
         if (state.normalizeSizeOnLoad) {
             state.normalizeSizeOnLoad = false;
@@ -631,7 +622,7 @@ function createImageCompare(node) {
                 Math.max(minHeight, Number(computed?.[1]) || 0),
             ]);
             node.setDirtyCanvas?.(true, true);
-        } else if (changed || viewChanged) {
+        } else if (changed) {
             markChanged(node);
         }
     };
@@ -652,7 +643,7 @@ function createImageCompare(node) {
         // 分割线越靠左 → 上层（A）露出越多，画面偏 A；越靠右 → 底层（B）露出越多，
         // 画面偏 B。拖动方向与画面呈现的图一致（拖到左端整张 A、右端整张 B）。
         // 双拼视图不裁剪图层：底层直接占左/上半幅，分割位置只对滑动视图有意义
-        secondWrap.style.clipPath = state.resolvedView === COMPARE_VIEW_DEFAULT
+        secondWrap.style.clipPath = state.viewMode === COMPARE_VIEW_DEFAULT
             ? `inset(0 0 0 ${value}%)`
             : "none";
         line.style.left = `${value}%`;
@@ -724,7 +715,7 @@ function createImageCompare(node) {
         updateSplit();
     };
     // 分割拖拽只在滑动视图生效：双拼视图没有分割线，任意拖动都会变成「误触滑块」
-    const isSplittable = () => state.resolvedView === COMPARE_VIEW_DEFAULT;
+    const isSplittable = () => state.viewMode === COMPARE_VIEW_DEFAULT;
     stage.addEventListener("pointerdown", (event) => {
         if (!isSplittable()) return;
         // 拖拽期间锁住闲置：分辨率低时拖到一半控件消失会让人以为操作中断了
@@ -761,7 +752,7 @@ function createImageCompare(node) {
             getWOSAIVarNum("--ws-media-preview-min-width", 240),
             stage.clientWidth || (Number(node.size?.[0]) || 420) - padInline * 2,
         );
-        const ratio = stageAspectRatio(state.resolvedView, state.aspectRatio);
+        const ratio = stageAspectRatio(state.viewMode, state.aspectRatio);
         return contentWidth / Math.max(0.1, ratio) + gap * 2;
     };
     addSizedDOMWidget(node, "wosai_compare_ui", "wosai_compare", root, {
