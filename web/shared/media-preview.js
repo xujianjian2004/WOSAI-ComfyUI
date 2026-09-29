@@ -78,23 +78,3 @@ export function mediaSourceRatio(media) {
     if (width <= 0 || height <= 0) return 0;
     return width / height;
 }
-
-/**
- * 尺寸标注文本，例如 `1024×1024`。
- *
- * 用 U+00D7 乘号而不是字母 x：等宽字形对齐更好，也不会被误读成变量名。
- * 尺寸未知时返回空串，调用方据此退化为「只显示 A/B 字母」。
- */
-export function formatMediaSize(media) {
-    const width = Math.round(Number(media?.width) || 0);
-    const height = Math.round(Number(media?.height) || 0);
-    if (width <= 0 || height <= 0) return "";
-    return `${width}\u00d7${height}`;
-}
-
-/** 角标文本：`A 1024×1024`；尺寸未知时退化为 `A`。 */
-export function formatMediaBadgeLabel(media, letter) {
-    const size = formatMediaSize(media);
-    const prefix = String(letter ?? "").trim() || "?";
-    return size ? `${prefix} ${size}` : prefix;
-}

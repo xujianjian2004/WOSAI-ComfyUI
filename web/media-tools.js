@@ -18,7 +18,6 @@ import {
     COMPARE_VIEW_DEFAULT,
     COMPARE_VIEW_MODES,
     compareDisplayPair,
-    formatMediaBadgeLabel,
     mediaSourceRatio,
     normalizeSplitPercent,
     normalizeViewMode,
@@ -34,7 +33,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=14", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=15", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -493,10 +492,6 @@ function createImageCompare(node) {
     slider.max = "100";
     slider.value = "50";
     slider.setAttribute("aria-label", t("nodes.imageCompare.position", "Comparison position"));
-    const startLabel = document.createElement("span");
-    startLabel.className = "wosai-image-compare-label is-start";
-    const endLabel = document.createElement("span");
-    endLabel.className = "wosai-image-compare-label is-end";
     const swap = document.createElement("button");
     swap.type = "button";
     swap.className = "wosai-image-compare-swap";
@@ -506,7 +501,7 @@ function createImageCompare(node) {
         '<path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
         "</svg>",
     ].join("");
-    stage.append(startLabel, endLabel, swap, viewBar, slider, empty);
+    stage.append(swap, viewBar, slider, empty);
     root.append(stage);
 
     // ── 闲置自动淡出 ──────────────────────────────────────────────
@@ -676,13 +671,6 @@ function createImageCompare(node) {
         else second.removeAttribute("src");
         root.classList.toggle("has-first", Boolean(display.b));
         root.classList.toggle("has-second", Boolean(display.a));
-        // 尺寸标注直接读载荷里的原始尺寸：不必等图片解码，也不会被显示尺寸影响
-        // 角标是「端点标签」而非「面板标签」：左下角标 = 分割线拖到最左端（0%）
-        // 时显示的那张图 = A，右下 = 拖到最右端（100%）时显示的 B，恒为左 A / 右 B。
-        // 中间位置时左侧画面是 B、角标仍标 A，这是端点语义的固有结果——
-        // 别改成「标注所在面板的图」，那会让左下角标随图层分配反转成 B
-        startLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
-        endLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
         swap.disabled = !(payload.a && payload.b);
         swap.classList.toggle("is-active", swapped);
         swap.setAttribute("aria-pressed", String(swapped));

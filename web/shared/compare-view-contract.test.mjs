@@ -76,11 +76,6 @@ test("双拼视图隐藏分割线 / 热区 / 十字手柄，只留分隔缝", ()
     assert.match(CSS, /\.wosai-image-compare-divider \{[^}]*display: none;/s);
 });
 
-test("双拼视图把 A/B 角标归位到各自面板", () => {
-    assert.match(CSS, /is-view-side \.wosai-image-compare-label\.is-start,\s*\n[^\n]*is-view-stack \.wosai-image-compare-label\.is-start,/);
-    assert.match(CSS, /is-view-stack \.wosai-image-compare-label\.is-end \{[^}]*right: auto;[^}]*left: var\(--ws-gap-sm\);/s);
-});
-
 test("滑动视图用左内缩裁剪，保证底层留在分割线左侧", () => {
     // clip-path 的 inset(top right bottom left)：上层从左侧按分割位置裁掉，
     // 剩下的部分落在分割线右边；底层铺满 ⇒ 左侧露出的是底层。
@@ -96,10 +91,10 @@ test("拖动方向 = 画面呈现的图：左端 A、右端 B", () => {
     assert.match(JS, /const firstUrl = imageUrl\(display\.b\);/);
     assert.match(JS, /const secondUrl = imageUrl\(display\.a\);/);
     assert.match(JS, /root\.classList\.toggle\("has-first", Boolean\(display\.b\)\)/);
-    // 角标是「端点标签」：左下恒 A（= 拖到 0% 时显示的图）、右下恒 B（= 100%）。
-    // 改成「标注所在面板的图」会让左下随图层分配反转成 B，与左端是 A 自相矛盾
-    assert.match(JS, /startLabel\.textContent = formatMediaBadgeLabel\(display\.a/);
-    assert.match(JS, /endLabel\.textContent = formatMediaBadgeLabel\(display\.b/);
+    // 底部已不再渲染 A/B 角标：角标语义（标端点 vs 标所在面板）与拖动方向互相
+    // 打架，改为不显示，方向只由「拖到哪端就是哪张图」表达
+    assert.doesNotMatch(JS, /wosai-image-compare-label/);
+    assert.doesNotMatch(CSS, /wosai-image-compare-label/);
 });
 
 test("拖拽光标只在滑动视图开启", () => {
@@ -149,11 +144,6 @@ test("控件高度按舞台宽高比换算，且内边距与 CSS 同源", () => 
     assert.doesNotMatch(JS, /padInline = Math\.max\(gap, getWOSAIVarNum\("--ws-compare-swap-size"/);
 });
 
-test("尺寸标注直接取载荷尺寸并走统一的格式化函数", () => {
-    assert.match(JS, /formatMediaBadgeLabel\(display\.a, swapped \? "B" : "A"\)/);
-    assert.match(JS, /formatMediaBadgeLabel\(display\.b, swapped \? "A" : "B"\)/);
-});
-
 // ── 闲置自动淡出（控件遮挡优化）────────────────────────────────────
 // 视图条 / A/B 角标 / 交换按钮都是压在图片上的浮层，常驻会遮住主体的构图重心。
 // 这一组断言锁住「什么时候隐、隐掉谁、隐了还能不能用」三件事。
@@ -171,7 +161,7 @@ test("闲置态类名的生产者（JS）与消费者（CSS）一致", () => {
 test("闲置只隐藏控件，分割线保持可见", () => {
     const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-views[\s\S]*?\}/);
     assert.ok(rule, "未找到闲置隐藏规则");
-    for (const part of ["-views", "-label", "-swap"]) {
+    for (const part of ["-views", "-swap"]) {
         assert.ok(rule[0].includes(`.wosai-image-compare${part}`), `闲置清单缺少 ${part}`);
     }
     // 分割线 / 热区 / 十字手柄是「这是一张对比图」的语义表达，不是操作项：

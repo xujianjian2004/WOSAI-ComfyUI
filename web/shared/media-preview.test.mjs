@@ -5,8 +5,6 @@ import {
     COMPARE_STAGE_RATIO_BOUNDS,
     COMPARE_VIEW_MODES,
     compareDisplayPair,
-    formatMediaBadgeLabel,
-    formatMediaSize,
     mediaSourceRatio,
     normalizeSplitPercent,
     normalizeViewMode,
@@ -135,23 +133,3 @@ test("mediaSourceRatio reads payload dimensions and rejects unusable ones", () =
     }
 });
 
-test("formatMediaSize renders a W×H readout with the multiplication sign", () => {
-    assert.equal(formatMediaSize({ width: 1024, height: 1024 }), "1024\u00d71024");
-    assert.equal(formatMediaSize({ width: 1920.4, height: 1080.2 }), "1920\u00d71080");
-    assert.equal(formatMediaSize({ width: "800", height: "600" }), "800\u00d7600");
-    for (const media of [undefined, null, {}, { width: 0, height: 0 }, { width: "x", height: 2 }]) {
-        assert.equal(formatMediaSize(media), "");
-    }
-});
-
-test("formatMediaBadgeLabel degrades to the bare letter when the size is unknown", () => {
-    assert.equal(formatMediaBadgeLabel({ width: 1024, height: 768 }, "A"), "A 1024\u00d7768");
-    assert.equal(formatMediaBadgeLabel({ width: 1024, height: 768 }, "B"), "B 1024\u00d7768");
-    // 尺寸缺失时保持历史外观，不加多余空格
-    assert.equal(formatMediaBadgeLabel(null, "A"), "A");
-    assert.equal(formatMediaBadgeLabel({}, "B"), "B");
-    assert.equal(formatMediaBadgeLabel({ width: 10, height: 0 }, "A"), "A");
-    // 字母缺失时用占位符，避免出现 "undefined 800×600"
-    assert.equal(formatMediaBadgeLabel({ width: 800, height: 600 }), "? 800\u00d7600");
-    assert.equal(formatMediaBadgeLabel(null, ""), "?");
-});

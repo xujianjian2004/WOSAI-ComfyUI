@@ -402,55 +402,7 @@
   stroke-linejoin: round;
 }
 
-/* A/B 角标：浮在图像区下角，与居中的交换按钮构成 A ⇄ B 一行 */
-.wosai-image-compare-label {
-  position: absolute;
-  /* 与更高的交换按钮垂直居中：三者圆心共线 */
-  bottom: calc(
-    var(--ws-gap-sm) + (var(--ws-compare-swap-size) - var(--ws-compare-badge-size)) / 2
-  );
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  min-width: var(--ws-compare-badge-size);
-  height: var(--ws-compare-badge-size);
-  border: var(--ws-glass-border);
-  border-radius: var(--ws-radius-pill);
-  padding-inline: var(--ws-gap-xs);
-  background: var(--ws-glass-bg);
-  backdrop-filter: var(--ws-glass-blur-sm);
-  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
-  color: var(--ws-text-secondary);
-  font: 600 var(--ws-text-sm)/1 var(--ws-font-family);
-  text-align: center;
-  pointer-events: none;
-  transition: opacity var(--ws-transition);
-}
-
-.wosai-image-compare-label.is-start {
-  left: var(--ws-gap-sm);
-}
-
-.wosai-image-compare-label.is-end {
-  right: var(--ws-gap-sm);
-}
-
-/* 双拼视图里角标要跟着面板走：左右并排时 A/B 各占一侧顶角，
-   上下并排时 A 在顶、B 在底（左对齐），保证角标始终贴着它描述的半幅 */
-.wosai-image-compare-stage.is-view-side .wosai-image-compare-label.is-start,
-.wosai-image-compare-stage.is-view-stack .wosai-image-compare-label.is-start,
-.wosai-image-compare-stage.is-view-side .wosai-image-compare-label.is-end {
-  top: var(--ws-gap-sm);
-  bottom: auto;
-}
-
-.wosai-image-compare-stage.is-view-stack .wosai-image-compare-label.is-end {
-  right: auto;
-  left: var(--ws-gap-sm);
-}
-
-/* 交换按钮：水平居中于图像区，与 A/B 角标同处一行 */
+/* 交换按钮：水平居中于图像区底部 */
 .wosai-image-compare-swap {
   position: absolute;
   left: 50%;
@@ -507,8 +459,7 @@
   cursor: not-allowed;
 }
 
-/* 无图时不显示角标、交换按钮与视图切换，避免压在空状态提示上 */
-.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-label,
+/* 无图时不显示交换按钮与视图切换，避免压在空状态提示上 */
 .wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-swap,
 .wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-views {
   opacity: 0;
@@ -520,9 +471,8 @@
    横跨图片过半宽度，常驻会持续打断观看。这里只隐藏「控件」：分割线保持可见——
    它是「这是一张对比图」的语义表达而不是操作项，隐藏后节点会退化成普通图片。
    必须同时关掉命中：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到
-   看不见的按钮。opacity 不改变 a11y 树，屏幕阅读器仍能读到角标里的尺寸。 */
+   看不见的按钮。opacity 不改变 a11y 树，屏幕阅读器仍能读到控件语义。 */
 .wosai-image-compare-stage.is-idle .wosai-image-compare-views,
-.wosai-image-compare-stage.is-idle .wosai-image-compare-label,
 .wosai-image-compare-stage.is-idle .wosai-image-compare-swap {
   opacity: 0;
   pointer-events: none;
@@ -572,7 +522,6 @@
   .wosai-image-compare-top,
   .wosai-image-compare-handle,
   .wosai-image-compare-views,
-  .wosai-image-compare-label,
   .wosai-image-compare-swap {
     transition: none;
   }
