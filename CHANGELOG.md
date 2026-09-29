@@ -100,6 +100,11 @@
   - 缓存破坏：`device-info.js` `?v=15 → 16`、`device-info.css` `?v=11 → 12`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）、`wosai-variables.css` `?v=24 → 25`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
   - 体积：主 JavaScript **1377.5 → 1378.4 KiB**（余 37.6 KiB）、样式 **237.6 → 238.1 KiB**（余 11.9 KiB），预算内。
 
+- **设备面板：硬件资源卡的「处理器」磁贴由行末提到行首**（承接上一条，最终顺序以本条为准）。处理器答的是「这台机器是什么」，显存 / 内存 / 磁盘答的是「现在占用多少」——先给机器身份再给实时指标，与「环境健康度置顶」是同一种「先结论后明细」的排布。磁贴总数与 `progressbar` 计数均不变（处理器磁贴仍为 `is-static`、不画条），实际只是把 `textTile()` 的追加位置从磁盘循环之后移到磁贴行创建之初。
+  - 卡内顺序最终为「磁贴行（**处理器** / 显存 / 内存 / 各磁盘）→ GPU 体征区块」。
+  - 缓存破坏：`device-info.js` `?v=16 → 17`（`device-info.css` 与 `wosai-variables.css` 均未改动，故不递增）。
+  - 体积：主 JavaScript **1378.4 KiB**（余 37.6 KiB，与上一条持平——仅移动一行的追加位置与改写注释）、样式 **238.1 KiB**（余 11.9 KiB），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。

@@ -400,7 +400,7 @@ function dependenciesHeading(entries) {
 }
 
 /**
- * 硬件资源：磁贴行（显存 / 内存 / 各磁盘 / 处理器）→ GPU 体征区块。
+ * 硬件资源：磁贴行（处理器 / 显存 / 内存 / 各磁盘）→ GPU 体征区块。
  * 磁贴与 GPU 块讲的是同一件事的两层——磁贴答「满了多少」，GPU 块答「这些占用由什么构成」——
  * 所以 GPU 块不再复述百分比，只留磁贴给不出的三层显存构成、图例与温度/功耗/驱动。
  * 处理器也曾是一条朴素行，但它是这台机器的固定配置而非实时指标，与磁贴同列扫读更顺；
@@ -412,6 +412,8 @@ function renderHardware(target) {
     const gpus = okGpus();
 
     const tiles = make("div", "ws-di-tiles");
+    // 处理器排在首位：它是这台机器的固定配置而非实时指标，先答「机器是什么」再答「占用多少」
+    tiles.append(textTile(label("processor", "Processor"), valueOf(system.cpu, label("unavailable", "Unavailable"))));
     if (gpus.length) {
         const gpu = gpus[0];
         const name = gpus.length > 1 ? `${label("gpu", "GPU")} ${gpu.id}` : label("vram", "VRAM");
@@ -422,8 +424,6 @@ function renderHardware(target) {
     (data.dynamic?.disks || []).forEach((disk) => {
         tiles.append(tile(`${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total)));
     });
-    // 处理器排在磁盘之后：它和内存、磁盘一样是这台机器的固定配置，混在占用率磁贴里扫读最顺
-    tiles.append(textTile(label("processor", "Processor"), valueOf(system.cpu, label("unavailable", "Unavailable"))));
     section.append(tiles);
 
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
