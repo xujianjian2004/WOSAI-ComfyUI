@@ -1,15 +1,13 @@
 // ══ WOSAI 视觉增强套件 —— 子球·画布背景设置 ════════════════════════════
 //   自定义背景图 / 固定·跟随 / 填充模式(拉伸·平铺·自定义位置) / 亮度调节 / 恢复默认。
 import { app } from "../../../scripts/app.js";
-import { retryUntil, getWOSAIVarNum, makeDraggable } from "./shared/shared-utils.js";
+import { retryUntil, getWOSAIVarNum } from "./shared/shared-utils.js";
 import { registerHudTab, unregisterHudTab } from "./shared/hud-kit.js";
-import { _sec, _row } from "./shared/panel-builder.js";
+import { _sec, _row, buildControlPanel } from "./shared/panel-builder.js";
 import { dodgeBall } from "./launcher.js";
 import { t } from "./shared/i18n.js";
 import { calcSnapToNodeSide } from "./shared/canvas-utils.js";
-import { WOSAI_COPYRIGHT } from "./shared/constants.js";
-import { glassT, getGlassTheme } from "./shared/glass-theme.js";
-import { closeIcon } from "./shared/svg-icons.js";
+import { getGlassTheme } from "./shared/glass-theme.js";
 
 const SEC_STYLE = "font-size:var(--ws-text-md);font-weight:500;color:var(--ws-accent);margin:var(--ws-gap-lg) 0 var(--ws-gap)";
 
@@ -234,31 +232,13 @@ function closePanel() {
 }
 
 function buildPanel() {
-    const T = glassT();
-    const panel = document.createElement("div");
-    panel.className = "wosai-control-panel";
-    panel.dataset.wsControl = "background";
-    panel.setAttribute("data-wosai-panel", "");
-    panel.setAttribute("data-theme", getGlassTheme());
-    panel.style.cssText = `position:fixed;display:none;z-index:var(--ws-z-hud);width:var(--ws-panel-width-md);box-sizing:border-box;padding:var(--ws-panel-padding-md);border-radius:var(--ws-panel-radius-md);background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:var(--ws-border-width-thin) solid var(--ws-border);box-shadow:var(--ws-shadow-panel);color:var(--ws-text);font-family:var(--ws-font-family);font-size:var(--ws-text-md);user-select:none;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain`;
-    panel.onpointerdown = (event) => event.stopPropagation();
-
-    const header = document.createElement("div");
-    header.className = "wosai-control-header";
-    header.dataset.panelHead = "";
-    header.style.cssText = "display:flex;align-items:center;justify-content:space-between;font-size:var(--ws-text-xl);font-weight:500;margin-bottom:var(--ws-gap-md);position:sticky;top:calc(-1 * var(--ws-panel-padding-md));background:transparent;z-index:2;padding:var(--ws-gap-xs) 0;margin-left:calc(-1 * var(--ws-panel-padding-md));margin-right:calc(-1 * var(--ws-panel-padding-md));padding-left:var(--ws-panel-padding-md);padding-right:var(--ws-panel-padding-md)";
-    const title = document.createElement("span");
-    title.textContent = t("nodes.visualFx.panelTitle");
-    const close = closeIcon();
-    close.onclick = closePanel;
-    header.append(title, close);
-
-    const copyright = document.createElement("div");
-    copyright.className = "wosai-control-copyright";
-    copyright.textContent = WOSAI_COPYRIGHT;
-    panel.append(header, buildBackgroundSection(), copyright);
-    document.body.appendChild(panel);
-    _removePanelDrag = makeDraggable(panel, { handle: header });
+    const { panel, cleanup } = buildControlPanel({
+        wsControl: "background",
+        title: t("nodes.visualFx.panelTitle"),
+        onClose: closePanel,
+        content: buildBackgroundSection(),
+    });
+    _removePanelDrag = cleanup;
     return panel;
 }
 

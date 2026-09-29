@@ -1,9 +1,9 @@
 // ══ WOSAI 系统设置（子球·设置）：界面语言 / 性能模式 /  ══
 import { app } from "../../../scripts/app.js";
-import { glassT, getGlassTheme, getGlassMode, setGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./shared/glass-theme.js";
+import { getGlassTheme, getGlassMode, setGlassMode, onGlassChange, GLASS_MODE_DEFS } from "./shared/glass-theme.js";
 import { registerHudTab, unregisterHudTab } from "./shared/hud-kit.js";
-import { iconBtn, closeIcon } from "./shared/svg-icons.js";
-import { _sec } from "./shared/panel-builder.js";
+import { iconBtn } from "./shared/svg-icons.js";
+import { _sec, buildControlPanel } from "./shared/panel-builder.js";
 import { dodgeBall, createLauncher, removeLauncher } from "./launcher.js";
 import { t, onLangChange } from "./shared/i18n.js";
 import { wosaiGetBool, wosaiGetInt, wosaiSetBool, wosaiSetInt } from "./shared/wosai-prefs.js";
@@ -318,24 +318,17 @@ function buildPanel() {
 
 // 保留既有构建器，避免影响其它已加载模块；它不再作为 HUB BAR 的设置入口。
 function buildUnifiedSettingsPanel() {
-    const T = glassT();
-    const panel = document.createElement("div");
-    panel.className = "wosai-control-panel wosai-global-settings";
-    panel.dataset.wsControl = "settings";
-    panel.setAttribute("data-wosai-panel", "");
-    panel.setAttribute("data-theme", getGlassTheme());
-    panel.style.cssText = `position:fixed;display:none;z-index:var(--ws-z-hud);width:min(680px,calc(100vw - 32px));box-sizing:border-box;padding:var(--ws-panel-padding-md);border-radius:var(--ws-panel-radius-md);background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:var(--ws-border-width-thin) solid var(--ws-border);box-shadow:var(--ws-shadow-panel);color:var(--ws-text);font-family:var(--ws-font-family);font-size:var(--ws-text-md);user-select:none;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain`;
-    panel.onpointerdown = (event) => event.stopPropagation();
-
-    const header = document.createElement("div");
-    header.className = "wosai-control-header";
-    header.style.cssText = "display:flex;align-items:center;justify-content:space-between;font-size:var(--ws-text-xl);font-weight:500;margin-bottom:var(--ws-gap-md)";
-    const title = document.createElement("span"); title.textContent = t('common.settings');
-    const close = closeIcon(); close.onclick = closePanel;
-    header.append(title, close);
-
     const body = document.createElement("div");
     body.className = "wosai-global-settings__body";
+    const { panel } = buildControlPanel({
+        wsControl: "settings",
+        extraClass: "wosai-global-settings",
+        width: "min(680px,calc(100vw - 32px))",
+        title: t('common.settings'),
+        onClose: closePanel,
+        content: body,
+        stickyHeader: false,
+    });
     // The launcher context menu intentionally exposes one concise settings
     // destination. Feature-specific panels stay registered elsewhere.
     const definitions = [["system", 'menus.launcher.settingsSystem', () => _buildSystemSettingsSection()]];
@@ -354,14 +347,17 @@ function buildUnifiedSettingsPanel() {
     };
     selectTab("system");
     panel.addEventListener("wosai:close-settings", closePanel);
-    const copyright = document.createElement("div");
-    copyright.className = "wosai-control-copyright"; copyright.textContent = WOSAI_COPYRIGHT;
-    panel.append(header, body, copyright);
-    document.body.appendChild(panel);
     return panel;
 }
 
-function rebuild() { if (_panel) { const shown = _panel.style.display !== "none"; _panel.remove(); _panel = null; if (shown) openPanel(); } }
+function rebuild() {
+    if (!_panel) return;
+    const shown = _panel.style.display !== "none";
+    _panel._wosaiDragCleanup?.(); // 面板销毁时一并解绑拖拽监听
+    _panel.remove();
+    _panel = null;
+    if (shown) openPanel();
+}
 function openPanel() {
     if (!_panel) _panel = buildPanel();
     _panel.setAttribute("data-theme", getGlassTheme()); _panel.style.display = "block";

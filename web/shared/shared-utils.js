@@ -100,50 +100,59 @@ export function getSetting(id, dflt) {
 }
 
 /**
- * 为弹出式面板添加任意位置拖拽能力
- * @param {HTMLElement} panel - 面板 DOM 元素（position:fixed）
- * @param {{ handle?: HTMLElement, onDragStart?: (e:PointerEvent)=>void, onDragEnd?: (e:PointerEvent)=>void }} [opts]
+ * 为弹出式面板 / 浮层添加「任意位置拖拽」能力。
+ *
+ * 这是全项目唯一的拖拽实现：`web/panel-drag.js` 的全局自动接管，以及
+ * link-fx / visual-fx / color-bar / save-node / layout-align 的显式调用，
+ * 全部收敛于此。历史上这里与 panel-drag 各有一份同名实现，仅靠一个
+ * `panel._wosaiDraggable` 标记去重，漏写即双重绑定（两套 handler 同时改写
+ * left/top，且基准算法不同：offsetLeft vs getBoundingClientRect）。
+ *
+ * @param {HTMLElement} panel - 被拖拽的元素（通常 position:fixed）
+ * @param {{
+ *   handle?: HTMLElement,
+ *   cursor?: string,
+ *   clamp?: boolean,
+ *   threshold?: number,
+ *   onDragStart?: (e: PointerEvent) => void,
+ *   onDragEnd?: (e: PointerEvent) => void,
+ * }} [opts] - handle 缺省为面板自身；clamp 缺省为 true（约束在视口内）
+ * @returns {() => void} 解绑函数（重复调用安全）
  */
 export function makeDraggable(panel, opts = {}) {
-    // 与 web/panel-drag.js 的全局自动接管共用同一个去重标记：那个模块的
-    // MutationObserver 靠 panel._wosaiDraggable 判断是否已绑定。这里若不写该标记，
-    // 凡带 data-wosai-panel 的面板（link-fx / visual-fx 面板即如此）会被两套实现
-    // 各绑一次，拖拽时双份 handler 同时改写 left/top——两套的基准算法并不相同
-    // （offsetLeft vs getBoundingClientRect），行为因此不可预期。
-    if (!panel || panel._wosaiDraggable) return () => {};
+    if (!panel) return () => {};
+    // 已绑定则复用既有清理函数，永不叠加第二套 handler
+    if (panel._wosaiDraggable) return panel._wosaiDragCleanup || (() => {});
     const handle = opts.handle || panel;
+    const threshold = opts.threshold ?? 4;
+    const clamp = opts.clamp !== false;
+    const origCursor = handle.style.cursor;
+    if (!origCursor) handle.style.cursor = opts.cursor || 'grab';
     panel._wosaiDraggable = true;
-    let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0, origTransition = '';
 
-    function onDown(e) {
-        if (e.button !== 0) return;
-        const tag = e.target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable ||
-            e.target.closest?.('button, a, [role="button"], [data-no-drag], .ws-no-drag')) return;
-        dragging = false;
-        startX = e.clientX;
-        startY = e.clientY;
-        origX = panel.offsetLeft;
-        origY = panel.offsetTop;
-        origTransition = panel.style.transition;
-        panel.style.transition = 'none';
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup', onUp);
-        document.addEventListener('pointercancel', onUp);
-    }
+    let dragging = false, startX = 0, startY = 0, baseLeft = 0, baseTop = 0, origTransition = '';
 
     function onMove(e) {
         const dx = e.clientX - startX;
         const dy = e.clientY - startY;
         if (!dragging) {
-            if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+            // 阈值：避免点击控件时的亚像素抖动被当成拖拽
+            if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) return;
             dragging = true;
-            opts.onDragStart?.(e);
+            panel.dataset.wosaiManualPosition = 'true';
             handle.style.cursor = 'grabbing';
             handle.classList.add('ws-dragging');
+            opts.onDragStart?.(e);
         }
-        panel.style.left = (origX + dx) + 'px';
-        panel.style.top = (origY + dy) + 'px';
+        let nx = baseLeft + dx;
+        let ny = baseTop + dy;
+        if (clamp) {
+            const w = panel.offsetWidth, h = panel.offsetHeight;
+            nx = Math.max(0, Math.min(nx, window.innerWidth - w));
+            ny = Math.max(0, Math.min(ny, window.innerHeight - h));
+        }
+        panel.style.left = nx + 'px';
+        panel.style.top = ny + 'px';
     }
 
     function onUp(e) {
@@ -151,23 +160,58 @@ export function makeDraggable(panel, opts = {}) {
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
         panel.style.transition = origTransition;
+        document.body.style.userSelect = '';
         if (dragging) {
-            handle.style.cursor = '';
+            handle.style.cursor = origCursor;
             handle.classList.remove('ws-dragging');
             opts.onDragEnd?.(e);
         }
         dragging = false;
     }
 
-    handle.style.cursor = 'grab';
+    function onDown(e) {
+        if (e.button !== 0) return;
+        const el = e.target;
+        if (el.isContentEditable ||
+            el.closest?.("button, a, input, select, textarea, [role='button'], [data-no-drag], .ws-no-drag")) return;
+        dragging = false;
+        startX = e.clientX;
+        startY = e.clientY;
+        // right/bottom 与 left/top 混用会互相打架：先换算成等效的 left/top
+        const r = panel.getBoundingClientRect();
+        if (panel.style.right || panel.style.bottom) {
+            panel.style.left = r.left + 'px';
+            panel.style.top = r.top + 'px';
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        }
+        // 百分比 left/top 不可靠，回退到 getBoundingClientRect
+        const rawLeft = panel.style.left;
+        const rawTop = panel.style.top;
+        baseLeft = (rawLeft && !rawLeft.includes('%')) ? parseFloat(rawLeft) : r.left;
+        baseTop = (rawTop && !rawTop.includes('%')) ? parseFloat(rawTop) : r.top;
+        origTransition = panel.style.transition;
+        panel.style.transition = 'none';
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
+        document.body.style.userSelect = 'none';
+    }
+
     handle.addEventListener('pointerdown', onDown);
 
-    return () => {
-        panel._wosaiDraggable = false;
-        handle.style.cursor = '';
+    const cleanup = () => {
         handle.removeEventListener('pointerdown', onDown);
         document.removeEventListener('pointermove', onMove);
         document.removeEventListener('pointerup', onUp);
         document.removeEventListener('pointercancel', onUp);
+        document.body.style.userSelect = '';
+        handle.style.cursor = origCursor;
+        handle.classList.remove('ws-dragging');
+        panel._wosaiDraggable = false;
+        panel._wosaiDragCleanup = null;
     };
+    // 全局自动接管（panel-drag.js）靠这个钩子批量解绑
+    panel._wosaiDragCleanup = cleanup;
+    return cleanup;
 }

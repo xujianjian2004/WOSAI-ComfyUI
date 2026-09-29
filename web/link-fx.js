@@ -4,17 +4,16 @@
 //   连线动画绘制并入 layout-toolkit 的单一 onDrawForeground（经 hud-kit 前景注册表）。
 import { t } from "./shared/i18n.js";
 import { app } from "../../../scripts/app.js";
-import { retryUntil, makeDraggable } from "./shared/shared-utils.js";
+import { retryUntil } from "./shared/shared-utils.js";
 import { registerHudTab, unregisterHudTab, registerForegroundDraw, unregisterForegroundDraw } from "./shared/hud-kit.js";
 import { bezier, ctrlPoints, particleTs, routePoints, polyPointAt, LINK_MODES } from "./shared/link-fx-engine.js";
 import { iconBtn, iconEl } from "./shared/svg-icons.js";
 import { showTip, hideTip } from "./shared/tooltip.js";
-import { WOSAI_COPYRIGHT, STORAGE_KEYS } from "./shared/constants.js";
-import { _sec, _row } from "./shared/panel-builder.js";
+import { STORAGE_KEYS } from "./shared/constants.js";
+import { _sec, _row, buildControlPanel } from "./shared/panel-builder.js";
 import { dodgeBall } from "./launcher.js";
 import { calcSnapToNodeSide } from "./shared/canvas-utils.js";
-import { glassT, getGlassTheme } from "./shared/glass-theme.js";
-import { closeIcon } from "./shared/svg-icons.js";
+import { getGlassTheme } from "./shared/glass-theme.js";
 
 const SEC_STYLE = "font-size:var(--ws-text-md);font-weight:500;color:var(--ws-accent);margin:var(--ws-gap-lg) 0 var(--ws-gap-md)";
 
@@ -356,32 +355,14 @@ function closeFxPanel() {
 }
 
 function buildFxPanel() {
-    const T = glassT();
-    const panel = document.createElement("div");
-    panel.className = "wosai-control-panel";
-    panel.dataset.wsControl = "link-fx";
-    panel.dataset.wsModule = "fx";
-    panel.setAttribute("data-wosai-panel", "");
-    panel.setAttribute("data-theme", getGlassTheme());
-    panel.style.cssText = `position:fixed;display:none;z-index:var(--ws-z-hud);width:var(--ws-panel-width-md);box-sizing:border-box;padding:var(--ws-panel-padding-md);border-radius:var(--ws-panel-radius-md);background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:var(--ws-border-width-thin) solid var(--ws-border);box-shadow:var(--ws-shadow-panel);color:var(--ws-text);font-family:var(--ws-font-family);font-size:var(--ws-text-md);user-select:none;max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain`;
-    panel.onpointerdown = (event) => event.stopPropagation();
-
-    const header = document.createElement("div");
-    header.className = "wosai-control-header";
-    header.dataset.panelHead = "";
-    header.style.cssText = "display:flex;align-items:center;justify-content:space-between;font-size:var(--ws-text-xl);font-weight:500;margin-bottom:var(--ws-gap-md);position:sticky;top:calc(-1 * var(--ws-panel-padding-md));background:transparent;z-index:2;padding:var(--ws-gap-xs) 0;margin-left:calc(-1 * var(--ws-panel-padding-md));margin-right:calc(-1 * var(--ws-panel-padding-md));padding-left:var(--ws-panel-padding-md);padding-right:var(--ws-panel-padding-md)";
-    const title = document.createElement("span");
-    title.textContent = t("nodes.linkFx.link");
-    const close = closeIcon();
-    close.onclick = closeFxPanel;
-    header.append(title, close);
-
-    const copyright = document.createElement("div");
-    copyright.className = "wosai-control-copyright";
-    copyright.textContent = WOSAI_COPYRIGHT;
-    panel.append(header, buildFxSection(), copyright);
-    document.body.appendChild(panel);
-    _removeFxPanelDrag = makeDraggable(panel, { handle: header });
+    const { panel, cleanup } = buildControlPanel({
+        wsControl: "link-fx",
+        wsModule: "fx",
+        title: t("nodes.linkFx.link"),
+        onClose: closeFxPanel,
+        content: buildFxSection(),
+    });
+    _removeFxPanelDrag = cleanup;
     return panel;
 }
 

@@ -18,7 +18,7 @@ import { getSelectedNodes, getSelectedGroups, getNodesInGroup } from "./shared/c
 import { centerAndShowOrbs } from "./launcher.js";
 import {
     ICONS as ALIGN_ICONS,
-    openPanel, closePanel, togglePanel,
+    openPanel, closePanel, togglePanel, disposePanel,
     selectSameNodes,
     _panel,
 } from "./shared/layout-align.js";
@@ -812,6 +812,8 @@ app.registerExtension({
         if (_ltKeyEscHandler) { document.removeEventListener("keydown", _ltKeyEscHandler); _ltKeyEscHandler = null; }
         if (_ltPtrDownDocHandler) { document.removeEventListener("pointerdown", _ltPtrDownDocHandler, { capture: true }); _ltPtrDownDocHandler = null; }
         if (_ltOffGlassChange) { _ltOffGlassChange(); _ltOffGlassChange = null; }
+        // 对齐面板自带的拖拽监听与 document 级选中态监听随面板一起回收
+        disposePanel();
         _uninstallCH();
         _removeLayoutPanelDOM();
         _chEnabled = false;

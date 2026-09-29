@@ -7,7 +7,7 @@ import { compute, resize, stretch, ALIGN_COMMANDS } from "./align-engine.js";
 import { getGlassTheme } from "./glass-theme.js";
 import { bindTip } from "./tooltip.js";
 import { quickToast } from "./toast.js";
-import { makeDraggable } from "../panel-drag.js";
+import { makeDraggable } from "./shared-utils.js";
 import { calcSnapToNodeSide, getSelectedNodes } from "./canvas-utils.js";
 import { registerSelectionFollower } from "./selection-follow.js";
 import { WOSAI_COPYRIGHT } from "./constants.js";
@@ -219,6 +219,10 @@ const LABELS = {
 let _panel = null;
 let _panelFollowCleanup = null;
 let _updateQuickAvailability = null;
+// 面板级别的常驻副作用，必须在 disposePanel() 里成对回收：
+// 拖拽监听（makeDraggable 返回的清理函数）+ 选中态同步的 document 级监听
+let _panelDragCleanup = null;
+let _selectionSyncHandler = null;
 function _buildQuickAlign() {
     const quick = document.createElement("section");
     quick.className = "wosai-al-quick";
@@ -329,9 +333,13 @@ export function buildPanel() {
         quick.querySelectorAll("button:not(.wosai-al-advanced-toggle)").forEach(button => { button.disabled = !enabled; });
     };
     _updateQuickAvailability = updateQuickAvailability;
-    document.addEventListener("pointerup", () => {
-        if (_panel?.style.display !== "none") requestAnimationFrame(updateQuickAvailability);
-    }, true);
+    // 具名保存：面板销毁时要能精确解绑，避免匿名监听随面板一起泄漏
+    if (!_selectionSyncHandler) {
+        _selectionSyncHandler = () => {
+            if (_panel?.style.display !== "none") requestAnimationFrame(updateQuickAvailability);
+        };
+        document.addEventListener("pointerup", _selectionSyncHandler, true);
+    }
     updateQuickAvailability();
 
     const _pBtn = (icon, label, onclick) => {
@@ -356,7 +364,7 @@ export function buildPanel() {
 
     document.body.appendChild(p);
     // 对齐面板采用整块拖拽：普通内容区域均可拖动，交互控件仍由拖拽器自动排除。
-    makeDraggable(p, p);
+    _panelDragCleanup = makeDraggable(p, { handle: p });
     return p;
 }
 
@@ -388,6 +396,24 @@ export function closePanel() {
 }
 if (typeof window !== "undefined") window.__wosaiCloseAlignPanel = closePanel;
 export function togglePanel() { (_panel && _panel.style.display !== "none") ? closePanel() : openPanel(); }
+
+/**
+ * 彻底销毁对齐面板：关闭 → 解绑拖拽 → 解绑选中态同步监听 → 移除 DOM。
+ * 扩展卸载（layout-toolkit 的 remove 钩子）或面板重建前调用，避免 document 级
+ * 匿名监听与拖拽监听在面板消失后继续常驻。
+ */
+export function disposePanel() {
+    closePanel();
+    _panelDragCleanup?.();
+    _panelDragCleanup = null;
+    if (_selectionSyncHandler) {
+        document.removeEventListener("pointerup", _selectionSyncHandler, true);
+        _selectionSyncHandler = null;
+    }
+    _panel?.remove();
+    _panel = null;
+    _updateQuickAvailability = null;
+}
 export { _panel };
 
 // ── 自定义间距输入状态 ──

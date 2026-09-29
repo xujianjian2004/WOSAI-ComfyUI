@@ -34,6 +34,8 @@
 - 新增 `tests/test_media_preview.py`（33 项）：覆盖媒体类型判定、托管目录路径解析、执行图反查、批次上限、视频 trim 回退、以及前端载荷字段契约。
 - 新增 `web/shared/frontend-reachability.test.mjs`（4 项）：把「发布体积」与「启动解析体积」永久对齐——以 `extension.json` 的 29 个 JS 入口为种子求静态 import 传递闭包，断言 `web/` 下每个 `.js` 都必须落入启动闭包或按需（动态 `import()`）闭包，`web/` 之外不得存在「随包发布但运行时永不加载」的模块。该测试在落地时经阴性验证（临时放入 stray 文件后按预期失败并指名该文件）。
 - 新增 `dev/frontend/README.md`：说明该目录收录「已写好、有单测、但尚未接入运行时」的前端纯函数地基（布局引擎 / 布局几何 / 功能注册表），约定不得被 `web/` 运行时模块静态 import，接线时移回 `web/shared/` 并同步本表。
+- 新增 `web/shared/draggable-contract.test.mjs`（6 项）与 `web/shared/panel-builder-contract.test.mjs`（3 项），把本轮两处结构性去重固化为回归测试（详见 Fixed / Changed 段对应条目）。
+- `scripts/check-i18n.mjs` 新增**反向检查**（此前只检查「用到的键必须存在」，不检查「定义了却没人用」）：以 `web/**/*.{js,mjs,json}` 与 `wosai_core` / `nodes` 的 Python 源为语料，键名只要以①完整字符串形式出现，或②以「字面量前缀 + 运行时拼接」形式出现（`"saveText." + key`、`` `nodeDefs.${type}.display_name` ``），即视为已消费——动态键因此不会被误判。其余记为死键；**新增死键会让检查失败**，历史遗留登记在 `UNUSED_KEY_BASELINE`（218 项）里，只减不增，键被重新启用时也必须同步从基线移除（否则检查同样失败，避免基线腐烂）。判据经阴性验证（临时注入 `common.zzzTestDead` 后按预期报错并指名）。
 
 ### Changed
 
@@ -149,6 +151,8 @@
   - 闲置淡出、无图隐藏、键盘聚焦唤回、disabled 降级透明度等规则统一切到容器：`is-idle` 下隐藏 `.wosai-image-compare-bottom`，焦点进入时再整体唤回；disabled 交换按钮在容器 `opacity: 1` 时仍用额外选择器保留自己的半透。
   - `compare-view-contract.test.mjs` 同步更新「闲置隐藏清单」「命中关闭」「键盘唤回」三组断言，新增「底部工具栏整体淡出」哨兵。
   - 缓存破坏：`media-tools.js` `?v=16 → 17`、`media-tools.css` `?v=17 → 18`。
+- **玻璃控制面板的外壳收敛为单一生产者。** `visual-fx`（背景）、`link-fx`（连线特效）、`settings`（设置中心）三处各自复刻了一整套外壳：`div.wosai-control-panel` + `data-wosai-panel` / `data-theme` + 一长串内联玻璃样式（背景、模糊、边框、阴影、圆角、最大高度）+ 头部（标题 + `closeIcon()`）+ 版权行 + `document.body.appendChild` + 拖拽绑定。任何一处改样式都要手动同步另外两处，漏一处就是「同一个面板两套观感」且无任何报错。现统一由 `web/shared/panel-builder.js::buildControlPanel()` 产出，差异以参数表达（`wsControl` / `wsModule` / `extraClass` / `width` / `stickyHeader` / `copyright`），三处调用点分别瘦身约 18 / 18 / 12 行，并顺带回收了不再使用的 `glassT` / `closeIcon` / `WOSAI_COPYRIGHT` / `makeDraggable` 等 import。新增 `panel-builder-contract.test.mjs`（3 项）锁定：面板类名只允许在 builder 里生产、三处消费者必须调用 `buildControlPanel`、以及 `data-wosai-panel` / `data-theme` / `stopPropagation` / 拖拽绑定 / 版权行类名等关键契约不丢失。
+- **补齐 20 个 JS 入口缺失的缓存破坏版本号。** `extension.json` 的 29 个 JS 入口此前有 20 个不带 `?v=`（`omni-slider` / `node-color` / `color-bar` / `auto-connect` / `shake-disconnect` / `visual-fx` / `link-fx` / `settings` / `performance-mode` / `menu-hide` / `panel-drag` / `run-highlight` / `ignore-groups` / `save-node` / `save-text` / `compact-nodes` / `logic-switch` / `route-switch` / `size-select` / `reset-defaults`），改动这些文件后浏览器可能继续用旧副本，且没有任何断言兜底。现已全部纳入版本管理（新纳入者起 `?v=1`，本轮统一递增到 `?v=2`），其余入口同步递增。CSS 侧按既有约定不动（`os-slider*` / `os-color` / `os-size` / `save-node` 等刻意不带版本号）。
 
 ### Performance
 
@@ -173,6 +177,10 @@
 - 修复 **浮层面板被两套拖拽实现各绑一次**的问题。项目里存在两份同名的 `makeDraggable`：`web/panel-drag.js`（`mousedown` 系，靠 `panel._wosaiDraggable` 去重，并由 MutationObserver 全局自动接管所有 `[data-wosai-panel]`）与 `web/shared/shared-utils.js`（`pointerdown` 系，供 `link-fx` / `visual-fx` / `color-bar` / `save-node` 显式调用）。后者**不写那个去重标记**，于是带 `data-wosai-panel` 的面板会被观察器判定为「未绑定」而补绑第二套 —— 拖拽时两个 handler 同时改写 `left` / `top`，且两者基准算法不同（`offsetLeft` vs `getBoundingClientRect`），行为不可预期。现让 `shared-utils` 版本也维护同一标记（并在其返回的清理函数里复位），使全局自动接管正确跳过已绑定的面板。
 - 修复 **`node-color.js` 面板初始化链上的未捕获 Promise**：`initStore().then(() => { renderRecentPicks(); buildPresets(); })` 没有 `.catch`。`initStore()` 自身虽吞掉了后端 fetch 错误，但 `then` 回调内部抛错仍会产生 `unhandledrejection`，并让配色面板停在半初始化状态。现补上 `catch` 并打点告警（同步那一行已先渲染过一次，故失败不会白屏）。
 - 修复 **两个 Python 测试模块在缺可选依赖时以 ERROR 失败**的问题。`tests/test_media_preview.py` 顶层直接 `from PIL import Image`、`tests/test_http_routes.py` 直接 `from aiohttp import web`，在没有 Pillow / aiohttp 的环境（打包环境即如此）会因导入失败被 unittest 记成 **ERROR**，掩盖真正的回归；本次环境下 `python -m unittest discover` 即报 `FAILED (errors=2)`。现改为条件导入 + `@unittest.skipIf(...)`（skip 标记会被子类继承，`MediaPreviewTestCase` 一处即可覆盖其 5 个子类），`test_http_routes` 模块级的 `_register_routes()` 调用在缺依赖时同样跳过。修复后为 `OK (skipped=53)` —— 在装齐依赖的 ComfyUI 运行环境中这些用例照常执行。
+
+- 修复 **两份 `makeDraggable` 并存**这一结构性隐患（上一轮只做了「补写去重标记」的止血）。`web/panel-drag.js`（`mousedown` 系 + MutationObserver 全局接管）与 `web/shared/shared-utils.js`（`pointerdown` 系 + 显式调用）各有一份实现，行为差异散布在细节里：前者做视口夹取与 `right`/`bottom` → `left`/`top` 换算、后者带 4px 起拖阈值与拖拽期 `transition` 关闭，去重全靠 `panel._wosaiDraggable` 一个标记，任一侧漏写即双重绑定。现合并为 `shared-utils.js` 的唯一实现，取两家之长（pointer 事件 + 起拖阈值 + 视口夹取 + 定位换算 + 拖拽期禁用过渡与文本选中 + 写入 `wosaiManualPosition` + 返回清理函数并挂 `_wosaiDragCleanup`），`panel-drag.js` 只保留「发现浮层 → 识别手柄 → 绑定」的自动接管。新增 `draggable-contract.test.mjs`（6 项）：全仓 `function makeDraggable` 只允许出现一次、去重标记与清理钩子成对、所有调用点必须是选项对象形式（禁止旧式裸 handle 传参）；另有两项把函数体抽出来在最小 DOM stub 上真跑——断言阈值内不产生位移、位移后落在 `基准 + Δ`、越界时夹到 `视口 − 尺寸`、抬手后 document 监听清零、重复绑定不替换 handler。测试经阴性验证（把定义改回旧式调用后按预期变红）。
+- 修复 **对齐面板的 document 级匿名监听无法解绑**：`layout-align.js` 在 `buildPanel()` 里注册 `document.addEventListener("pointerup", () => {...}, true)` 用于刷新按钮可用态，匿名函数既无法 `removeEventListener`，也随面板一起常驻到页面结束。现改为具名保存（`_selectionSyncHandler`），并新增 `disposePanel()` 成对回收「关闭 → 解绑拖拽 → 解绑选中态同步 → 移除 DOM → 清空引用」，由 `layout-toolkit.js` 的 `remove()` 钩子调用；面板重建（先 dispose 再 build）也能正确重建闭包。顺带修掉 `settings.js` 的同类问题：`rebuild()` 原先只 `_panel.remove()`，拖拽监听残留，现先调 `_panel._wosaiDragCleanup?.()`。
+- 清理 **33 个全仓零引用的 `common.*` 死键**（`wosaiNodeAlign` / `wosaiSelectSame` / `alignCenter` / `interfaceLanguage` …）：这些条目属于早期「通用词库」，随 UI 改版后已无任何消费者，`t()` 的兜底参数让缺失不会暴露。删除后 zh / en 两侧键数 1344 → 1311，并由新增的 i18n 反向检查防止再堆积。
 
 ## [2.1.0] - 2026-09-27
 
