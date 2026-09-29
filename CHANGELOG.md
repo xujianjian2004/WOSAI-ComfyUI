@@ -92,6 +92,14 @@
   - 缓存破坏：`device-info.js` `?v=14 → 15`（`device-info.css` 未改动，故不递增）。
   - 体积：主 JavaScript **1377.6 → 1377.5 KiB**（余 38.5 KiB，缩进与注释改写抵消了大部分删减的 3 行）、样式 **237.6 KiB**（余 12.4 KiB，无变化），预算内。
 
+- **设备面板：硬件资源的「处理器」由朴素行改为磁贴，并挪到磁盘磁贴之后。** 处理器型号是一条长文本（`AMD Ryzen 9 9950X 16-Core Processor (4.30 GHz)`），在朴素行里被右对齐挤成两行、第二行还贴到卡片边缘。它是这台机器的固定配置，和内存、磁盘一样属于「一眼扫过去」的静态信息，与占用率磁贴同处一栏比单独占一行更好扫读。
+  - 新增 `textTile()`：沿用占用率磁贴的外壳（同款底色、圆角、小字标签），但**不画占用条** —— 后端并不采集 CPU 占用率，硬塞一根空条只会被读成「这项数据没加载出来」，与既有的「算不出占用率就不画 0% 空条」是同一条原则。空值同样走「不可用」降级。
+  - 型号全名允许折行、不截成省略号：型号是排障时要逐字抄下来的信息。行高用新增几何令牌 `--ws-di-tile-text-line-height`(15px) —— 型号最长要折三行，行距比正文密排更易读。
+  - 静态磁贴以 `is-static` 与占用率磁贴区分，验收脚本据此分流条形断言：磁贴 5 → **6** 个，其中带条仍是 5 个（+ 显存分段条），故 `progressbar` 总数仍为 6，处理器磁贴不计数。
+  - 卡内顺序变为「磁贴行（显存 / 内存 / 各磁盘 / 处理器）→ GPU 体征区块」——硬件资源卡**不再有任何朴素行**。
+  - 缓存破坏：`device-info.js` `?v=15 → 16`、`device-info.css` `?v=11 → 12`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）、`wosai-variables.css` `?v=24 → 25`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
+  - 体积：主 JavaScript **1377.5 → 1378.4 KiB**（余 37.6 KiB）、样式 **237.6 → 238.1 KiB**（余 11.9 KiB），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。

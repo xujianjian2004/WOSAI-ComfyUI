@@ -129,6 +129,8 @@
 .ws-di-metric-value { display: flex; align-items: baseline; gap: var(--ws-gap-xs); margin: var(--ws-gap-xs) 0 var(--ws-gap-sm); min-width: 0; }
 .ws-di-metric-value strong { color: var(--ws-text); font-size: var(--ws-text-lg); font-weight: 600; }
 .ws-di-metric-detail { overflow: hidden; color: var(--ws-text-muted); font-size: var(--ws-text-xs); text-overflow: ellipsis; white-space: nowrap; }
+/* 无量化指标的信息磁贴（处理器型号）：没有占用条，大号位换成型号文本，并允许折行 —— 型号全名值得完整显示，不该截成省略号 */
+.ws-di-metric.is-static .ws-di-metric-text { display: block; margin-top: var(--ws-gap-xs); color: var(--ws-text); font-size: var(--ws-text-sm); line-height: var(--ws-di-tile-text-line-height); }
 
 /* ── 资源占用条 ── */
 .ws-di-bar { display: block; flex: 1 1 auto; min-width: 0; height: var(--ws-di-bar-height); border-radius: var(--ws-radius-pill); background: var(--ws-surface-2); overflow: hidden; }

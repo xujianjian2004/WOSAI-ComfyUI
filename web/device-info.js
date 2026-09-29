@@ -27,7 +27,7 @@ const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=11", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=12", import.meta.url).href],
     ]);
 }
 
@@ -196,6 +196,19 @@ function tile(name, percent, detail) {
     line.append(make("span", "ws-di-metric-detail", detail));
     element.append(line);
     element.append(usageBar(percent, { name }));
+    return element;
+}
+
+/**
+ * 无量化指标的信息磁贴：沿用占用率磁贴的外壳，但大号位放型号文本、不画占用条。
+ * 处理器没有后端采集的占用率 —— 硬塞一根空条只会被读成「这项数据没加载出来」，
+ * 而型号本来就没有百分比可言。空值时走与占用率磁贴一致的「不可用」降级，不画假条。
+ */
+function textTile(name, value) {
+    const element = make("div", "ws-di-metric is-static");
+    element.dataset.search = `${name} ${value}`.toLowerCase();
+    element.append(make("span", "ws-di-metric-name", name));
+    element.append(make("span", "ws-di-metric-text", value));
     return element;
 }
 
@@ -387,10 +400,11 @@ function dependenciesHeading(entries) {
 }
 
 /**
- * 硬件资源：概览磁贴 → GPU 体征区块 → 处理器。
+ * 硬件资源：磁贴行（显存 / 内存 / 各磁盘 / 处理器）→ GPU 体征区块。
  * 磁贴与 GPU 块讲的是同一件事的两层——磁贴答「满了多少」，GPU 块答「这些占用由什么构成」——
  * 所以 GPU 块不再复述百分比，只留磁贴给不出的三层显存构成、图例与温度/功耗/驱动。
- * 上一版把磁贴单独放在「概览」卡里，与这里的行逐项重复（连取值表达式都逐字相同）。
+ * 处理器也曾是一条朴素行，但它是这台机器的固定配置而非实时指标，与磁贴同列扫读更顺；
+ * 具体见 `textTile()` 为何不走占用率磁贴的形状。
  */
 function renderHardware(target) {
     const section = card(label("hardware", "Hardware Resources"), "pi-microchip", { id: "hardware" });
@@ -408,11 +422,12 @@ function renderHardware(target) {
     (data.dynamic?.disks || []).forEach((disk) => {
         tiles.append(tile(`${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total)));
     });
+    // 处理器排在磁盘之后：它和内存、磁盘一样是这台机器的固定配置，混在占用率磁贴里扫读最顺
+    tiles.append(textTile(label("processor", "Processor"), valueOf(system.cpu, label("unavailable", "Unavailable"))));
     section.append(tiles);
 
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
     gpus.forEach((gpu) => section.append(gpuBlock(gpu, gpus.length > 1)));
-    row(section, "processor", system.cpu, { label: label("processor", "Processor") });
     target.append(section);
 }
 
