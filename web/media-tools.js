@@ -642,20 +642,21 @@ function createImageCompare(node) {
     };
 
     const updateAspectRatio = () => {
-        const aRatio = first.naturalWidth && first.naturalHeight
+        const baseRatio = first.naturalWidth && first.naturalHeight
             ? first.naturalWidth / first.naturalHeight
             : 0;
-        const bRatio = second.naturalWidth && second.naturalHeight
+        const topRatio = second.naturalWidth && second.naturalHeight
             ? second.naturalWidth / second.naturalHeight
             : 0;
-        commitLayout(aRatio || bRatio || state.aspectRatio);
+        commitLayout(baseRatio || topRatio || state.aspectRatio);
     };
 
     const updateSplit = () => {
         const value = normalizeSplitPercent(slider.value);
-        // B 图层（上层）从分割线起向右侧裁剪出来，A 图层（底层）留在左侧：
-        // 这样图像内容与角标语义一致（左下角标 A 对应左侧的 A 图）。
-        // 双拼视图不裁剪图层：B 面板直接占右/下半幅，分割位置只对滑动视图有意义
+        // 上层从分割线起向右侧裁剪出来，底层铺满、留在左侧：
+        // 分割线越靠左 → 上层（A）露出越多，画面偏 A；越靠右 → 底层（B）露出越多，
+        // 画面偏 B。拖动方向与画面呈现的图一致（拖到左端整张 A、右端整张 B）。
+        // 双拼视图不裁剪图层：底层直接占左/上半幅，分割位置只对滑动视图有意义
         secondWrap.style.clipPath = state.resolvedView === COMPARE_VIEW_DEFAULT
             ? `inset(0 0 0 ${value}%)`
             : "none";
@@ -665,17 +666,20 @@ function createImageCompare(node) {
     };
     const renderImages = () => {
         const display = compareDisplayPair(payload, swapped);
-        const firstUrl = imageUrl(display.a);
-        const secondUrl = imageUrl(display.b);
+        // 底层铺满 ⇒ 它占据分割线左侧；上层只保留分割线右侧。要让「拖到左端是 A、
+        // 拖到右端是 B」，底层必须放 B、上层放 A（与字面直觉相反，勿照字面调换）
+        const firstUrl = imageUrl(display.b);
+        const secondUrl = imageUrl(display.a);
         if (firstUrl) first.src = firstUrl;
         else first.removeAttribute("src");
         if (secondUrl) second.src = secondUrl;
         else second.removeAttribute("src");
-        root.classList.toggle("has-first", Boolean(display.a));
-        root.classList.toggle("has-second", Boolean(display.b));
+        root.classList.toggle("has-first", Boolean(display.b));
+        root.classList.toggle("has-second", Boolean(display.a));
         // 尺寸标注直接读载荷里的原始尺寸：不必等图片解码，也不会被显示尺寸影响
-        startLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
-        endLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
+        // 角标标注的是它所在面板实际显示的那张图：左下 = B、右下 = A
+        startLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
+        endLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
         swap.disabled = !(payload.a && payload.b);
         swap.classList.toggle("is-active", swapped);
         swap.setAttribute("aria-pressed", String(swapped));

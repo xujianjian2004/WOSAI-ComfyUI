@@ -80,11 +80,24 @@ test("双拼视图把 A/B 角标归位到各自面板", () => {
     assert.match(CSS, /is-view-stack \.wosai-image-compare-label\.is-end \{[^}]*right: auto;[^}]*left: var\(--ws-gap-sm\);/s);
 });
 
-test("滑动视图用左内缩裁剪，保证 A 在分割线左侧", () => {
-    // clip-path 的 inset(top right bottom left)：B 图层从左侧按分割位置裁掉，
-    // 剩下的部分落在分割线右边；反过来会把 A/B 与左下角标 A 的语义颠倒
+test("滑动视图用左内缩裁剪，保证底层留在分割线左侧", () => {
+    // clip-path 的 inset(top right bottom left)：上层从左侧按分割位置裁掉，
+    // 剩下的部分落在分割线右边；底层铺满 ⇒ 左侧露出的是底层。
+    // 反过来（裁右侧）会把「拖到左端显示 A、右端显示 B」整体掉个方向
     assert.match(JS, /secondWrap\.style\.clipPath = state\.resolvedView === COMPARE_VIEW_DEFAULT\s*\n\s*\? `inset\(0 0 0 \$\{value\}%\)`/);
     assert.doesNotMatch(JS, /inset\(0 \$\{100 - value\}% 0 0\)/);
+});
+
+test("拖动方向 = 画面呈现的图：左端 A、右端 B", () => {
+    // 底层铺满占左侧、上层只保留右侧。要「拖到左端是 A、右端是 B」，底层必须
+    // 放 B、上层放 A —— 照字面按 A/B 顺序分配会让整套方向反转，且双拼视图
+    // （底层占左/上半幅）会跟着一起反，切视图时左右对调。
+    assert.match(JS, /const firstUrl = imageUrl\(display\.b\);/);
+    assert.match(JS, /const secondUrl = imageUrl\(display\.a\);/);
+    assert.match(JS, /root\.classList\.toggle\("has-first", Boolean\(display\.b\)\)/);
+    // 角标必须标注它所在面板实际显示的那张图，否则左下角标会指向一张被盖住的图
+    assert.match(JS, /startLabel\.textContent = formatMediaBadgeLabel\(display\.b/);
+    assert.match(JS, /endLabel\.textContent = formatMediaBadgeLabel\(display\.a/);
 });
 
 test("拖拽光标只在滑动视图开启", () => {
@@ -135,8 +148,8 @@ test("控件高度按舞台宽高比换算，且内边距与 CSS 同源", () => 
 });
 
 test("尺寸标注直接取载荷尺寸并走统一的格式化函数", () => {
-    assert.match(JS, /formatMediaBadgeLabel\(display\.a, swapped \? "B" : "A"\)/);
     assert.match(JS, /formatMediaBadgeLabel\(display\.b, swapped \? "A" : "B"\)/);
+    assert.match(JS, /formatMediaBadgeLabel\(display\.a, swapped \? "B" : "A"\)/);
 });
 
 // ── 闲置自动淡出（控件遮挡优化）────────────────────────────────────
