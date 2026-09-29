@@ -68,6 +68,17 @@
   - 缓存破坏：`device-info.js` `?v=11 → 12`、`device-info.css` `?v=8 → 9`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
   - 体积：主 JavaScript **1380.5 → 1380.2 KiB**（余 35.8 KiB）、样式 **237.0 → 236.8 KiB**（余 13.2 KiB），预算内。
 
+- **设备面板：运行环境卡改左右两栏、移除「网络与启动参数」卡、环境健康度置顶。**
+  - **运行环境卡一卡两栏**：左栏「环境标识」（系统 / 架构 / Python / 解释器 / PyTorch / CUDA / cuDNN / ComfyUI / Git 共九行），右栏「关键依赖」（5 项依赖版本）。原先两者纵向串成 15 行，并排后卡高只由较高的一栏决定，同样的信息少占约四成高度（实测卡高 317px，单栏排列需 406px）。依赖原靠一枚纵向小节标签划界——否则 `Git` 之下紧跟一行 `Torch` 会被读成上方 `PyTorch` 那一行的重复——改成横向分栏后这层歧义自然消失，标签转为右栏的栏标题、与左栏首行同高起排，栏间以一道竖线分隔。
+  - 两栏由栅格 `repeat(auto-fit, minmax(min(100%, var(--ws-di-column-min-width)), 1fr))` 排布：窄侧栏下自动塌成单栏；简洁版隐藏整条依赖栏后，左栏还会因 `auto-fit` **折叠空轨道**而自动占满整卡宽度——因此不需要额外判断「还剩几栏」。栏级显隐并入既有的统一裁决 `applyFilters()`，与逐单元裁决同一趟完成。
+  - 新增几何令牌 `--ws-di-column-min-width`（110px）。刻意取小：栅格要在容器宽 ≥ 2 倍此值时才排成两栏，取大了会让常规宽度的侧栏直接塌成单栏——这个值只负责「窄到什么程度才塌」。
+  - 栏内标签不再吃 `.ws-di-label` 的 40% 固定宽（半栏放不下），改为按内容取宽并可换行，长包名不会把右侧的版本号挤成两行。
+  - **移除「网络与启动参数」卡**：删除 `renderNetwork()` / `proxyText()` 与卡片注册。卡片总数 5 → 4；简洁版仍是三张。`network` / `httpProxy` / `httpsProxy` / `noProxy` / `startup` / `set` / `notSet` / `none` 这 8 条文案随之停用，但**未从 locale 删除**——`deviceInfo` 里存在大量动态键消费（`label(key, …)` 的键来自数组与对象，如 `["simple", "simple"]`、`` label(`issues.${issue}`) ``），静态文本判据只能在「几乎全活」与「误判一片」之间摆动，误删风险大于收益。
+  - **「环境健康度」提到内容区首位**（原为第三位）：它是这套数据的结论，先给结论再给明细。卡片顺序现为「环境健康度 → 运行环境 → 硬件资源 → ComfyUI 路径」。
+  - 分节标签不再挂在卡片直接子元素下（`dependenciesHeading()` 的唯一调用点在 `renderEnvironment`，且总落在栏内），故 `.ws-di-card > .ws-di-group-label` 已成永不匹配的死选择器，改写为 `.ws-di-column > .ws-di-group-label` 并把字号、配色一并迁入——漏掉这步会让栏标题回退成 h3 默认的 14px 正文色（此缺陷由真实浏览器验收抓出）。
+  - 缓存破坏：`device-info.js` `?v=12 → 13`、`device-info.css` `?v=9 → 10`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）、`wosai-variables.css` `?v=23 → 24`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
+  - 体积：主 JavaScript **1380.2 → 1380.0 KiB**（余 36.0 KiB）、样式 **236.8 → 238.1 KiB**（余 11.9 KiB），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。

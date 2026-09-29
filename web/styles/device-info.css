@@ -71,8 +71,29 @@
 .ws-di-card > .ws-di-gpu { margin-left: var(--ws-gap-lg); margin-right: var(--ws-gap-lg); }
 .ws-di-row { justify-content: space-between; gap: var(--ws-gap); min-height: var(--ws-di-row-min-height); border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted); }
 .ws-di-card > .ws-di-row:last-child { border-bottom: 0; }
-/* 卡内分节标签：运行环境卡把「环境本身」与「关键依赖」分成两段，靠它划界 */
-.ws-di-card > .ws-di-group-label { margin: var(--ws-gap-md) var(--ws-gap-lg) 0; color: var(--ws-text-muted); font-size: var(--ws-text-sm); font-weight: 600; letter-spacing: var(--ws-letter-spacing-wide); }
+/* 卡内分节标签：如今只用作运行环境卡右栏的栏标题，与左栏首行同高起排。
+   dependenciesHeading() 的唯一调用点在 renderEnvironment，且总挂在 .ws-di-column 里，
+   所以不再保留「卡片直接子元素」那套规则——留着就是永不匹配的死选择器。 */
+.ws-di-column > .ws-di-group-label {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  min-height: var(--ws-di-row-min-height);
+  border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted);
+  color: var(--ws-text-muted);
+  font-size: var(--ws-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--ws-letter-spacing-wide);
+}
+
+/* ── 运行环境卡的两栏：左「环境是什么」/ 右「装了哪些包」 ── */
+.ws-di-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--ws-di-column-min-width)), 1fr)); padding: var(--ws-gap-sm) 0 var(--ws-gap-sm); }
+.ws-di-column { min-width: 0; padding: 0 var(--ws-gap-lg); }
+.ws-di-column + .ws-di-column { border-left: var(--ws-border-width-thin) solid var(--ws-border-muted); }
+.ws-di-column > .ws-di-row:last-child { border-bottom: 0; }
+/* 栏宽只有卡的一半，标签不吃 40% 固定宽、改按内容取宽并可换行，长包名才不会把值挤成两行 */
+.ws-di-column .ws-di-label { flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ws-di-column .ws-di-value { flex: 0 1 auto; }
 .ws-di-label { flex: 0 0 40%; color: var(--ws-text-muted); }
 .ws-di-value { min-width: 0; color: var(--ws-text-secondary); text-align: right; overflow-wrap: anywhere; white-space: pre-line; user-select: text; }
 .ws-di-value.is-error { color: var(--ws-warning); }

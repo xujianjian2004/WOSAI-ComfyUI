@@ -46,7 +46,7 @@ function storeView(mode) {
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=9", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=10", import.meta.url).href],
     ]);
 }
 
@@ -350,29 +350,41 @@ function healthRing(score) {
 
 /**
  * 运行环境卡：环境标识（系统 / Python / PyTorch / Git）与关键依赖版本同处一卡。
- * 依赖作为卡内分节，用小节标签把「环境本身」与「装了哪些包」分开——否则 `Git` 下面紧跟
- * 一行 `Torch`，会被读成 `PyTorch` 那一行的重复。
+ * 一卡两栏——左栏答「环境是什么」，右栏答「装了哪些包」——纵向 15 行压到 9 行左右。
+ * 依赖原先靠小节标签在纵向划界（否则 `Git` 下面紧跟一行 `Torch` 会被读成 `PyTorch` 的重复），
+ * 改横向分栏后这个歧义自然消失，标签改为栏标题留在右栏顶部，与左栏首行同高对齐。
+ * 窄侧边栏下由栅格 auto-fit 自动塌成单栏；简洁版右栏整栏隐藏后，左栏作为唯一栅格项占满整行。
  */
 function renderEnvironment(target) {
     const section = card(label("system", "Runtime Environment"), "pi-desktop", { id: "environment" });
     const system = data.static?.system || {};
     const runtime = data.static?.runtime || {};
     const comfyui = data.static?.comfyui || {};
-    row(section, "os", system.os, { label: label("os", "OS") });
-    row(section, "machine", system.machine, { label: label("machine", "Architecture"), advanced: true });
-    row(section, "python", system.python, { label: label("python", "Python") });
-    row(section, "executable", system.executable, { label: label("executable", "Python executable"), advanced: true });
-    row(section, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
-    row(section, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime"), advanced: true });
-    row(section, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN"), advanced: true });
-    row(section, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI"), advanced: true });
-    row(section, "git", comfyui.git, { label: label("git", "Git") });
+
+    const columns = make("div", "ws-di-columns");
+    const identity = make("div", "ws-di-column");
+    identity.dataset.column = "identity";
+    row(identity, "os", system.os, { label: label("os", "OS") });
+    row(identity, "machine", system.machine, { label: label("machine", "Architecture"), advanced: true });
+    row(identity, "python", system.python, { label: label("python", "Python") });
+    row(identity, "executable", system.executable, { label: label("executable", "Python executable"), advanced: true });
+    row(identity, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
+    row(identity, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime"), advanced: true });
+    row(identity, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN"), advanced: true });
+    row(identity, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI"), advanced: true });
+    row(identity, "git", comfyui.git, { label: label("git", "Git") });
+    columns.append(identity);
 
     const dependencies = dependencyEntries(runtime);
     if (dependencies.length) {
-        section.append(dependenciesHeading(dependencies));
-        for (const [name, item] of dependencies) row(section, name, item, { label: capitalizeInitial(name), advanced: true });
+        const deps = make("div", "ws-di-column");
+        deps.dataset.column = "dependencies";
+        deps.append(dependenciesHeading(dependencies));
+        for (const [name, item] of dependencies) row(deps, name, item, { label: capitalizeInitial(name), advanced: true });
+        columns.append(deps);
     }
+
+    section.append(columns);
     target.append(section);
 }
 
@@ -430,32 +442,6 @@ function renderHardware(target) {
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
     gpus.forEach((gpu) => section.append(gpuBlock(gpu, gpus.length > 1)));
     row(section, "processor", system.cpu, { label: label("processor", "Processor") });
-    target.append(section);
-}
-
-/**
- * 网络与启动参数。后端只回报 `Set` / `Not set` 两个英文串，这里映射成界面语言；
- * 其余意外取值原样透出——宁可显示原文，也不要谎报一个语义。
- */
-function proxyText(item) {
-    const raw = valueOf(item, "");
-    if (!raw) return label("unavailable", "Unavailable");
-    if (raw === "Set") return label("set", "Set");
-    if (raw === "Not set") return label("notSet", "Not set");
-    return raw;
-}
-
-function renderNetwork(target) {
-    const section = card(label("network", "Network & Startup"), "pi-wifi", { id: "network", advanced: true });
-    const network = data.static?.network || {};
-    [["httpProxy", network.http_proxy], ["httpsProxy", network.https_proxy], ["noProxy", network.no_proxy]].forEach(([key, item]) => {
-        row(section, key, { value: proxyText(item), status: item?.status, error: item?.error }, { label: label(key, titleCase(key)) });
-    });
-    // 启动参数可能为空数组，由 valueOf 的 fallback 兜成「无」，不留一行空白。
-    row(section, "startup", data.static?.runtime?.arguments, {
-        label: label("startup", "Startup arguments"),
-        fallback: label("none", "None"),
-    });
     target.append(section);
 }
 
@@ -709,6 +695,11 @@ function applyFilters(root = panel?.querySelector(".ws-device-info")) {
             unit.hidden = !hit;
             if (hit) anyVisible = true;
         }
+        // 栏级裁决：栏内无一单元可见时整栏隐藏。简洁版藏掉运行环境的右栏后，左栏会因栅格
+        // auto-fit 折叠空轨道而自动占满整行 —— 所以这里不需要再判断「还剩几栏」。
+        for (const column of section.querySelectorAll("[data-column]")) {
+            column.hidden = !column.querySelector("[data-search]:not([hidden])");
+        }
         section.hidden = !anyVisible;
         if (anyVisible) visibleCards += 1;
     }
@@ -766,10 +757,9 @@ function render() {
     else if (data) {
         renderTools(root);
         const content = make("main", "ws-di-content");
+        renderHealth(content);
         renderEnvironment(content);
         renderHardware(content);
-        renderHealth(content);
-        renderNetwork(content);
         renderPaths(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
         root.append(content);

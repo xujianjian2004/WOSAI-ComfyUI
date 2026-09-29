@@ -996,6 +996,9 @@
   --ws-di-swatch-size: 7px;
   /* 概览磁贴的最小列宽：侧栏窄至约 300px 时仍保持两列 */
   --ws-di-tile-min-width: 148px;
+  /* 运行环境卡两栏的最小列宽。刻意取得小：栅格要在容器宽 >= 2 倍此值时才排成两栏，
+     取大了会让常规宽度的侧栏直接塌成单栏。此值只负责「窄到什么程度才塌」。 */
+  --ws-di-column-min-width: 110px;
   /* 健康度环形 */
   --ws-di-ring-size: 46px;
   --ws-di-ring-width: 5px;
