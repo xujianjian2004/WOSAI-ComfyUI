@@ -9,6 +9,9 @@
   overflow: auto;
 }
 
+/* display:flex / grid 会盖掉浏览器的 [hidden]{display:none}，显隐过滤器必须显式声明 */
+.ws-device-info [hidden] { display: none !important; }
+
 .ws-di-header,
 .ws-di-tools,
 .ws-di-actions,
@@ -73,6 +76,8 @@
 .ws-di-label { flex: 0 0 40%; color: var(--ws-text-muted); }
 .ws-di-value { min-width: 0; color: var(--ws-text-secondary); text-align: right; overflow-wrap: anywhere; white-space: pre-line; user-select: text; }
 .ws-di-value.is-error { color: var(--ws-warning); }
+/* 只读目录标记：贴在路径右端，比一整枚 pill 轻，不撑高 29px 的行 */
+.ws-di-badge { display: inline-block; margin-left: var(--ws-gap-xs); padding: 0 var(--ws-gap-2xs); border-radius: var(--ws-radius-sm); background: var(--ws-surface-2); color: var(--ws-text-muted); font-size: var(--ws-text-xs); }
 .ws-di-path-row { align-items: flex-start; padding: var(--ws-gap-sm) 0; }
 .ws-di-path-row[type="button"] { width: calc(100% - var(--ws-gap-lg) * 2); border-top: 0; border-right: 0; border-left: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .ws-di-path-row[type="button"]:hover { background: var(--ws-accent-dim); }

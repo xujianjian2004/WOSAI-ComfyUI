@@ -50,7 +50,15 @@
   - 复用而非重写：`.ws-di-metric`（磁贴）与 `.ws-di-gpu`（GPU 区块）本就是这次要用的形态，直接沿用并收窄子选择器；仅删除确无需要的 `.ws-di-subtitle`，并保留 `.ws-di-search` / `.ws-di-view-switch` / `.ws-di-tools` 供下一步（概览/详细切换与搜索接线）使用。
   - 新增几何令牌 `--ws-di-bar-height`(6px)、`--ws-di-bar-height-lg`(9px)、`--ws-di-bar-min-fill`(2px)、`--ws-di-swatch-size`(7px)、`--ws-di-tile-min-width`(148px)、`--ws-di-ring-size`(46px)、`--ws-di-ring-width`(5px)。**颜色令牌刻意不在变量表里包一层**，原因见 Fixed 段。
   - 缓存破坏：`device-info.js` `?v=9 → 10`、`device-info.css` `?v=5 → 7`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增，本轮合并卡片后再次递增）、`wosai-variables.css` `?v=22 → 23`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
-  - 体积：主 JavaScript **1361.0 → 1371.1 KiB**（余 44.9 KiB）、样式 **232.0 → 236.5 KiB**（余 13.5 KiB），预算内。
+- **设备面板补齐「简洁 / 高级」两级视图与搜索过滤 —— 即原设计中被砍掉的那一半。** `simple` / `advanced` / `search` / `searchPlaceholder` 四条文案与 `.ws-di-tools` / `.ws-di-search` / `.ws-di-view-switch` 的全部样式从落库起就在仓库里，却没有任何代码引用；本次把这条链路接上：
+  - **分段控件**：简洁版只留「运行环境（基础四项）+ 概览 + 环境健康度 + 硬件资源」四张卡；高级版追加系统架构、Python 解释器、CUDA 运行时、cuDNN、ComfyUI 版本、6 项依赖清单，以及「网络与启动参数」「ComfyUI 路径」两张卡。偏好写入 `localStorage`（`wosai.device-info.view`），跨会话保留。
+  - **搜索框**：消费 `row()` / `tile()` 早已写好却无人读取的 `dataset.search`。搜索语料收录**英文键 + 本地化标签 + 实际值**三者，中英文查询都能命中；多词按「与」匹配。卡片标题命中则保留整卡，否则只保留命中自身的条目；卡内无一命中即整卡隐藏，全部隐藏时显示「没有匹配的设备信息。」
+  - 切换视图只改显隐、**不整块重渲染**，因此滚动位置与正在输入的搜索词都不会丢；后台 2s 刷新在搜索框持有焦点时主动跳过——否则整块重建会打断输入法组合，并把光标抢回去。
+- **设备面板补齐后端已采集、前端从未渲染的诊断数据**：`system.machine`（系统架构）、`system.executable`（Python 解释器）、`runtime.cuda_runtime` / `runtime.cudnn`、`comfyui.version`——以上归入高级版，让简洁版保持精简；新增「网络与启动参数」卡，展示 `network.http_proxy` / `https_proxy` / `no_proxy` 与 `runtime.arguments`（启动参数为空时显示「无」而不是一行空白）；路径行开始消费 `paths.*.value[].writable`，对可读不可写的目录标出「只读」（目录不存在时后端同样报 `writable=false`，那是「缺失」不是「只读」，不标）。代理项后端只回报 `Set` / `Not set` 两个英文串，前端映射为界面语言，其余取值原样透出——宁可显示原文，也不谎报一个语义。
+- 设备面板另收口三处易错点：`valueOf()` 现在把**空数组也视作「没有值」**（`[].join(" ")` 是空串，会让启动参数渲染成一片空白）；被过滤隐藏的行自身仍是 `display: flex`，故样式显式声明了 `[hidden] { display: none !important }`——`display: flex/grid` 会盖掉浏览器默认的 `[hidden]` 规则，漏掉这一条就会出现「逻辑上隐藏了、视觉上还在」的假隐藏；新增 `data-section` 属性供真实浏览器验收稳定定位（卡片标题随界面语言变化，不能拿来当选择器）。
+- 新增 9 条 i18n 文案（zh / en 同步）：`machine`、`executable`、`httpProxy`、`httpsProxy`、`noProxy`、`set`、`notSet`、`readonly`、`noMatch`。另有 8 条由「已存在但无人使用」转为实际渲染：`simple`、`advanced`、`search`、`searchPlaceholder`、`network`、`startup`、`cudaRuntime`、`cudnn`。
+- 缓存破坏：`device-info.js` `?v=10 → 11`、`device-info.css` `?v=7 → 8`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
+- 体积：主 JavaScript **1361.0 → 1380.5 KiB**（余 35.5 KiB）、样式 **232.0 → 237.0 KiB**（余 13.0 KiB），预算内。
 
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。

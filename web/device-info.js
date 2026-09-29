@@ -7,6 +7,11 @@ import { WOSAI_COPYRIGHT, WOSAI_GITHUB } from "./shared/constants.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
 
 const TAB_ID = "wosai-device-info";
+/**
+ * 简洁 / 高级视图偏好。面板会随 2s 实时刷新整块重渲染，状态必须活在模块级，
+ * 否则每两秒就被打回默认视图。写入 localStorage 让它跨会话保留。
+ */
+const VIEW_STORAGE_KEY = "wosai.device-info.view";
 
 let panel = null;
 let data = null;
@@ -14,15 +19,34 @@ let loading = false;
 let offLangChange = null;
 let offGlassChange = null;
 let liveRefreshTimer = null;
+let viewMode = readStoredView();
+let searchQuery = "";
 
 const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
+
+/** 读不到（隐私模式禁用 localStorage，或从未设置过）时回落到简洁版。 */
+function readStoredView() {
+    try {
+        return localStorage.getItem(VIEW_STORAGE_KEY) === "advanced" ? "advanced" : "simple";
+    } catch (_) {
+        return "simple";
+    }
+}
+
+function storeView(mode) {
+    try {
+        localStorage.setItem(VIEW_STORAGE_KEY, mode);
+    } catch (_) {
+        /* 隐私模式下写不进去，只是不记住偏好，不影响本次使用 */
+    }
+}
 
 // ComfyUI does not consistently load stylesheet entries from extension.json.
 // Load the shared tokens and this panel stylesheet explicitly so the sidebar
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=7", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=8", import.meta.url).href],
     ]);
 }
 
@@ -35,7 +59,8 @@ function make(tag, className, text) {
 
 function valueOf(item, fallback = "—") {
     if (!item || item.value === null || item.value === undefined || item.value === "") return fallback;
-    if (Array.isArray(item.value)) return item.value.join(" ");
+    // 空数组同样算「没有值」：启动参数为空时 `[].join(" ")` 是空串，会渲染成一片空白。
+    if (Array.isArray(item.value)) return item.value.length ? item.value.join(" ") : fallback;
     return String(item.value);
 }
 
@@ -116,8 +141,19 @@ function addButton(parent, key, fallback, icon, handler, extraClass = "") {
     return button;
 }
 
-function card(title, icon) {
+/** 标记「仅高级版可见」。显隐统一由 applyFilters() 裁决，渲染期一律不写 hidden。 */
+function markAdvanced(element, options = {}) {
+    if (options.advanced) element.dataset.view = "advanced";
+    return element;
+}
+
+function card(title, icon, options = {}) {
     const section = make("section", "ws-di-card");
+    // data-section 供真实浏览器验收定位：卡片标题随界面语言变化，不能拿它当选择器。
+    if (options.id) section.dataset.section = options.id;
+    // 卡片自身的搜索语料 = 标题，命中标题时整卡内容都保留（用户找的是这张卡）。
+    section.dataset.search = String(title).toLowerCase();
+    markAdvanced(section, options);
     const heading = make("div", "ws-di-card-heading");
     if (icon) heading.append(make("i", `pi ${icon}`));
     heading.append(make("h2", "", title));
@@ -133,10 +169,14 @@ function row(parent, key, item, options = {}) {
         element.title = label("openPathHint", "Open directory");
         element.addEventListener("click", options.onClick);
     }
-    element.dataset.search = `${key} ${display}`.toLowerCase();
-    element.append(make("span", "ws-di-label", options.label || titleCase(key)));
+    const name = options.label || titleCase(key);
+    // 搜索语料同时收录英文键、本地化标签与实际值，中英文查询都能命中。
+    element.dataset.search = `${key} ${name} ${display}`.toLowerCase();
+    markAdvanced(element, options);
+    element.append(make("span", "ws-di-label", name));
     const value = make("span", `ws-di-value${item?.status === "error" ? " is-error" : ""}`, display);
     if (item?.error) value.title = item.error;
+    if (options.badge) value.append(make("span", "ws-di-badge", options.badge));
     if (options.onClick) {
         const icon = make("i", "pi pi-external-link ws-di-open-icon");
         icon.setAttribute("aria-hidden", "true");
@@ -254,6 +294,8 @@ function vramBar(segments) {
 
 function gpuBlock(gpu, indexed) {
     const block = make("div", "ws-di-gpu");
+    // GPU 是原子信息：搜索要么整块保留，要么整块隐藏，不做块内过滤。
+    block.dataset.search = `${label("gpu", "GPU")} ${valueOf(gpu.name, "")} ${gpuShortName(gpu)}`.toLowerCase();
     const head = make("div", "ws-di-gpu-head");
     head.append(make("h3", "", indexed ? `${label("gpu", "GPU")} ${gpu.id}` : label("gpu", "GPU")));
     head.append(make("span", "ws-di-gpu-name", valueOf(gpu.name, label("unavailable", "Unavailable"))));
@@ -293,7 +335,7 @@ function gpuBlock(gpu, indexed) {
 
 /** 概览：把最该一眼看到的数字提到最前，细节仍留在下方各卡里。 */
 function renderOverview(target) {
-    const section = card(label("summary", "Overview"), "pi-chart-bar");
+    const section = card(label("summary", "Overview"), "pi-chart-bar", { id: "summary" });
     const tiles = make("div", "ws-di-tiles");
     const gpus = okGpus();
     if (gpus.length) {
@@ -311,7 +353,7 @@ function renderOverview(target) {
 }
 
 function renderHealth(target) {
-    const section = card(label("health", "Environment Health"), "pi-heart");
+    const section = card(label("health", "Environment Health"), "pi-heart", { id: "health" });
     const health = data.health || { score: 0, issues: [] };
     const body = make("div", "ws-di-health");
     body.append(healthRing(Number(health.score) || 0));
@@ -320,6 +362,8 @@ function renderHealth(target) {
     const issues = make("div", "ws-di-issues");
     if (!health.issues?.length) issues.append(pill(label("healthy", "No issues detected"), "good"));
     else health.issues.forEach((issue) => issues.append(pill(label(`issues.${issue}`, titleCase(issue)), issue === "cuda_unavailable" ? "warning" : "danger")));
+    // 问题清单也要能搜到：「磁盘」应定位到磁盘告警那条 pill，而不是把整卡滤没。
+    for (const node of issues.children) node.dataset.search = node.textContent.toLowerCase();
     text.append(issues);
     body.append(text);
     section.append(body);
@@ -329,6 +373,7 @@ function renderHealth(target) {
 function healthRing(score) {
     const tone = score >= 80 ? "good" : score >= 60 ? "warning" : "danger";
     const ring = make("div", `ws-di-ring is-${tone}`);
+    ring.dataset.search = `${label("health", "Environment Health")} ${label("healthScore", "Health score")} ${score}`.toLowerCase();
     ring.setAttribute("role", "img");
     ring.setAttribute("aria-label", `${label("healthScore", "Health score")} ${score}/100`);
     ring.innerHTML = HEALTH_RING;
@@ -346,20 +391,43 @@ function healthRing(score) {
  * 一行 `Torch`，会被读成 `PyTorch` 那一行的重复。
  */
 function renderEnvironment(target) {
-    const section = card(label("system", "Runtime Environment"), "pi-desktop");
+    const section = card(label("system", "Runtime Environment"), "pi-desktop", { id: "environment" });
     const system = data.static?.system || {};
     const runtime = data.static?.runtime || {};
+    const comfyui = data.static?.comfyui || {};
     row(section, "os", system.os, { label: label("os", "OS") });
+    row(section, "machine", system.machine, { label: label("machine", "Architecture"), advanced: true });
     row(section, "python", system.python, { label: label("python", "Python") });
+    row(section, "executable", system.executable, { label: label("executable", "Python executable"), advanced: true });
     row(section, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
-    row(section, "git", data.static?.comfyui?.git, { label: label("git", "Git") });
-    section.append(make("h3", "ws-di-group-label", label("dependencies", "Key Dependencies")));
-    for (const [name, item] of Object.entries(data.static?.dependencies || {})) row(section, name, item, { label: capitalizeInitial(name) });
+    row(section, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime"), advanced: true });
+    row(section, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN"), advanced: true });
+    row(section, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI"), advanced: true });
+    row(section, "git", comfyui.git, { label: label("git", "Git") });
+
+    const dependencies = Object.entries(data.static?.dependencies || {});
+    if (dependencies.length) {
+        section.append(dependenciesHeading(dependencies));
+        for (const [name, item] of dependencies) row(section, name, item, { label: capitalizeInitial(name), advanced: true });
+    }
     target.append(section);
 }
 
+/**
+ * 依赖分节的小节标签。它必须一起参与搜索过滤：否则「依赖行被搜出来、标签被滤掉」之后，
+ * 首行会紧跟在 `Git` 下面，重新变成「看起来像 PyTorch 那一行的重复」——正是这枚标签要避免的。
+ * 故它把整组依赖都收进搜索语料，命中任一条就保留标签。
+ */
+function dependenciesHeading(entries) {
+    const text = label("dependencies", "Key Dependencies");
+    const heading = make("h3", "ws-di-group-label", text);
+    heading.dataset.view = "advanced";
+    heading.dataset.search = `${text} ${entries.map(([name, item]) => `${name} ${valueOf(item, "")}`).join(" ")}`.toLowerCase();
+    return heading;
+}
+
 function renderHardware(target) {
-    const section = card(label("hardware", "Hardware Resources"), "pi-microchip");
+    const section = card(label("hardware", "Hardware Resources"), "pi-microchip", { id: "hardware" });
     const system = data.static?.system || {};
     const gpus = okGpus();
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
@@ -373,13 +441,39 @@ function renderHardware(target) {
     target.append(section);
 }
 
+/**
+ * 网络与启动参数。后端只回报 `Set` / `Not set` 两个英文串，这里映射成界面语言；
+ * 其余意外取值原样透出——宁可显示原文，也不要谎报一个语义。
+ */
+function proxyText(item) {
+    const raw = valueOf(item, "");
+    if (!raw) return label("unavailable", "Unavailable");
+    if (raw === "Set") return label("set", "Set");
+    if (raw === "Not set") return label("notSet", "Not set");
+    return raw;
+}
+
+function renderNetwork(target) {
+    const section = card(label("network", "Network & Startup"), "pi-wifi", { id: "network", advanced: true });
+    const network = data.static?.network || {};
+    [["httpProxy", network.http_proxy], ["httpsProxy", network.https_proxy], ["noProxy", network.no_proxy]].forEach(([key, item]) => {
+        row(section, key, { value: proxyText(item), status: item?.status, error: item?.error }, { label: label(key, titleCase(key)) });
+    });
+    // 启动参数可能为空数组，由 valueOf 的 fallback 兜成「无」，不留一行空白。
+    row(section, "startup", data.static?.runtime?.arguments, {
+        label: label("startup", "Startup arguments"),
+        fallback: label("none", "None"),
+    });
+    target.append(section);
+}
+
 /** 导出报告沿用的三段式用量文本；面板内已改用占用条 + 紧凑用量。 */
 function usageText(used, total, available) {
     return `${resourceValue(used)} ${label("used", "Used")} / ${resourceValue(available)} ${label("available", "Available")} / ${label("totalLabel", "Total")} ${resourceValue(total)}`;
 }
 
 function renderPaths(target) {
-    const section = card(label("paths", "ComfyUI Paths"), "pi-folder");
+    const section = card(label("paths", "ComfyUI Paths"), "pi-folder", { id: "paths", advanced: true });
     const seenPaths = new Set();
     for (const [name, item] of Object.entries(data.paths || {})) {
         const entries = item?.value || [];
@@ -390,6 +484,9 @@ function renderPaths(target) {
             const pathRow = row(section, `${name}-${index}`, { value: entry.path, status: entry.exists ? "ok" : "error" }, {
                 label: pathLabel(name, entry.path),
                 onClick: () => openPath(name, index),
+                // 只读目录照样能打开，只是写不进去——标出来，免得用户把保存失败归因到别处。
+                // 目录不存在时后端同样报 writable=false，那是「缺失」不是「只读」，不标。
+                badge: entry.exists && !entry.writable ? label("readonly", "Read-only") : "",
             });
             pathRow.classList.add("ws-di-path-row");
             if (!entry.exists) pathRow.classList.add("is-missing");
@@ -537,6 +634,8 @@ async function copyReport() {
 
 async function load(force = false, background = false) {
     if (loading) return;
+    // 用户正在搜索时不打断他：输入框里的内容比这两秒的实时数字更值得保护。
+    if (background && searchIsActive()) return;
     loading = true;
     if (!background) render();
     try {
@@ -550,6 +649,85 @@ async function load(force = false, background = false) {
         loading = false;
         render();
     }
+}
+
+/** 工具条：搜索框 + 简洁/高级分段控件。样式与令牌早已就绪，只是此前无人消费。 */
+function renderTools(root) {
+    const tools = make("div", "ws-di-tools");
+    const search = make("input", "ws-di-search");
+    search.type = "search";
+    search.value = searchQuery;
+    search.placeholder = label("searchPlaceholder", "Search device information");
+    search.setAttribute("aria-label", label("search", "Search"));
+    search.addEventListener("input", () => {
+        searchQuery = search.value;
+        applyFilters();
+    });
+    tools.append(search);
+
+    const switcher = make("div", "ws-di-view-switch");
+    switcher.setAttribute("role", "group");
+    [["simple", "simple"], ["advanced", "advanced"]].forEach(([mode, key]) => {
+        const button = make("button", "", label(key, capitalizeInitial(mode)));
+        button.type = "button";
+        button.dataset.mode = mode;
+        button.addEventListener("click", () => setViewMode(mode));
+        switcher.append(button);
+    });
+    tools.append(switcher);
+    root.append(tools);
+}
+
+/** 切换视图只改显隐、不整块重渲染：重渲染会丢掉滚动位置和正在输入的搜索词。 */
+function setViewMode(mode) {
+    if (mode === viewMode) return;
+    viewMode = mode;
+    storeView(mode);
+    applyFilters();
+}
+
+/**
+ * 显隐总裁决：视图（简洁/高级）+ 搜索词，两者都作用在已建好的 DOM 上。
+ * 规则：高级专属单元在简洁版一律隐藏；无搜索词时其余单元全显示；有搜索词时卡片标题命中
+ * 则整卡保留，否则只保留自身语料命中的单元；卡内无一单元可见时整卡隐藏，
+ * 全部卡片都不可见时给出「无匹配」提示。
+ */
+function applyFilters(root = panel?.querySelector(".ws-device-info")) {
+    if (!root) return;
+    const advanced = viewMode === "advanced";
+    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+    for (const button of root.querySelectorAll(".ws-di-view-switch button")) {
+        const active = button.dataset.mode === viewMode;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+    }
+
+    let visibleCards = 0;
+    for (const section of root.querySelectorAll(".ws-di-card")) {
+        if (!advanced && section.dataset.view === "advanced") {
+            section.hidden = true;
+            continue;
+        }
+        const cardHit = terms.length > 0 && terms.every((term) => (section.dataset.search || "").includes(term));
+        let anyVisible = false;
+        for (const unit of section.querySelectorAll("[data-search]")) {
+            const excluded = !advanced && unit.dataset.view === "advanced";
+            const hit = !excluded && (!terms.length || cardHit || terms.every((term) => (unit.dataset.search || "").includes(term)));
+            unit.hidden = !hit;
+            if (hit) anyVisible = true;
+        }
+        section.hidden = !anyVisible;
+        if (anyVisible) visibleCards += 1;
+    }
+
+    const noMatch = root.querySelector(".ws-di-no-match");
+    if (noMatch) noMatch.hidden = !(terms.length && visibleCards === 0);
+}
+
+/** 搜索框有焦点时跳过这次后台刷新：整块重渲染会打断输入法组合，并把光标抢回去。 */
+function searchIsActive() {
+    return Boolean(document.activeElement?.classList?.contains("ws-di-search"));
 }
 
 function panelIsVisible() {
@@ -567,6 +745,8 @@ function startLiveRefresh() {
 
 function render() {
     if (!panel) return;
+    // 2s 一次的后台刷新会整块重建 DOM，正在输入的搜索框会因此失焦，这里把它接回来。
+    const restoreSearch = searchIsActive();
     panel.replaceChildren();
     panel.setAttribute("data-theme", getGlassTheme());
     panel.setAttribute("data-wosai-panel", "");
@@ -592,16 +772,30 @@ function render() {
     if (loading) root.append(make("div", "ws-di-loading", label("loading", "Collecting device information…")));
     else if (data?.error) root.append(make("div", "ws-di-error", `${label("loadFailed", "Could not load device information.")} ${data.error}`));
     else if (data) {
+        renderTools(root);
         const content = make("main", "ws-di-content");
         renderEnvironment(content);
         renderOverview(content);
         renderHealth(content);
         renderHardware(content);
+        renderNetwork(content);
         renderPaths(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
         root.append(content);
+        const noMatch = make("p", "ws-di-empty ws-di-no-match", label("noMatch", "No matching device information."));
+        noMatch.hidden = true;
+        root.append(noMatch);
+        applyFilters(root);
     } else root.append(make("div", "ws-di-loading", label("loading", "Collecting device information…")));
     panel.append(root);
+    if (restoreSearch) {
+        const search = root.querySelector(".ws-di-search");
+        if (search) {
+            search.focus();
+            const end = search.value.length;
+            search.setSelectionRange(end, end);
+        }
+    }
 }
 
 function mount(element) {

@@ -35,7 +35,7 @@
     "web/size-select.js",
     "web/preset-prompt.js?v=12",
     "web/reset-defaults.js",
-    "web/device-info.js?v=10"
+    "web/device-info.js?v=11"
   ],
   "css": [
     "web/styles/wosai-variables.css?v=23",
@@ -52,7 +52,7 @@
     "web/styles/selector.css?v=5",
     "web/styles/media-tools.css?v=13",
     "web/styles/preset-prompt.css?v=52",
-    "web/styles/device-info.css?v=7"
+    "web/styles/device-info.css?v=8"
   ],
   "tags": ["canvas", "annotation", "size-selection", "node-color", "omni-slider", "theme", "align", "layout"],
   "min_comfyui_version": "0.2.0"
