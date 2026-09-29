@@ -14,12 +14,6 @@ let loading = false;
 let offLangChange = null;
 let offGlassChange = null;
 let liveRefreshTimer = null;
-/**
- * 搜索词。面板会随 2s 实时刷新整块重渲染，状态必须活在模块级，
- * 否则每两秒就被清空。
- */
-let searchQuery = "";
-
 const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
 
 // ComfyUI does not consistently load stylesheet entries from extension.json.
@@ -27,7 +21,7 @@ const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=12", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=13", import.meta.url).href],
     ]);
 }
 
@@ -94,13 +88,6 @@ function pairText(usedItem, totalItem) {
     return `${used} / ${valueOf(totalItem, "—")}`;
 }
 
-const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
-// 静态模板，不含任何插值：数值与配色一律在写入后由 JS / CSS 赋予
-const HEALTH_RING = "<svg viewBox=\"0 0 46 46\" aria-hidden=\"true\">"
-    + "<circle class=\"ws-di-ring-track\" cx=\"23\" cy=\"23\" r=\"18\"></circle>"
-    + "<circle class=\"ws-di-ring-value\" cx=\"23\" cy=\"23\" r=\"18\" transform=\"rotate(-90 23 23)\"></circle>"
-    + "<text class=\"ws-di-ring-text\" x=\"23\" y=\"23\" text-anchor=\"middle\" dominant-baseline=\"central\"></text>"
-    + "</svg>";
 
 function titleCase(value) {
     return String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -126,8 +113,6 @@ function card(title, icon, options = {}) {
     const section = make("section", "ws-di-card");
     // data-section 供真实浏览器验收定位：卡片标题随界面语言变化，不能拿它当选择器。
     if (options.id) section.dataset.section = options.id;
-    // 卡片自身的搜索语料 = 标题，命中标题时整卡内容都保留（用户找的是这张卡）。
-    section.dataset.search = String(title).toLowerCase();
     const heading = make("div", "ws-di-card-heading");
     if (icon) heading.append(make("i", `pi ${icon}`));
     heading.append(make("h2", "", title));
@@ -144,8 +129,6 @@ function row(parent, key, item, options = {}) {
         element.addEventListener("click", options.onClick);
     }
     const name = options.label || titleCase(key);
-    // 搜索语料同时收录英文键、本地化标签与实际值，中英文查询都能命中。
-    element.dataset.search = `${key} ${name} ${display}`.toLowerCase();
     element.append(make("span", "ws-di-label", name));
     const value = make("span", `ws-di-value${item?.status === "error" ? " is-error" : ""}`, display);
     if (item?.error) value.title = item.error;
@@ -189,7 +172,6 @@ function usageBar(percent, { large = false, name = "" } = {}) {
 /** 概览磁贴：名称 / 大号占用率 + 用量 / 占用条。 */
 function tile(name, percent, detail) {
     const element = make("div", "ws-di-metric");
-    element.dataset.search = `${name} ${detail}`.toLowerCase();
     element.append(make("span", "ws-di-metric-name", name));
     const line = make("div", "ws-di-metric-value");
     line.append(make("strong", "", percent === null ? label("unavailable", "Unavailable") : `${percent}%`));
@@ -206,7 +188,6 @@ function tile(name, percent, detail) {
  */
 function textTile(name, value) {
     const element = make("div", "ws-di-metric is-static");
-    element.dataset.search = `${name} ${value}`.toLowerCase();
     element.append(make("span", "ws-di-metric-name", name));
     element.append(make("span", "ws-di-metric-text", value));
     return element;
@@ -263,8 +244,6 @@ function vramBar(segments) {
 
 function gpuBlock(gpu, indexed) {
     const block = make("div", "ws-di-gpu");
-    // GPU 是原子信息：搜索要么整块保留，要么整块隐藏，不做块内过滤。
-    block.dataset.search = `${label("gpu", "GPU")} ${valueOf(gpu.name, "")} ${gpuShortName(gpu)}`.toLowerCase();
     const head = make("div", "ws-di-gpu-head");
     head.append(make("h3", "", indexed ? `${label("gpu", "GPU")} ${gpu.id}` : label("gpu", "GPU")));
     head.append(make("span", "ws-di-gpu-name", valueOf(gpu.name, label("unavailable", "Unavailable"))));
@@ -301,39 +280,6 @@ function gpuBlock(gpu, indexed) {
     return block;
 }
 
-function renderHealth(target) {
-    const section = card(label("health", "Environment Health"), "pi-heart", { id: "health" });
-    const health = data.health || { score: 0, issues: [] };
-    const body = make("div", "ws-di-health");
-    body.append(healthRing(Number(health.score) || 0));
-    const text = make("div", "ws-di-health-text");
-    text.append(make("span", "", `${label("healthScore", "Health score")} / 100`));
-    const issues = make("div", "ws-di-issues");
-    if (!health.issues?.length) issues.append(pill(label("healthy", "No issues detected"), "good"));
-    else health.issues.forEach((issue) => issues.append(pill(label(`issues.${issue}`, titleCase(issue)), issue === "cuda_unavailable" ? "warning" : "danger")));
-    // 问题清单也要能搜到：「磁盘」应定位到磁盘告警那条 pill，而不是把整卡滤没。
-    for (const node of issues.children) node.dataset.search = node.textContent.toLowerCase();
-    text.append(issues);
-    body.append(text);
-    section.append(body);
-    target.append(section);
-}
-
-function healthRing(score) {
-    const tone = score >= 80 ? "good" : score >= 60 ? "warning" : "danger";
-    const ring = make("div", `ws-di-ring is-${tone}`);
-    ring.dataset.search = `${label("health", "Environment Health")} ${label("healthScore", "Health score")} ${score}`.toLowerCase();
-    ring.setAttribute("role", "img");
-    ring.setAttribute("aria-label", `${label("healthScore", "Health score")} ${score}/100`);
-    ring.innerHTML = HEALTH_RING;
-    const clamped = Math.max(0, Math.min(100, score));
-    const value = ring.querySelector(".ws-di-ring-value");
-    value.setAttribute("stroke-dasharray", RING_CIRCUMFERENCE.toFixed(2));
-    value.setAttribute("stroke-dashoffset", (RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2));
-    ring.querySelector(".ws-di-ring-text").textContent = String(score);
-    return ring;
-}
-
 /**
  * 运行环境卡：环境标识（Python / PyTorch / CUDA / cuDNN / ComfyUI / Git）与关键依赖版本同处一卡。
  * 一卡两栏——左栏答「环境是什么」，右栏答「装了哪些包」——同样的信息少占约四成高度。
@@ -364,7 +310,7 @@ function renderEnvironment(target) {
     if (dependencies.length) {
         const deps = make("div", "ws-di-column");
         deps.dataset.column = "dependencies";
-        deps.append(dependenciesHeading(dependencies));
+        deps.append(make("h3", "ws-di-group-label", label("dependencies", "Key Dependencies")));
         for (const [name, item] of dependencies) row(deps, name, item, { label: capitalizeInitial(name) });
         columns.append(deps);
     }
@@ -387,17 +333,6 @@ function dependencyEntries(runtime) {
     ));
 }
 
-/**
- * 依赖分节的小节标签。它必须一起参与搜索过滤：否则「依赖行被搜出来、标签被滤掉」之后，
- * 首行会紧跟在 `Git` 下面，重新变成「看起来像 PyTorch 那一行的重复」——正是这枚标签要避免的。
- * 故它把整组依赖都收进搜索语料，命中任一条就保留标签。
- */
-function dependenciesHeading(entries) {
-    const text = label("dependencies", "Key Dependencies");
-    const heading = make("h3", "ws-di-group-label", text);
-    heading.dataset.search = `${text} ${entries.map(([name, item]) => `${name} ${valueOf(item, "")}`).join(" ")}`.toLowerCase();
-    return heading;
-}
 
 /**
  * 硬件资源：磁贴行（处理器 / 显存 / 内存 / 各磁盘）→ GPU 体征区块。
@@ -622,8 +557,6 @@ async function copyReport() {
 
 async function load(force = false, background = false) {
     if (loading) return;
-    // 用户正在搜索时不打断他：输入框里的内容比这两秒的实时数字更值得保护。
-    if (background && searchIsActive()) return;
     loading = true;
     if (!background) render();
     try {
@@ -637,58 +570,6 @@ async function load(force = false, background = false) {
         loading = false;
         render();
     }
-}
-
-/** 工具条：搜索框。 */
-function renderTools(root) {
-    const tools = make("div", "ws-di-tools");
-    const search = make("input", "ws-di-search");
-    search.type = "search";
-    search.value = searchQuery;
-    search.placeholder = label("searchPlaceholder", "Search device information");
-    search.setAttribute("aria-label", label("search", "Search"));
-    search.addEventListener("input", () => {
-        searchQuery = search.value;
-        applyFilters();
-    });
-    tools.append(search);
-    root.append(tools);
-}
-
-/**
- * 显隐总裁决：只看搜索词，作用在已建好的 DOM 上。
- * 规则：无搜索词时全部单元显示；有搜索词时卡片标题命中则整卡保留，否则只保留自身语料命中的
- * 单元；卡内无一单元可见时整卡隐藏，全部卡片都不可见时给出「无匹配」提示。
- */
-function applyFilters(root = panel?.querySelector(".ws-device-info")) {
-    if (!root) return;
-    const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-    let visibleCards = 0;
-    for (const section of root.querySelectorAll(".ws-di-card")) {
-        const cardHit = terms.length > 0 && terms.every((term) => (section.dataset.search || "").includes(term));
-        let anyVisible = false;
-        for (const unit of section.querySelectorAll("[data-search]")) {
-            const hit = !terms.length || cardHit || terms.every((term) => (unit.dataset.search || "").includes(term));
-            unit.hidden = !hit;
-            if (hit) anyVisible = true;
-        }
-        // 栏级裁决：栏内无一单元可见时整栏隐藏。右栏隐藏后，左栏会因栅格 auto-fit 折叠空轨道
-        // 而自动占满整行 —— 所以这里不需要再判断「还剩几栏」。
-        for (const column of section.querySelectorAll("[data-column]")) {
-            column.hidden = !column.querySelector("[data-search]:not([hidden])");
-        }
-        section.hidden = !anyVisible;
-        if (anyVisible) visibleCards += 1;
-    }
-
-    const noMatch = root.querySelector(".ws-di-no-match");
-    if (noMatch) noMatch.hidden = !(terms.length && visibleCards === 0);
-}
-
-/** 搜索框有焦点时跳过这次后台刷新：整块重渲染会打断输入法组合，并把光标抢回去。 */
-function searchIsActive() {
-    return Boolean(document.activeElement?.classList?.contains("ws-di-search"));
 }
 
 function panelIsVisible() {
@@ -706,8 +587,6 @@ function startLiveRefresh() {
 
 function render() {
     if (!panel) return;
-    // 2s 一次的后台刷新会整块重建 DOM，正在输入的搜索框会因此失焦，这里把它接回来。
-    const restoreSearch = searchIsActive();
     panel.replaceChildren();
     panel.setAttribute("data-theme", getGlassTheme());
     panel.setAttribute("data-wosai-panel", "");
@@ -733,28 +612,14 @@ function render() {
     if (loading) root.append(make("div", "ws-di-loading", label("loading", "Collecting device information…")));
     else if (data?.error) root.append(make("div", "ws-di-error", `${label("loadFailed", "Could not load device information.")} ${data.error}`));
     else if (data) {
-        renderTools(root);
         const content = make("main", "ws-di-content");
-        renderHealth(content);
         renderHardware(content);
         renderEnvironment(content);
         renderPaths(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
         root.append(content);
-        const noMatch = make("p", "ws-di-empty ws-di-no-match", label("noMatch", "No matching device information."));
-        noMatch.hidden = true;
-        root.append(noMatch);
-        applyFilters(root);
     } else root.append(make("div", "ws-di-loading", label("loading", "Collecting device information…")));
     panel.append(root);
-    if (restoreSearch) {
-        const search = root.querySelector(".ws-di-search");
-        if (search) {
-            search.focus();
-            const end = search.value.length;
-            search.setSelectionRange(end, end);
-        }
-    }
 }
 
 function mount(element) {

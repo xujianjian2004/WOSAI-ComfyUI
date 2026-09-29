@@ -13,12 +13,10 @@
 .ws-device-info [hidden] { display: none !important; }
 
 .ws-di-header,
-.ws-di-tools,
 .ws-di-actions,
 .ws-di-identity,
 .ws-di-card-heading,
-.ws-di-row,
-.ws-di-issues {
+.ws-di-row {
   display: flex;
   align-items: center;
 }
@@ -49,12 +47,7 @@
 .ws-di-button:hover,
 .ws-di-export:hover { color: var(--ws-text); border-color: var(--ws-accent); background: var(--ws-accent-dim); }
 .ws-di-button:focus-visible,
-.ws-di-export:focus-visible,
-.ws-di-search:focus-visible { outline: none; box-shadow: var(--ws-focus-ring); }
-
-.ws-di-tools { align-items: stretch; gap: var(--ws-gap-sm); margin-bottom: var(--ws-gap-lg); }
-.ws-di-search { width: 100%; min-width: 0; height: var(--ws-btn-h-sm); padding: var(--ws-input-padding); border: var(--ws-border-width-thin) solid var(--ws-input-border); border-radius: var(--ws-radius); background: var(--ws-input-bg); color: var(--ws-input-text); font: inherit; }
-.ws-di-search::placeholder { color: var(--ws-text-placeholder); }
+.ws-di-export:focus-visible { outline: none; box-shadow: var(--ws-focus-ring); }
 
 .ws-di-content { display: grid; gap: var(--ws-gap); }
 .ws-di-card { overflow: hidden; border: var(--ws-border-width-thin) solid var(--ws-border); border-radius: var(--ws-panel-radius); background: var(--ws-surface); box-shadow: var(--ws-shadow-sm); }
@@ -100,25 +93,7 @@
 .ws-di-open-icon { margin-left: var(--ws-gap-xs); color: var(--ws-accent); font-size: var(--ws-text-sm); }
 .ws-di-path-row.is-missing .ws-di-value { color: var(--ws-danger); }
 
-.ws-di-health { display: flex; align-items: center; gap: var(--ws-gap-lg); padding: var(--ws-gap-lg); }
-.ws-di-health-text { display: flex; flex-direction: column; gap: var(--ws-gap-xs); min-width: 0; }
-.ws-di-health-text > span { color: var(--ws-text-muted); }
-.ws-di-ring { flex: 0 0 auto; width: var(--ws-di-ring-size); height: var(--ws-di-ring-size); }
-.ws-di-ring svg { display: block; width: 100%; height: 100%; }
-.ws-di-ring-track { fill: none; stroke: var(--ws-surface-2); stroke-width: var(--ws-di-ring-width); }
-.ws-di-ring-value { fill: none; stroke: var(--ws-accent); stroke-width: var(--ws-di-ring-width); stroke-linecap: round; transition: stroke-dashoffset var(--ws-transition-slow); }
-.ws-di-ring-text { fill: var(--ws-text); font-size: var(--ws-text-md); font-weight: 600; }
-.ws-di-ring.is-good .ws-di-ring-value { stroke: var(--ws-syntax-complete); }
-.ws-di-ring.is-good .ws-di-ring-text { fill: var(--ws-syntax-complete); }
-.ws-di-ring.is-warning .ws-di-ring-value { stroke: var(--ws-warning); }
-.ws-di-ring.is-warning .ws-di-ring-text { fill: var(--ws-warning); }
-.ws-di-ring.is-danger .ws-di-ring-value { stroke: var(--ws-danger); }
-.ws-di-ring.is-danger .ws-di-ring-text { fill: var(--ws-danger); }
-.ws-di-issues { gap: var(--ws-gap-xs); flex-wrap: wrap; }
 .ws-di-pill { display: inline-flex; align-items: center; min-height: var(--ws-di-pill-min-height); padding: 0 var(--ws-gap-sm); border-radius: var(--ws-radius-pill); background: var(--ws-surface-2); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
-.ws-di-pill.is-good { background: var(--ws-success-bg); color: var(--ws-syntax-complete); }
-.ws-di-pill.is-warning { background: color-mix(in srgb, var(--ws-warning) 14%, transparent); color: var(--ws-warning); }
-.ws-di-pill.is-danger { background: var(--ws-danger-bg); color: var(--ws-danger); }
 
 /* ── 概况磁贴：一屏一眼看到的关键数字 ── */
 .ws-di-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--ws-di-tile-min-width), 1fr)); gap: var(--ws-gap); padding: var(--ws-gap-lg); }

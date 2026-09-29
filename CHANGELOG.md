@@ -111,6 +111,12 @@
   - 缓存破坏：`device-info.js` `?v=17 → 18`（CSS 未改动，故不递增）。
   - 体积：主 JavaScript **1378.4 → 1379.9 KiB**（余 36.1 KiB）、样式 **238.1 KiB**（余 11.9 KiB，无变化），预算内。
 
+- **设备面板：移除「环境健康度」卡片与搜索框。** 把设备面板从「结论 → 扫描 → 明细」的形态改成「信息速查」形态：去掉健康度环形、issue pill 与问题清单，也去掉搜索框和基于搜索词的显隐裁决。面板现在由三张卡组成——硬件资源、运行环境、ComfyUI 路径。所有内容常显，没有折叠/隐藏。
+  - 连带的清理：删除 `searchQuery`、`renderTools()`、`applyFilters()`、`searchIsActive()`；删除 8 处 `dataset.search` 搜索语料赋值；删除 `.ws-di-tools` / `.ws-di-search` 样式与 `--ws-di-ring-size` / `--ws-di-ring-width` 令牌；`load()` 里「搜索输入时跳过后台刷新」的保护随之移除（面板已无可输入文本的控件）。
+  - 保留但停用（不删除 locale 键）的文案：`health` / `healthScore` / `healthy` / `issues.*` / `search` / `searchPlaceholder` / `noMatch` —— 它们或是动态键消费、或随搜索功能停用；静态死键判据在这里会误报，所以统一保留。
+  - 缓存破坏：`device-info.js` `?v=18 → 19`、`device-info.css` `?v=12 → 13`（双源）、`wosai-variables.css` `?v=25 → 26`（双源）。
+  - 体积：主 JavaScript **1379.9 → 1373.0 KiB**（余 77.0 KiB）、样式 **238.1 → 236.0 KiB**（余 14.0 KiB），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。
