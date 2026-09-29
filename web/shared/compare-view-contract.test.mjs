@@ -240,14 +240,16 @@ function pickSource(re, marker) {
 }
 
 const HEIGHT_SRC = pickSource(/const getWidgetHeight = \(\) => \{[\s\S]*?\n {4}\};/g, "stage.clientWidth");
+const SYNC_SRC = pickSource(/const syncBaseWidth = \(\) => \{[\s\S]*?\n {4}\};/g, "state.baseWidth");
 const FIT_SRC = pickSource(/const (fitNodeToStage|syncNodeSize)\s*=\s*\([\s\S]*?\n {4}\};/g, "node.setSize");
 
 function loadCompareSizing(viewMode = "slide") {
     assert.ok(HEIGHT_SRC, "未找到 getWidgetHeight");
+    assert.ok(SYNC_SRC, "未找到 syncBaseWidth");
     assert.ok(FIT_SRC, "未找到 fitNodeToStage");
     const factory = new Function(
         "getWOSAIVarNum", "stage", "state", "stageAspectRatio", "root", "requestAnimationFrame",
-        `${HEIGHT_SRC}\n${FIT_SRC}\n`
+        `${HEIGHT_SRC}\n${SYNC_SRC}\n${FIT_SRC}\n`
         // node.computeSize 要用到 widget 高度，故在同源作用域里造这个 stub
         + "const node = {\n"
         + "  size: [420, 520], dirty: false,\n"
@@ -255,7 +257,7 @@ function loadCompareSizing(viewMode = "slide") {
         + "  setSize(v) { node.size = v.slice(); },\n"
         + "  setDirtyCanvas() { node.dirty = true; },\n"
         + "};\n"
-        + "return { getWidgetHeight, fitNodeToStage, node };\n",
+        + "return { getWidgetHeight, fitNodeToStage, syncBaseWidth, node, state };\n",
     );
     const vars = {
         "--ws-gap-sm": 6,
@@ -264,10 +266,11 @@ function loadCompareSizing(viewMode = "slide") {
         "--ws-media-node-min-width": 420,
         "--ws-compare-node-min-height": 280,
     };
+    const state = { aspectRatio: 16 / 9, viewMode, baseWidth: 0, appliedWidth: 0 };
     return factory(
         (name, fallback) => vars[name] ?? fallback,
         { clientWidth: 400 },
-        { aspectRatio: 16 / 9, viewMode },
+        state,
         stageAspectRatio,
         { isConnected: true },
         (fn) => fn(), // 同步执行，测试里不引入真实帧延迟
@@ -292,6 +295,57 @@ test("重算只改高度，不动用户拖出来的宽度", () => {
     sizing.fitNodeToStage();
     assert.equal(sizing.node.size[0], 420, "宽度必须沿用节点当前宽度");
     assert.equal(sizing.node.dirty, true, "改完尺寸必须标脏，否则画布不重绘");
+});
+
+// 左右并排时每半幅只占节点宽的一半，沿用单幅宽度会把两张图都挤成缩略图。
+test("左右并排把单幅基准宽度翻倍", () => {
+    const sizing = loadCompareSizing("slide");
+    sizing.fitNodeToStage();
+    assert.equal(sizing.node.size[0], 420, "单幅视图先确立基准宽度");
+    sizing.state.viewMode = "side";
+    sizing.fitNodeToStage();
+    assert.equal(sizing.node.size[0], 840, `左右并排应把宽度翻倍：${sizing.node.size[0]}`);
+});
+
+// 宽度是相对「单幅基准」展开的，不是相对节点当前宽度——否则
+// slide → side → slide → side 每次都会再翻一倍。
+test("来回切换视图不会逐级翻倍", () => {
+    const sizing = loadCompareSizing("slide");
+    sizing.fitNodeToStage(); // 先确立单幅基准
+    const widthAfter = (mode) => {
+        sizing.syncBaseWidth(); // 真实 setView() 在改视图前先折回基准
+        sizing.state.viewMode = mode;
+        sizing.fitNodeToStage();
+        return sizing.node.size[0];
+    };
+    assert.equal(widthAfter("side"), 840);
+    assert.equal(widthAfter("slide"), 420);
+    assert.equal(widthAfter("side"), 840);
+    assert.equal(widthAfter("slide"), 420);
+});
+
+// 用户在左右并排下拖宽过节点 ⇒ 折回单幅基准后再展开，不覆盖手动调整
+test("手动拖宽后切换：按当前视图折回单幅基准再展开", () => {
+    const sizing = loadCompareSizing("slide");
+    sizing.fitNodeToStage();          // 420
+    sizing.syncBaseWidth();
+    sizing.state.viewMode = "side";
+    sizing.fitNodeToStage();          // 840
+    sizing.node.size[0] = 1200;       // 用户在左右并排下拖宽
+    sizing.syncBaseWidth();           // 仍在左右视图 ⇒ 基准 600
+    sizing.state.viewMode = "slide";
+    sizing.fitNodeToStage();
+    assert.equal(sizing.node.size[0], 600, "左右视图下拖宽后切回单幅应取一半");
+});
+
+// 顺序反了（先改视图再折基准）会把双幅宽度当成单幅基准，切回去节点不收窄
+test("setView 必须在改视图前折回基准宽度", () => {
+    const setView = JS.match(/const setView = \(mode\) => \{[\s\S]*?\n {4}\};/);
+    assert.ok(setView, "未找到 setView");
+    const atSync = setView[0].indexOf("syncBaseWidth()");
+    const atAssign = setView[0].indexOf("state.viewMode = next");
+    assert.ok(atSync !== -1, "setView 必须调用 syncBaseWidth()");
+    assert.ok(atSync < atAssign, "syncBaseWidth() 必须排在 state.viewMode = next 之前");
 });
 
 test("左右并排会把过窄的节点补宽（半幅不得小于最小预览宽）", () => {

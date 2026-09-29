@@ -575,6 +575,11 @@ function createImageCompare(node) {
     const state = {
         aspectRatio: 16 / 9,
         normalizeSizeOnLoad: false,
+        // 单幅视图下的节点宽度基准：左右并排在此基础上翻倍
+        baseWidth: 0,
+        // 最近一次由本控件落到 node.size 上的宽度，用来区分「我们改的」和
+        // 「用户拖出来的」——后者要按当前视图折回基准，否则来回切换会逐级翻倍
+        appliedWidth: 0,
         // 视图模式即实际布局：三种模式各自对应一套 CSS 切分，不存在「运行时解析」
         viewMode: normalizeViewMode(node.properties.wosai_compare_view),
     };
@@ -605,28 +610,50 @@ function createImageCompare(node) {
         );
     };
 
+    // 把「当前节点宽度」按当前视图折回单幅基准宽度。左右视图的宽度是基准的
+    // 两倍，不折回就改视图，来回切换会逐级翻倍（slide → side → slide → …）。
+    const syncBaseWidth = () => {
+        const currentWidth = Number(node.size?.[0]) || 0;
+        if (currentWidth > 0) {
+            state.baseWidth = state.viewMode === "side" ? currentWidth / 2 : currentWidth;
+        }
+        state.appliedWidth = currentWidth;
+    };
+
     // 把节点尺寸重算到「当前视图 + 当前比例」所需的大小。
     // node.size 是持久化值，ComfyUI 不会因为 DOM widget 的高度契约变了就自动
     // 调整节点：切换视图改变的是舞台宽高比（左右 ×2 → 变矮、上下 ÷2 → 变高），
     // 不重算就会出现「图像区被压扁」或「节点下方留一大块空白」。
-    // 宽度沿用节点当前宽度（用户拖出来的宽度是有意的），只重算高度。
+    // 宽度：单幅视图沿用基准宽度，左右并排把它翻倍（用户拖出来的宽度是有意的，
+    // 只在切换视图时按基准重新展开，不覆盖手动调整的结果）。
     // clampMinHeight：只有「首次载入」才夹到 --ws-compare-node-min-height。
     // 切换视图时不夹——左右并排的舞台本来就矮，夹到初始最小高度会在图像区
     // 下方留出一块空白，看起来就像「没跟着模式调整」。
     const fitNodeToStage = ({ clampMinHeight = false } = {}) => {
+        const currentWidth = Number(node.size?.[0]) || 0;
+        // 基准宽度 = 单幅视图下的节点宽度。用户手动拖过宽度（与我们上次落下去
+        // 的值不一致）时要按**当前**视图折回单幅基准：左右视图的宽度是基准的
+        // 两倍，不折回就切，来回切换会逐级翻倍（slide → side → slide → side …）。
+        if (!state.baseWidth
+            || (state.appliedWidth && Math.abs(currentWidth - state.appliedWidth) > 1)) {
+            syncBaseWidth();
+        }
         const nodeMinWidth = getWOSAIVarNum("--ws-media-node-min-width", 420);
-        // 左右并排时每半幅只占节点宽的一半：沿用滑动视图的宽度会把两张图都
-        // 挤成缩略图，故该模式下把最小宽度抬到「两幅最小预览宽」
-        const minWidth = state.viewMode === "side"
+        const base = state.baseWidth || currentWidth;
+        // 左右并排时每半幅只占节点宽的一半：沿用单幅宽度会把两张图都挤成缩略
+        // 图，故该模式下节点宽度翻倍，让每半幅的显示尺寸与滑动视图一致；下限
+        // 仍是「两幅最小预览宽」，避免基准本身过窄时半幅小于最小预览宽
+        const targetWidth = state.viewMode === "side"
             ? Math.max(
                 nodeMinWidth,
                 getWOSAIVarNum("--ws-media-preview-min-width", 240) * 2,
+                base * 2,
             )
-            : nodeMinWidth;
-        const targetWidth = Math.max(minWidth, Number(node.size?.[0]) || 0);
+            : Math.max(nodeMinWidth, base);
+        state.appliedWidth = targetWidth;
         // 宽度变了必须先落下去：DOM widget 的高度契约读的是 stage 实测宽度，
         // 同一帧里取到的还是旧宽度，据此算出的高度会差一截。故分两步。
-        if (targetWidth !== Number(node.size?.[0])) {
+        if (targetWidth !== currentWidth) {
             node.setSize?.([targetWidth, Number(node.size?.[1]) || 0]);
         }
         const applyHeight = () => {
@@ -725,6 +752,9 @@ function createImageCompare(node) {
     const setView = (mode) => {
         const next = normalizeViewMode(mode);
         if (next === state.viewMode) return;
+        // 先按**旧**视图把当前宽度折回单幅基准，再改视图：左右视图的宽度是
+        // 基准的两倍，顺序反了就会拿双幅宽度当单幅基准，切回去节点不会收窄
+        syncBaseWidth();
         state.viewMode = next;
         node.properties.wosai_compare_view = next;
         stage.classList.add("is-switching");
