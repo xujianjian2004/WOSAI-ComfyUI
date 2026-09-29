@@ -342,15 +342,16 @@
   display: none;
 }
 
-/* ── 视图切换分段控件：图像区顶部居中的浮层 ───────────────────── */
-.wosai-image-compare-views {
+/* ── 底部工具栏：视图切换 + 交换按钮合并为一行，居中浮在图像区下边缘 ─ */
+.wosai-image-compare-bottom {
   position: absolute;
-  top: var(--ws-gap-sm);
   left: 50%;
+  bottom: var(--ws-gap-sm);
   z-index: 3;
   display: flex;
   align-items: center;
   box-sizing: border-box;
+  gap: var(--ws-gap-xs);
   padding: var(--ws-gap-2xs);
   border: var(--ws-glass-border);
   border-radius: var(--ws-radius-pill);
@@ -359,6 +360,13 @@
   -webkit-backdrop-filter: var(--ws-glass-blur-sm);
   transform: translateX(-50%);
   transition: opacity var(--ws-transition);
+}
+
+.wosai-image-compare-views {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  gap: var(--ws-gap-2xs);
 }
 
 .wosai-image-compare-view {
@@ -402,28 +410,20 @@
   stroke-linejoin: round;
 }
 
-/* 交换按钮：水平居中于图像区底部 */
+/* 交换按钮：位于底部工具栏最右侧 */
 .wosai-image-compare-swap {
-  position: absolute;
-  left: 50%;
-  bottom: var(--ws-gap-sm);
-  z-index: 3;
   display: grid;
   place-items: center;
   box-sizing: border-box;
   width: var(--ws-compare-swap-size);
   height: var(--ws-compare-swap-size);
-  transform: translateX(-50%);
-  border: var(--ws-glass-border);
+  border: 0;
   border-radius: var(--ws-radius-full);
   padding: 0;
-  background: var(--ws-glass-bg);
-  backdrop-filter: var(--ws-glass-blur-sm);
-  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
+  background: none;
   color: var(--ws-text-secondary);
   cursor: pointer;
   transition:
-    border-color var(--ws-transition),
     background var(--ws-transition),
     color var(--ws-transition),
     opacity var(--ws-transition);
@@ -441,7 +441,6 @@
 
 .wosai-image-compare-swap:hover:not(:disabled),
 .wosai-image-compare-swap.is-active {
-  border-color: var(--ws-accent);
   color: var(--ws-accent);
 }
 
@@ -459,9 +458,8 @@
   cursor: not-allowed;
 }
 
-/* 无图时不显示交换按钮与视图切换，避免压在空状态提示上 */
-.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-swap,
-.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-views {
+/* 无图时不显示底部工具栏，避免压在空状态提示上 */
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-bottom {
   opacity: 0;
   pointer-events: none;
 }
@@ -472,19 +470,21 @@
    它是「这是一张对比图」的语义表达而不是操作项，隐藏后节点会退化成普通图片。
    必须同时关掉命中：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到
    看不见的按钮。opacity 不改变 a11y 树，屏幕阅读器仍能读到控件语义。 */
-.wosai-image-compare-stage.is-idle .wosai-image-compare-views,
-.wosai-image-compare-stage.is-idle .wosai-image-compare-swap {
+.wosai-image-compare-stage.is-idle .wosai-image-compare-bottom {
   opacity: 0;
   pointer-events: none;
 }
 
 /* 键盘 Tab 进控件时必须可见，否则焦点会落在一个看不见的按钮上（焦点环画得出来，
-   控件本体却是透明的）。pointer-events 不参与 tab 序列，所以键盘始终能走到按钮。
-   :not(:disabled) 是必需的：disabled 的交换按钮要保留自己的降级透明度。 */
-.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-views,
-.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-swap:not(:disabled) {
+   控件本体却是透明的）。pointer-events 不参与 tab 序列，所以键盘始终能走到按钮。 */
+.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-bottom {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* disabled 的交换按钮在键盘唤回时要保留自己的降级透明度，不被容器 opacity:1 盖掉 */
+.wosai-image-compare-stage.is-idle:focus-within .wosai-image-compare-bottom .wosai-image-compare-swap:disabled {
+  opacity: var(--ws-disabled-opacity);
 }
 
 .wosai-media-range {
@@ -521,6 +521,7 @@
   .wosai-image-compare-stage > img,
   .wosai-image-compare-top,
   .wosai-image-compare-handle,
+  .wosai-image-compare-bottom,
   .wosai-image-compare-views,
   .wosai-image-compare-swap {
     transition: none;

@@ -24,7 +24,7 @@
 
 ### Added
 
-- 图像对比节点新增 3 种对比视图（图像区顶部居中的分段控件切换，状态持久化到 `wosai_compare_view`）：
+- 图像对比节点新增 3 种对比视图（底部工具栏左侧的分段控件切换，状态持久化到 `wosai_compare_view`）：
   - **滑动对比**（默认，原有行为）：单一舞台 + 可拖动分割线。
   - **左右并排**：舞台一分为二，A 占左半、B 占右半。
   - **上下并排**：A 占上半、B 占下半。
@@ -125,7 +125,7 @@
 - `WOSAI_ImageCompare` 移除已无用途的 `extra_pnginfo` 隐藏输入，改为声明 `unique_id`（用于沿执行图反查上游文件引用）。
 - 拖拽光标由分割热区的基础态移入滑动视图态：双拼视图不再出现「有 `ew-resize` 光标但拖不动」的误导。
 - 图像对比新增设计令牌 `--ws-compare-view-size`（24px）、`--ws-compare-view-icon-size`（14px）；i18n 新增 `nodes.imageCompare.views` / `viewSlide` / `viewSide` / `viewStack`。
-- **图像对比的浮层控件改为闲置自动淡出，解决图标遮挡图片的问题。** 视图切换条、A/B 尺寸角标与交换按钮都是压在图像区上的绝对定位浮层——顶部条落在水平居中处（正是主体的构图重心），底部一行横跨图片过半宽度，常驻显示会持续打断观看。现改为：指针离开节点 400ms、或在图像区内静止 1800ms 后，三组控件整体淡出，指针移入、键盘聚焦、拖拽分割线、切换视图、换图任一动作都立刻唤回（动作触发后另有 1500ms 的强制可见期，避免刚点完就消失）。要点：
+- **图像对比的浮层控件改为闲置自动淡出，解决图标遮挡图片的问题。** 控件都压在图像区上，常驻显示会持续打断观看（尤其落在水平居中处——正是主体的构图重心）。现改为：指针离开节点 400ms、或在图像区内静止 1800ms 后，三组控件整体淡出，指针移入、键盘聚焦、拖拽分割线、切换视图、换图任一动作都立刻唤回（动作触发后另有 1500ms 的强制可见期，避免刚点完就消失）。要点：
   - 淡出时**必须同时关闭命中**（`pointer-events: none`）：交换按钮正落在拖分割线的常用路径上，只做视觉隐藏会点到看不见的按钮。
   - 分割线、拖拽热区与十字手柄**不参与**隐藏——它们是「这是一张对比图」的语义表达，不是操作项；一并隐掉会让节点退化成一张普通图片。
   - 用 `opacity` 而非 `visibility` / `display`：`opacity: 0` 的元素仍留在无障碍树中，屏幕阅读器依旧能读到角标里的尺寸文本。键盘 Tab 到控件时由 `:focus-within` 恢复可见，选择器带 `:not(:disabled)` 以免把 disabled 交换按钮自身的降级透明度覆盖成 1。
@@ -144,6 +144,11 @@
   - `compare-view-contract.test.mjs` 新增哨兵断言：`viewAuto` 不得再出现、`COMPARE_VIEW_MODES` 不得再含 `"auto"`、`resolveViewMode` 不得复活；`media-preview.test.mjs` 删除 3 组 `resolveViewMode` 测试、新增「旧值 `auto` 回落 slide」（15 → 10 项）。
   - 缓存破坏：`media-tools.js` `?v=14 → 15`（CSS 未改动，故不递增）。
 - **图像对比的 A/B 交换按钮改为正圆并缩小**：尺寸 `--ws-compare-swap-size` `34 → 28px`、图标改用新的 `--ws-compare-swap-icon-size`（16px，原为通用 `--ws-media-action-icon-size` 18px），圆角由 `--ws-radius`（8px 方角）改为 `--ws-radius-full`（50% 正圆），与顶部视图切换条的胶囊按钮同属一套圆形语汇；按钮更小后对画面的遮挡也随之减少。交换按钮只作浮层存在，不进入 `getWidgetHeight()` 的高度计算，故节点尺寸不变。缓存破坏：`media-tools.css` `?v=15 → 16`、`wosai-variables.css` `?v=27 → 28`、`media-tools.js` `?v=15 → 16`。
+- **图像对比的视图切换与交换按钮合并为底部一条工具栏。** 原先视图切换条在图像区顶部居中、交换按钮在底部居中，用户需要在上下两处找操作；现合并到图像区底部居中一条毛玻璃胶囊工具栏内：左侧是「滑动 / 左右 / 上下」三个视图分段按钮，最右侧是圆形的「交换 A/B」按钮。
+  - 新增 `.wosai-image-compare-bottom` 容器统管定位与玻璃态样式；`.wosai-image-compare-views` 只负责内部 flex 布局，`.wosai-image-compare-swap` 不再是绝对定位，而是工具栏最右侧的 flex 项。
+  - 闲置淡出、无图隐藏、键盘聚焦唤回、disabled 降级透明度等规则统一切到容器：`is-idle` 下隐藏 `.wosai-image-compare-bottom`，焦点进入时再整体唤回；disabled 交换按钮在容器 `opacity: 1` 时仍用额外选择器保留自己的半透。
+  - `compare-view-contract.test.mjs` 同步更新「闲置隐藏清单」「命中关闭」「键盘唤回」三组断言，新增「底部工具栏整体淡出」哨兵。
+  - 缓存破坏：`media-tools.js` `?v=16 → 17`、`media-tools.css` `?v=16 → 17`。
 
 ### Performance
 

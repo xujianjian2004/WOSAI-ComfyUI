@@ -32,7 +32,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=16", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=17", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -458,8 +458,10 @@ function createImageCompare(node) {
     empty.className = "wosai-media-empty";
     empty.textContent = t("nodes.imageCompare.empty", "Connect two images and execute");
     secondWrap.append(second);
-    // 视图切换浮层：置于图像区顶部居中，与底部的 A ⇄ B 一行上下呼应。
-    // 做成浮层而不是独立工具栏，新增视图不会改变节点高度契约。
+    // 底部工具栏：视图切换 + 交换按钮合并为一行，交换按钮在最右侧。
+    // 仍是浮层（绝对定位），不进入 getWidgetHeight() 的高度计算。
+    const bottomBar = document.createElement("div");
+    bottomBar.className = "wosai-image-compare-bottom";
     const viewBar = document.createElement("div");
     viewBar.className = "wosai-image-compare-views";
     const viewButtons = new Map();
@@ -476,7 +478,7 @@ function createImageCompare(node) {
         viewButtons.set(mode, button);
         viewBar.append(button);
     }
-    // 图像区按顺序挂：图层 → 面板分隔缝 → 分割线交互层 → 角标 / 交换 / 视图浮层
+    // 图像区按顺序挂：图层 → 面板分隔缝 → 分割线交互层 → 底部工具栏
     // → 隐藏的原生滑块
     stage.append(first, secondWrap, divider, line, grab, handle);
     // 原生滑块不再单独占一行（视觉隐藏，1px）：只承担键盘操作与无障碍语义，
@@ -497,15 +499,15 @@ function createImageCompare(node) {
         '<path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
         "</svg>",
     ].join("");
-    stage.append(swap, viewBar, slider, empty);
+    bottomBar.append(viewBar, swap);
+    stage.append(bottomBar, slider, empty);
     root.append(stage);
 
     // ── 闲置自动淡出 ──────────────────────────────────────────────
-    // 视图条 / A/B 角标 / 交换按钮都是压在图片上的浮层：顶部条落在水平居中处
-    // （正是主体的构图重心），底部一行横跨图片过半宽度。这里让它们在「指针离开」
-    // 或「在图内静止」后整体隐去，回到纯净画面；任何操作意图都会立刻把它们唤回。
-    // 契约：只切 stage 上的类名，完全不碰高度——getWidgetHeight() 与既有的高度
-    // 断言不受影响，控件的新增 / 删除也不会改变节点尺寸。
+    // 底部工具栏（视图切换 + 交换按钮）压在图片下边缘居中，常驻会打断观看。
+    // 这里让它在「指针离开」或「在图内静止」后整体隐去，回到纯净画面；任何操作
+    // 意图都会立刻唤回。契约：只切 stage 上的类名，完全不碰高度——getWidgetHeight()
+    // 与既有的高度断言不受影响，控件的新增 / 删除也不会改变节点尺寸。
     const IDLE_STILL_DELAY = 1800;  // 图内无动作多久算闲置
     const IDLE_LEAVE_DELAY = 400;   // 离开 / 解锁后多久收起（容错掠过节点）
     const IDLE_REVEAL_HOLD = 1500;  // 动作触发后的强制可见期
@@ -550,7 +552,7 @@ function createImageCompare(node) {
     // 拿到的是恢复命中后的结果，可以据此补一次锁定。
     const isOverControl = (x, y) => {
         const el = document.elementFromPoint(x, y);
-        return Boolean(el && (viewBar.contains(el) || swap.contains(el)));
+        return Boolean(el && bottomBar.contains(el));
     };
     stage.addEventListener("pointermove", (event) => {
         if (idleLocked) return;
@@ -564,10 +566,8 @@ function createImageCompare(node) {
         if (!idleLocked) scheduleIdle(IDLE_LEAVE_DELAY);
     }, { signal });
     // 指针停在控件上时收起会同时抽掉命中区（idle 会关 pointer-events），必须先锁住
-    for (const control of [viewBar, swap]) {
-        control.addEventListener("pointerenter", () => lockIdle(true), { signal });
-        control.addEventListener("pointerleave", () => lockIdle(false), { signal });
-    }
+    bottomBar.addEventListener("pointerenter", () => lockIdle(true), { signal });
+    bottomBar.addEventListener("pointerleave", () => lockIdle(false), { signal });
 
     node.properties ??= {};
     let payload = { a: null, b: null };

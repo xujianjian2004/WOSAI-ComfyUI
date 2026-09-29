@@ -167,11 +167,9 @@ test("闲置态类名的生产者（JS）与消费者（CSS）一致", () => {
 });
 
 test("闲置只隐藏控件，分割线保持可见", () => {
-    const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-views[\s\S]*?\}/);
+    const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-bottom[\s\S]*?\}/);
     assert.ok(rule, "未找到闲置隐藏规则");
-    for (const part of ["-views", "-swap"]) {
-        assert.ok(rule[0].includes(`.wosai-image-compare${part}`), `闲置清单缺少 ${part}`);
-    }
+    assert.ok(rule[0].includes(".wosai-image-compare-bottom"), "闲置清单应以底部工具栏为整体");
     // 分割线 / 热区 / 十字手柄是「这是一张对比图」的语义表达，不是操作项：
     // 把分割线一起隐掉，节点会退化成一张普通图片
     for (const part of ["-line", "-grab", "-handle"]) {
@@ -183,19 +181,18 @@ test("闲置只隐藏控件，分割线保持可见", () => {
 });
 
 test("闲置必须同时关掉命中，否则会点到看不见的按钮", () => {
-    const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-views[\s\S]*?\}/);
-    // 交换按钮正落在拖分割线的常用路径上：只做视觉隐藏 = 拖拽时误触交换
+    const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-bottom[\s\S]*?\}/);
+    // 底部工具栏正落在拖分割线的常用路径上：只做视觉隐藏 = 拖拽时误触按钮
     assert.match(rule[0], /pointer-events:\s*none/);
-    assert.ok(!/visibility|display:\s*none/.test(rule[0]), "用 opacity 隐藏以保留 a11y 树里的尺寸文本");
+    assert.ok(!/visibility|display:\s*none/.test(rule[0]), "用 opacity 隐藏以保留 a11y 树里的控件语义");
 });
 
 test("键盘聚焦时闲置让位，且 disabled 控件保留降级透明度", () => {
-    assert.match(CSS, /\.wosai-image-compare-stage\.is-idle:focus-within \.wosai-image-compare-views/);
-    // :not(:disabled) 不可省：焦点落在视图按钮上时，会把 disabled 交换按钮的
-    // 降级透明度一并覆盖成 1，看起来像可以点
+    assert.match(CSS, /\.wosai-image-compare-stage\.is-idle:focus-within \.wosai-image-compare-bottom/);
+    // disabled 的交换按钮在键盘唤回时要保留自己的降级透明度，不被容器 opacity:1 盖掉
     assert.match(
         CSS,
-        /\.wosai-image-compare-stage\.is-idle:focus-within \.wosai-image-compare-swap:not\(:disabled\)/,
+        /\.wosai-image-compare-stage\.is-idle:focus-within \.wosai-image-compare-bottom \.wosai-image-compare-swap:disabled/,
     );
 });
 
