@@ -59,6 +59,14 @@
 - 新增 9 条 i18n 文案（zh / en 同步）：`machine`、`executable`、`httpProxy`、`httpsProxy`、`noProxy`、`set`、`notSet`、`readonly`、`noMatch`。另有 8 条由「已存在但无人使用」转为实际渲染：`simple`、`advanced`、`search`、`searchPlaceholder`、`network`、`startup`、`cudaRuntime`、`cudnn`。
 - 缓存破坏：`device-info.js` `?v=10 → 11`、`device-info.css` `?v=7 → 8`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
 - 体积：主 JavaScript **1361.0 → 1380.5 KiB**（余 35.5 KiB）、样式 **232.0 → 237.0 KiB**（余 13.0 KiB），预算内。
+- **设备面板移除「简洁 / 高级」两级视图，只留单一完整视图。** 分段控件当初是为了收窄 15 行长的环境卡；改用左右两栏后卡高已由「较高的一栏」决定，再靠砍内容省高度收益很薄，代价却是同一块面板要维护两套显隐规则、且不同用户看到的面板不一致。改动如下：
+  - 删除分段控件、`viewMode` 状态与 `localStorage` 键 `wosai.device-info.view`；原先只在高级版出现的系统架构、Python 解释器、CUDA 运行时、cuDNN、ComfyUI 版本、依赖清单，以及「ComfyUI 路径」卡，现全部常显。
+  - **搜索框保留**——它是现在唯一的显隐来源，行为完全不变（语料、多词与匹配、无结果提示均照旧）。
+  - 连带移除 `markAdvanced()` 与各处 `advanced` 标记；`applyFilters()` 由「视图 + 搜索」两段裁决收缩为纯搜索裁决，栏级裁决仍与逐单元裁决同趟完成：只命中右栏时整条左栏隐藏，右栏因栅格 `auto-fit` 折叠空轨道自动占满整宽。
+  - CSS 删除 `.ws-di-view-switch` 的三条规则并从按钮分组选择器中摘除；`.ws-di-tools` 现在只装一个搜索框，故去掉不再需要的 `flex-direction: column`。
+  - `simple` / `advanced` 两条文案随之停用，但**不从 locale 删除**：面板存在大量动态键消费（`label(key, …)` 的键来自数组与对象，如 `["simple","simple"]`、`` label(`issues.${issue}`) ``），键名不以字面量出现在代码里，静态判据无法可靠区分死键与动态键（宽判据报 0 个死键、严判据误报 32 个），误删风险大于收益。
+  - 缓存破坏：`device-info.js` `?v=13 → 14`、`device-info.css` `?v=10 → 11`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
+  - 体积：主 JavaScript **1380.0 → 1377.6 KiB**（余 38.4 KiB）、样式 **238.1 → 237.6 KiB**（余 12.4 KiB），预算内。
 
 - **设备面板合并同类项：删掉重复的「概览」卡，并把「Torch」与「PyTorch」合为一行。** 概览卡与硬件资源卡讲的是同一件事——显存、内存、各磁盘在两处各画一遍，连取值表达式都逐字相同（`numberOrNull(memory.percent?.value) ?? percentOf(...)` 在两张卡里各出现一次），并排只会让人怀疑哪里渲染错了。
   - 合并为一张「硬件资源」卡，卡内自顶向下为「磁贴行（一眼可见的占用率）→ GPU 体征区块 → 处理器」，磁贴与 GPU 区之间以一道分隔线划开。GPU 块**不再复述百分比**，只保留磁贴给不出的三层显存构成、四色图例与温度 / 功耗 / 驱动。

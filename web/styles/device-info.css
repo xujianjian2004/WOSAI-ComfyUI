@@ -30,8 +30,7 @@
 .ws-di-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ws-gap-xs); }
 
 .ws-di-button,
-.ws-di-export,
-.ws-di-view-switch button {
+.ws-di-export {
   min-height: var(--ws-btn-h-xs);
   border: var(--ws-border-width-thin) solid var(--ws-border);
   border-radius: var(--ws-radius-sm);
@@ -48,19 +47,14 @@
 [data-theme="light"] .ws-device-info { color-scheme: light; }
 .ws-di-export option { background: var(--ws-surface); color: var(--ws-text); }
 .ws-di-button:hover,
-.ws-di-export:hover,
-.ws-di-view-switch button:hover { color: var(--ws-text); border-color: var(--ws-accent); background: var(--ws-accent-dim); }
+.ws-di-export:hover { color: var(--ws-text); border-color: var(--ws-accent); background: var(--ws-accent-dim); }
 .ws-di-button:focus-visible,
 .ws-di-export:focus-visible,
-.ws-di-view-switch button:focus-visible,
 .ws-di-search:focus-visible { outline: none; box-shadow: var(--ws-focus-ring); }
 
-.ws-di-tools { align-items: stretch; flex-direction: column; gap: var(--ws-gap-sm); margin-bottom: var(--ws-gap-lg); }
+.ws-di-tools { align-items: stretch; gap: var(--ws-gap-sm); margin-bottom: var(--ws-gap-lg); }
 .ws-di-search { width: 100%; min-width: 0; height: var(--ws-btn-h-sm); padding: var(--ws-input-padding); border: var(--ws-border-width-thin) solid var(--ws-input-border); border-radius: var(--ws-radius); background: var(--ws-input-bg); color: var(--ws-input-text); font: inherit; }
 .ws-di-search::placeholder { color: var(--ws-text-placeholder); }
-.ws-di-view-switch { display: flex; width: 100%; gap: var(--ws-gap-2xs); padding: var(--ws-gap-2xs); border-radius: var(--ws-radius); background: var(--ws-seg-bg); }
-.ws-di-view-switch button { flex: 1 1 0; border-color: transparent; padding: 0 var(--ws-gap-sm); }
-.ws-di-view-switch button.is-active { color: var(--ws-text-on-accent); border-color: var(--ws-accent); background: var(--ws-accent); }
 
 .ws-di-content { display: grid; gap: var(--ws-gap); }
 .ws-di-card { overflow: hidden; border: var(--ws-border-width-thin) solid var(--ws-border); border-radius: var(--ws-panel-radius); background: var(--ws-surface); box-shadow: var(--ws-shadow-sm); }

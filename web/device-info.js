@@ -7,11 +7,6 @@ import { WOSAI_COPYRIGHT, WOSAI_GITHUB } from "./shared/constants.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
 
 const TAB_ID = "wosai-device-info";
-/**
- * 简洁 / 高级视图偏好。面板会随 2s 实时刷新整块重渲染，状态必须活在模块级，
- * 否则每两秒就被打回默认视图。写入 localStorage 让它跨会话保留。
- */
-const VIEW_STORAGE_KEY = "wosai.device-info.view";
 
 let panel = null;
 let data = null;
@@ -19,34 +14,20 @@ let loading = false;
 let offLangChange = null;
 let offGlassChange = null;
 let liveRefreshTimer = null;
-let viewMode = readStoredView();
+/**
+ * 搜索词。面板会随 2s 实时刷新整块重渲染，状态必须活在模块级，
+ * 否则每两秒就被清空。
+ */
 let searchQuery = "";
 
 const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
-
-/** 读不到（隐私模式禁用 localStorage，或从未设置过）时回落到简洁版。 */
-function readStoredView() {
-    try {
-        return localStorage.getItem(VIEW_STORAGE_KEY) === "advanced" ? "advanced" : "simple";
-    } catch (_) {
-        return "simple";
-    }
-}
-
-function storeView(mode) {
-    try {
-        localStorage.setItem(VIEW_STORAGE_KEY, mode);
-    } catch (_) {
-        /* 隐私模式下写不进去，只是不记住偏好，不影响本次使用 */
-    }
-}
 
 // ComfyUI does not consistently load stylesheet entries from extension.json.
 // Load the shared tokens and this panel stylesheet explicitly so the sidebar
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=10", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=11", import.meta.url).href],
     ]);
 }
 
@@ -141,19 +122,12 @@ function addButton(parent, key, fallback, icon, handler, extraClass = "") {
     return button;
 }
 
-/** 标记「仅高级版可见」。显隐统一由 applyFilters() 裁决，渲染期一律不写 hidden。 */
-function markAdvanced(element, options = {}) {
-    if (options.advanced) element.dataset.view = "advanced";
-    return element;
-}
-
 function card(title, icon, options = {}) {
     const section = make("section", "ws-di-card");
     // data-section 供真实浏览器验收定位：卡片标题随界面语言变化，不能拿它当选择器。
     if (options.id) section.dataset.section = options.id;
     // 卡片自身的搜索语料 = 标题，命中标题时整卡内容都保留（用户找的是这张卡）。
     section.dataset.search = String(title).toLowerCase();
-    markAdvanced(section, options);
     const heading = make("div", "ws-di-card-heading");
     if (icon) heading.append(make("i", `pi ${icon}`));
     heading.append(make("h2", "", title));
@@ -172,7 +146,6 @@ function row(parent, key, item, options = {}) {
     const name = options.label || titleCase(key);
     // 搜索语料同时收录英文键、本地化标签与实际值，中英文查询都能命中。
     element.dataset.search = `${key} ${name} ${display}`.toLowerCase();
-    markAdvanced(element, options);
     element.append(make("span", "ws-di-label", name));
     const value = make("span", `ws-di-value${item?.status === "error" ? " is-error" : ""}`, display);
     if (item?.error) value.title = item.error;
@@ -353,7 +326,7 @@ function healthRing(score) {
  * 一卡两栏——左栏答「环境是什么」，右栏答「装了哪些包」——纵向 15 行压到 9 行左右。
  * 依赖原先靠小节标签在纵向划界（否则 `Git` 下面紧跟一行 `Torch` 会被读成 `PyTorch` 的重复），
  * 改横向分栏后这个歧义自然消失，标签改为栏标题留在右栏顶部，与左栏首行同高对齐。
- * 窄侧边栏下由栅格 auto-fit 自动塌成单栏；简洁版右栏整栏隐藏后，左栏作为唯一栅格项占满整行。
+ * 窄侧边栏下由栅格 auto-fit 自动塌成单栏；右栏因数据缺失整栏隐藏时，左栏作为唯一栅格项占满整行。
  */
 function renderEnvironment(target) {
     const section = card(label("system", "Runtime Environment"), "pi-desktop", { id: "environment" });
@@ -365,13 +338,13 @@ function renderEnvironment(target) {
     const identity = make("div", "ws-di-column");
     identity.dataset.column = "identity";
     row(identity, "os", system.os, { label: label("os", "OS") });
-    row(identity, "machine", system.machine, { label: label("machine", "Architecture"), advanced: true });
+    row(identity, "machine", system.machine, { label: label("machine", "Architecture") });
     row(identity, "python", system.python, { label: label("python", "Python") });
-    row(identity, "executable", system.executable, { label: label("executable", "Python executable"), advanced: true });
+    row(identity, "executable", system.executable, { label: label("executable", "Python executable") });
     row(identity, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
-    row(identity, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime"), advanced: true });
-    row(identity, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN"), advanced: true });
-    row(identity, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI"), advanced: true });
+    row(identity, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime") });
+    row(identity, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN") });
+    row(identity, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI") });
     row(identity, "git", comfyui.git, { label: label("git", "Git") });
     columns.append(identity);
 
@@ -380,7 +353,7 @@ function renderEnvironment(target) {
         const deps = make("div", "ws-di-column");
         deps.dataset.column = "dependencies";
         deps.append(dependenciesHeading(dependencies));
-        for (const [name, item] of dependencies) row(deps, name, item, { label: capitalizeInitial(name), advanced: true });
+        for (const [name, item] of dependencies) row(deps, name, item, { label: capitalizeInitial(name) });
         columns.append(deps);
     }
 
@@ -410,7 +383,6 @@ function dependencyEntries(runtime) {
 function dependenciesHeading(entries) {
     const text = label("dependencies", "Key Dependencies");
     const heading = make("h3", "ws-di-group-label", text);
-    heading.dataset.view = "advanced";
     heading.dataset.search = `${text} ${entries.map(([name, item]) => `${name} ${valueOf(item, "")}`).join(" ")}`.toLowerCase();
     return heading;
 }
@@ -451,7 +423,7 @@ function usageText(used, total, available) {
 }
 
 function renderPaths(target) {
-    const section = card(label("paths", "ComfyUI Paths"), "pi-folder", { id: "paths", advanced: true });
+    const section = card(label("paths", "ComfyUI Paths"), "pi-folder", { id: "paths" });
     const seenPaths = new Set();
     for (const [name, item] of Object.entries(data.paths || {})) {
         const entries = item?.value || [];
@@ -629,7 +601,7 @@ async function load(force = false, background = false) {
     }
 }
 
-/** 工具条：搜索框 + 简洁/高级分段控件。样式与令牌早已就绪，只是此前无人消费。 */
+/** 工具条：搜索框。 */
 function renderTools(root) {
     const tools = make("div", "ws-di-tools");
     const search = make("input", "ws-di-search");
@@ -642,61 +614,29 @@ function renderTools(root) {
         applyFilters();
     });
     tools.append(search);
-
-    const switcher = make("div", "ws-di-view-switch");
-    switcher.setAttribute("role", "group");
-    [["simple", "simple"], ["advanced", "advanced"]].forEach(([mode, key]) => {
-        const button = make("button", "", label(key, capitalizeInitial(mode)));
-        button.type = "button";
-        button.dataset.mode = mode;
-        button.addEventListener("click", () => setViewMode(mode));
-        switcher.append(button);
-    });
-    tools.append(switcher);
     root.append(tools);
 }
 
-/** 切换视图只改显隐、不整块重渲染：重渲染会丢掉滚动位置和正在输入的搜索词。 */
-function setViewMode(mode) {
-    if (mode === viewMode) return;
-    viewMode = mode;
-    storeView(mode);
-    applyFilters();
-}
-
 /**
- * 显隐总裁决：视图（简洁/高级）+ 搜索词，两者都作用在已建好的 DOM 上。
- * 规则：高级专属单元在简洁版一律隐藏；无搜索词时其余单元全显示；有搜索词时卡片标题命中
- * 则整卡保留，否则只保留自身语料命中的单元；卡内无一单元可见时整卡隐藏，
- * 全部卡片都不可见时给出「无匹配」提示。
+ * 显隐总裁决：只看搜索词，作用在已建好的 DOM 上。
+ * 规则：无搜索词时全部单元显示；有搜索词时卡片标题命中则整卡保留，否则只保留自身语料命中的
+ * 单元；卡内无一单元可见时整卡隐藏，全部卡片都不可见时给出「无匹配」提示。
  */
 function applyFilters(root = panel?.querySelector(".ws-device-info")) {
     if (!root) return;
-    const advanced = viewMode === "advanced";
     const terms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-    for (const button of root.querySelectorAll(".ws-di-view-switch button")) {
-        const active = button.dataset.mode === viewMode;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-    }
 
     let visibleCards = 0;
     for (const section of root.querySelectorAll(".ws-di-card")) {
-        if (!advanced && section.dataset.view === "advanced") {
-            section.hidden = true;
-            continue;
-        }
         const cardHit = terms.length > 0 && terms.every((term) => (section.dataset.search || "").includes(term));
         let anyVisible = false;
         for (const unit of section.querySelectorAll("[data-search]")) {
-            const excluded = !advanced && unit.dataset.view === "advanced";
-            const hit = !excluded && (!terms.length || cardHit || terms.every((term) => (unit.dataset.search || "").includes(term)));
+            const hit = !terms.length || cardHit || terms.every((term) => (unit.dataset.search || "").includes(term));
             unit.hidden = !hit;
             if (hit) anyVisible = true;
         }
-        // 栏级裁决：栏内无一单元可见时整栏隐藏。简洁版藏掉运行环境的右栏后，左栏会因栅格
-        // auto-fit 折叠空轨道而自动占满整行 —— 所以这里不需要再判断「还剩几栏」。
+        // 栏级裁决：栏内无一单元可见时整栏隐藏。右栏隐藏后，左栏会因栅格 auto-fit 折叠空轨道
+        // 而自动占满整行 —— 所以这里不需要再判断「还剩几栏」。
         for (const column of section.querySelectorAll("[data-column]")) {
             column.hidden = !column.querySelector("[data-search]:not([hidden])");
         }
