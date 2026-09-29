@@ -32,7 +32,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=17", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=18", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。

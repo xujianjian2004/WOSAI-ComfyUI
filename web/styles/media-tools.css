@@ -343,6 +343,7 @@
 }
 
 /* ── 底部工具栏：视图切换 + 交换按钮合并为一行，居中浮在图像区下边缘 ─ */
+/* 注意：这里只负责定位与 flex 布局，不画公共胶囊背景；每个按钮都是独立圆形。 */
 .wosai-image-compare-bottom {
   position: absolute;
   left: 50%;
@@ -352,12 +353,6 @@
   align-items: center;
   box-sizing: border-box;
   gap: var(--ws-gap-xs);
-  padding: var(--ws-gap-2xs);
-  border: var(--ws-glass-border);
-  border-radius: var(--ws-radius-pill);
-  background: var(--ws-glass-bg);
-  backdrop-filter: var(--ws-glass-blur-sm);
-  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
   transform: translateX(-50%);
   transition: opacity var(--ws-transition);
 }
@@ -366,7 +361,7 @@
   display: flex;
   align-items: center;
   box-sizing: border-box;
-  gap: var(--ws-gap-2xs);
+  gap: var(--ws-gap-xs);
 }
 
 .wosai-image-compare-view {
@@ -375,22 +370,27 @@
   box-sizing: border-box;
   width: var(--ws-compare-view-size);
   height: var(--ws-compare-view-size);
-  border: 0;
-  border-radius: var(--ws-radius-pill);
+  border: var(--ws-glass-border);
+  border-radius: var(--ws-radius-full);
   padding: 0;
-  background: none;
+  background: var(--ws-glass-bg);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
   color: var(--ws-text-muted);
   cursor: pointer;
   transition:
     background var(--ws-transition),
+    border-color var(--ws-transition),
     color var(--ws-transition);
 }
 
 .wosai-image-compare-view:hover {
+  border-color: var(--ws-border-strong);
   color: var(--ws-text);
 }
 
 .wosai-image-compare-view.is-active {
+  border-color: var(--ws-accent);
   background: var(--ws-accent-dim);
   color: var(--ws-accent);
 }
@@ -410,21 +410,24 @@
   stroke-linejoin: round;
 }
 
-/* 交换按钮：位于底部工具栏最右侧 */
+/* 交换按钮：位于底部工具栏最右侧，与视图按钮同尺寸圆形 */
 .wosai-image-compare-swap {
   display: grid;
   place-items: center;
   box-sizing: border-box;
   width: var(--ws-compare-swap-size);
   height: var(--ws-compare-swap-size);
-  border: 0;
+  border: var(--ws-glass-border);
   border-radius: var(--ws-radius-full);
   padding: 0;
-  background: none;
+  background: var(--ws-glass-bg);
+  backdrop-filter: var(--ws-glass-blur-sm);
+  -webkit-backdrop-filter: var(--ws-glass-blur-sm);
   color: var(--ws-text-secondary);
   cursor: pointer;
   transition:
     background var(--ws-transition),
+    border-color var(--ws-transition),
     color var(--ws-transition),
     opacity var(--ws-transition);
 }
@@ -439,13 +442,15 @@
   stroke-linejoin: round;
 }
 
-.wosai-image-compare-swap:hover:not(:disabled),
-.wosai-image-compare-swap.is-active {
-  color: var(--ws-accent);
+.wosai-image-compare-swap:hover:not(:disabled) {
+  border-color: var(--ws-border-strong);
+  color: var(--ws-text);
 }
 
 .wosai-image-compare-swap.is-active {
+  border-color: var(--ws-accent);
   background: var(--ws-accent-dim);
+  color: var(--ws-accent);
 }
 
 .wosai-image-compare-swap:focus-visible {

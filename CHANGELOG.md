@@ -144,11 +144,11 @@
   - `compare-view-contract.test.mjs` 新增哨兵断言：`viewAuto` 不得再出现、`COMPARE_VIEW_MODES` 不得再含 `"auto"`、`resolveViewMode` 不得复活；`media-preview.test.mjs` 删除 3 组 `resolveViewMode` 测试、新增「旧值 `auto` 回落 slide」（15 → 10 项）。
   - 缓存破坏：`media-tools.js` `?v=14 → 15`（CSS 未改动，故不递增）。
 - **图像对比的 A/B 交换按钮改为正圆并缩小**：尺寸 `--ws-compare-swap-size` `34 → 28px`、图标改用新的 `--ws-compare-swap-icon-size`（16px，原为通用 `--ws-media-action-icon-size` 18px），圆角由 `--ws-radius`（8px 方角）改为 `--ws-radius-full`（50% 正圆），与顶部视图切换条的胶囊按钮同属一套圆形语汇；按钮更小后对画面的遮挡也随之减少。交换按钮只作浮层存在，不进入 `getWidgetHeight()` 的高度计算，故节点尺寸不变。缓存破坏：`media-tools.css` `?v=15 → 16`、`wosai-variables.css` `?v=27 → 28`、`media-tools.js` `?v=15 → 16`。
-- **图像对比的视图切换与交换按钮合并为底部一条工具栏。** 原先视图切换条在图像区顶部居中、交换按钮在底部居中，用户需要在上下两处找操作；现合并到图像区底部居中一条毛玻璃胶囊工具栏内：左侧是「滑动 / 左右 / 上下」三个视图分段按钮，最右侧是圆形的「交换 A/B」按钮。
+- **图像对比的视图切换与交换按钮合并为底部一条工具栏，且改为四个独立圆形按钮。** 原先视图切换条在图像区顶部居中、交换按钮在底部居中，用户需要在上下两处找操作；现合并到图像区底部居中一条工具栏内：左侧是「滑动 / 左右 / 上下」三个圆形视图按钮，最右侧是圆形的「交换 A/B」按钮。不再使用公共胶囊背景，每个按钮自带圆形玻璃背景与边框，选中项以强调色圆形高亮，hover 时边框加深。
   - 新增 `.wosai-image-compare-bottom` 容器统管定位与玻璃态样式；`.wosai-image-compare-views` 只负责内部 flex 布局，`.wosai-image-compare-swap` 不再是绝对定位，而是工具栏最右侧的 flex 项。
   - 闲置淡出、无图隐藏、键盘聚焦唤回、disabled 降级透明度等规则统一切到容器：`is-idle` 下隐藏 `.wosai-image-compare-bottom`，焦点进入时再整体唤回；disabled 交换按钮在容器 `opacity: 1` 时仍用额外选择器保留自己的半透。
   - `compare-view-contract.test.mjs` 同步更新「闲置隐藏清单」「命中关闭」「键盘唤回」三组断言，新增「底部工具栏整体淡出」哨兵。
-  - 缓存破坏：`media-tools.js` `?v=16 → 17`、`media-tools.css` `?v=16 → 17`。
+  - 缓存破坏：`media-tools.js` `?v=16 → 17`、`media-tools.css` `?v=17 → 18`。
 
 ### Performance
 
