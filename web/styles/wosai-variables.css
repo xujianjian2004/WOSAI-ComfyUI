@@ -581,12 +581,12 @@
   --ws-media-toolbar-height: 34px;
   --ws-media-frame-row-height: 30px;
   --ws-media-slider-row-height: 34px;
-  --ws-media-action-icon-size: 18px;
   --ws-points-node-min-height: 320px;
   --ws-compare-node-min-height: 280px;
   --ws-compare-handle-size: 28px;
   --ws-compare-handle-icon-size: 18px;
-  --ws-compare-swap-size: 34px;
+  --ws-compare-swap-size: 28px;
+  --ws-compare-swap-icon-size: 16px;
   --ws-compare-range-size: 1px;
   /* 对比视图切换分段控件的按钮与图标尺寸 */
   --ws-compare-view-size: 24px;

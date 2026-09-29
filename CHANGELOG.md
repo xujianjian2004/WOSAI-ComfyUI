@@ -143,6 +143,7 @@
   - 删除 `auto` 图标、`viewText()` 的 `auto` 分支与 `viewAuto` i18n 键（zh/en 同步）。**旧工作流里已存下的 `wosai_compare_view = "auto"` 由 `normalizeViewMode()` 自动回落为滑动视图**，不会退化成「没有任何视图类名」的裸状态（那样双拼 CSS 与分割线会同时失效）。
   - `compare-view-contract.test.mjs` 新增哨兵断言：`viewAuto` 不得再出现、`COMPARE_VIEW_MODES` 不得再含 `"auto"`、`resolveViewMode` 不得复活；`media-preview.test.mjs` 删除 3 组 `resolveViewMode` 测试、新增「旧值 `auto` 回落 slide」（15 → 10 项）。
   - 缓存破坏：`media-tools.js` `?v=14 → 15`（CSS 未改动，故不递增）。
+- **图像对比的 A/B 交换按钮改为正圆并缩小**：尺寸 `--ws-compare-swap-size` `34 → 28px`、图标改用新的 `--ws-compare-swap-icon-size`（16px，原为通用 `--ws-media-action-icon-size` 18px），圆角由 `--ws-radius`（8px 方角）改为 `--ws-radius-full`（50% 正圆），与顶部视图切换条的胶囊按钮同属一套圆形语汇；按钮更小后对画面的遮挡也随之减少。交换按钮只作浮层存在，不进入 `getWidgetHeight()` 的高度计算，故节点尺寸不变。缓存破坏：`media-tools.css` `?v=15 → 16`、`wosai-variables.css` `?v=27 → 28`、`media-tools.js` `?v=15 → 16`。
 
 ### Performance
 

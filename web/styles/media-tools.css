@@ -415,7 +415,7 @@
   height: var(--ws-compare-swap-size);
   transform: translateX(-50%);
   border: var(--ws-glass-border);
-  border-radius: var(--ws-radius);
+  border-radius: var(--ws-radius-full);
   padding: 0;
   background: var(--ws-glass-bg);
   backdrop-filter: var(--ws-glass-blur-sm);
@@ -430,8 +430,8 @@
 }
 
 .wosai-image-compare-swap svg {
-  width: var(--ws-media-action-icon-size);
-  height: var(--ws-media-action-icon-size);
+  width: var(--ws-compare-swap-icon-size);
+  height: var(--ws-compare-swap-icon-size);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.9;
