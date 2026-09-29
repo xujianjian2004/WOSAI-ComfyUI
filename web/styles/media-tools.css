@@ -277,28 +277,31 @@
 /* 两个图层共享 .wosai-image-compare-stage > img / .wosai-image-compare-top 的
    `inset: 0 + width/height: 100%`，切半时必须同时改写主轴尺寸，
    否则 left/top 偏移与 100% 尺寸叠加会把面板推出舞台边界。 */
+/* 双拼下 A（上层）占左半、B（底层）占右半：与滑动视图「左端是 A」同向，
+   也与底部恒为左 A / 右 B 的角标一致——照字面让底层占左半会出现
+   「左半幅写着 A 却显示 B 图」 */
 .wosai-image-compare-stage.is-view-side > img {
-  right: auto;
-  width: 50%;
-  border-radius: var(--ws-radius-lg) 0 0 var(--ws-radius-lg);
-}
-
-.wosai-image-compare-stage.is-view-side .wosai-image-compare-top {
   left: 50%;
   width: 50%;
   border-radius: 0 var(--ws-radius-lg) var(--ws-radius-lg) 0;
 }
 
-.wosai-image-compare-stage.is-view-stack > img {
-  bottom: auto;
-  height: 50%;
-  border-radius: var(--ws-radius-lg) var(--ws-radius-lg) 0 0;
+.wosai-image-compare-stage.is-view-side .wosai-image-compare-top {
+  right: auto;
+  width: 50%;
+  border-radius: var(--ws-radius-lg) 0 0 var(--ws-radius-lg);
 }
 
-.wosai-image-compare-stage.is-view-stack .wosai-image-compare-top {
+.wosai-image-compare-stage.is-view-stack > img {
   top: 50%;
   height: 50%;
   border-radius: 0 0 var(--ws-radius-lg) var(--ws-radius-lg);
+}
+
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-top {
+  bottom: auto;
+  height: 50%;
+  border-radius: var(--ws-radius-lg) var(--ws-radius-lg) 0 0;
 }
 
 /* 面板分隔缝：只在双拼视图出现，滑动视图由分割线承担视觉分隔 */

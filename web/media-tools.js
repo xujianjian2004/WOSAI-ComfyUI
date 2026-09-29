@@ -34,7 +34,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=13", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=14", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -677,9 +677,12 @@ function createImageCompare(node) {
         root.classList.toggle("has-first", Boolean(display.b));
         root.classList.toggle("has-second", Boolean(display.a));
         // 尺寸标注直接读载荷里的原始尺寸：不必等图片解码，也不会被显示尺寸影响
-        // 角标标注的是它所在面板实际显示的那张图：左下 = B、右下 = A
-        startLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
-        endLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
+        // 角标是「端点标签」而非「面板标签」：左下角标 = 分割线拖到最左端（0%）
+        // 时显示的那张图 = A，右下 = 拖到最右端（100%）时显示的 B，恒为左 A / 右 B。
+        // 中间位置时左侧画面是 B、角标仍标 A，这是端点语义的固有结果——
+        // 别改成「标注所在面板的图」，那会让左下角标随图层分配反转成 B
+        startLabel.textContent = formatMediaBadgeLabel(display.a, swapped ? "B" : "A");
+        endLabel.textContent = formatMediaBadgeLabel(display.b, swapped ? "A" : "B");
         swap.disabled = !(payload.a && payload.b);
         swap.classList.toggle("is-active", swapped);
         swap.setAttribute("aria-pressed", String(swapped));

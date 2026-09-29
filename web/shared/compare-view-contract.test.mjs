@@ -45,17 +45,18 @@ test("CSS 里所有视图规则都以 .wosai-image-compare-stage 限定", () => 
 
 test("双拼视图把图层切成半幅并补上主轴尺寸", () => {
     // left/top 偏移必须与主轴尺寸成对出现，否则 100% 尺寸会把面板推出舞台边界
-    assert.match(CSS, /is-view-side > img \{[^}]*right: auto;[^}]*width: 50%;/s);
-    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*left: 50%;[^}]*width: 50%;/s);
-    assert.match(CSS, /is-view-stack > img \{[^}]*bottom: auto;[^}]*height: 50%;/s);
-    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*top: 50%;[^}]*height: 50%;/s);
+    // 底层（B）占右/下半、上层（A）占左/上半：与滑动视图「左端是 A」同向
+    assert.match(CSS, /is-view-side > img \{[^}]*left: 50%;[^}]*width: 50%;/s);
+    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*right: auto;[^}]*width: 50%;/s);
+    assert.match(CSS, /is-view-stack > img \{[^}]*top: 50%;[^}]*height: 50%;/s);
+    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*bottom: auto;[^}]*height: 50%;/s);
 });
 
 test("双拼视图补外侧圆角，内缝保持直角", () => {
-    assert.match(CSS, /is-view-side > img \{[^}]*border-radius: var\(--ws-radius-lg\) 0 0 var\(--ws-radius-lg\);/s);
-    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*border-radius: 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0;/s);
-    assert.match(CSS, /is-view-stack > img \{[^}]*border-radius: var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0 0;/s);
-    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*border-radius: 0 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\);/s);
+    assert.match(CSS, /is-view-side > img \{[^}]*border-radius: 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0;/s);
+    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*border-radius: var\(--ws-radius-lg\) 0 0 var\(--ws-radius-lg\);/s);
+    assert.match(CSS, /is-view-stack > img \{[^}]*border-radius: 0 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\);/s);
+    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*border-radius: var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0 0;/s);
 });
 
 test("双拼视图隐藏分割线 / 热区 / 十字手柄，只留分隔缝", () => {
@@ -95,9 +96,10 @@ test("拖动方向 = 画面呈现的图：左端 A、右端 B", () => {
     assert.match(JS, /const firstUrl = imageUrl\(display\.b\);/);
     assert.match(JS, /const secondUrl = imageUrl\(display\.a\);/);
     assert.match(JS, /root\.classList\.toggle\("has-first", Boolean\(display\.b\)\)/);
-    // 角标必须标注它所在面板实际显示的那张图，否则左下角标会指向一张被盖住的图
-    assert.match(JS, /startLabel\.textContent = formatMediaBadgeLabel\(display\.b/);
-    assert.match(JS, /endLabel\.textContent = formatMediaBadgeLabel\(display\.a/);
+    // 角标是「端点标签」：左下恒 A（= 拖到 0% 时显示的图）、右下恒 B（= 100%）。
+    // 改成「标注所在面板的图」会让左下随图层分配反转成 B，与左端是 A 自相矛盾
+    assert.match(JS, /startLabel\.textContent = formatMediaBadgeLabel\(display\.a/);
+    assert.match(JS, /endLabel\.textContent = formatMediaBadgeLabel\(display\.b/);
 });
 
 test("拖拽光标只在滑动视图开启", () => {
@@ -148,8 +150,8 @@ test("控件高度按舞台宽高比换算，且内边距与 CSS 同源", () => 
 });
 
 test("尺寸标注直接取载荷尺寸并走统一的格式化函数", () => {
-    assert.match(JS, /formatMediaBadgeLabel\(display\.b, swapped \? "A" : "B"\)/);
     assert.match(JS, /formatMediaBadgeLabel\(display\.a, swapped \? "B" : "A"\)/);
+    assert.match(JS, /formatMediaBadgeLabel\(display\.b, swapped \? "A" : "B"\)/);
 });
 
 // ── 闲置自动淡出（控件遮挡优化）────────────────────────────────────
