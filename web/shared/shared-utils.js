@@ -105,8 +105,15 @@ export function getSetting(id, dflt) {
  * @param {{ handle?: HTMLElement, onDragStart?: (e:PointerEvent)=>void, onDragEnd?: (e:PointerEvent)=>void }} [opts]
  */
 export function makeDraggable(panel, opts = {}) {
-    let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0, origTransition = '';
+    // 与 web/panel-drag.js 的全局自动接管共用同一个去重标记：那个模块的
+    // MutationObserver 靠 panel._wosaiDraggable 判断是否已绑定。这里若不写该标记，
+    // 凡带 data-wosai-panel 的面板（link-fx / visual-fx 面板即如此）会被两套实现
+    // 各绑一次，拖拽时双份 handler 同时改写 left/top——两套的基准算法并不相同
+    // （offsetLeft vs getBoundingClientRect），行为因此不可预期。
+    if (!panel || panel._wosaiDraggable) return () => {};
     const handle = opts.handle || panel;
+    panel._wosaiDraggable = true;
+    let dragging = false, startX = 0, startY = 0, origX = 0, origY = 0, origTransition = '';
 
     function onDown(e) {
         if (e.button !== 0) return;
@@ -156,6 +163,7 @@ export function makeDraggable(panel, opts = {}) {
     handle.addEventListener('pointerdown', onDown);
 
     return () => {
+        panel._wosaiDraggable = false;
         handle.style.cursor = '';
         handle.removeEventListener('pointerdown', onDown);
         document.removeEventListener('pointermove', onMove);

@@ -664,7 +664,12 @@ export function openNodeColorPicker(nodes, anchorRect, groups) {
     });
 
     // store 同步加载 localStorage；服务端预设异步合并后重渲染
-    initStore().then(() => { renderRecentPicks(); buildPresets(); });
+    // initStore() 内部已吞掉 fetch 错误，但 then 回调里的 renderRecentPicks() /
+    // buildPresets() 抛错仍会产生 unhandledrejection 并让面板停在半初始化状态，
+    // 因此必须补 catch（同步那一行已先渲染过一次，这里失败不会白屏）。
+    initStore()
+        .then(() => { renderRecentPicks(); buildPresets(); })
+        .catch(e => console.warn("WOSAI 节点配色: preset merge failed.", e));
     buildPresets();renderRecentPicks();rebuildPins();refresh();
     // 初始化时同步渐变 UI 显隐
     updateGradVisibility();

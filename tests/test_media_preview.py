@@ -13,7 +13,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:  # Pillow 由 ComfyUI 运行环境提供，打包环境里未必装
+    Image = None
 
 from wosai_core import media_preview
 
@@ -117,6 +120,9 @@ class StubVideo:
         return self._metadata.get("duration", 0)
 
 
+# 缺 Pillow 时整组跳过而非报错：否则在没有 ComfyUI 依赖的环境里，unittest 会把
+# 模块导入失败记成 ERROR，掩盖真正的回归。skipIf 标记会被子类继承，故只需加在基类。
+@unittest.skipIf(Image is None, "Pillow (PIL) is not installed in this environment")
 class MediaPreviewTestCase(unittest.TestCase):
     def setUp(self):
         self._tmp = TemporaryDirectory()

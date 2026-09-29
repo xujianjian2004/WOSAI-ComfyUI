@@ -11,8 +11,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from aiohttp import web
-from aiohttp.test_utils import TestClient, TestServer
+try:
+    from aiohttp import web
+    from aiohttp.test_utils import TestClient, TestServer
+except ImportError:  # aiohttp 由 ComfyUI 运行环境提供，打包环境里未必装
+    web = None
+    TestClient = None
+    TestServer = None
 
 from wosai_core import device_info
 
@@ -53,9 +58,14 @@ def _register_routes() -> tuple[web.RouteTableDef, object, object]:
     return routes, color_presets, preset_library
 
 
-_ROUTES, _COLOR_PRESETS, _PRESET_LIBRARY = _register_routes()
+# 缺 aiohttp 时不能走 _register_routes()：该函数会实例化 web.RouteTableDef()。
+# 缺依赖就整组跳过而非报错，否则 unittest 会把模块导入失败记成 ERROR 掩盖真回归。
+_ROUTES, _COLOR_PRESETS, _PRESET_LIBRARY = (
+    (None, None, None) if web is None else _register_routes()
+)
 
 
+@unittest.skipIf(web is None, "aiohttp is not installed in this environment")
 class HttpRouteIntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()

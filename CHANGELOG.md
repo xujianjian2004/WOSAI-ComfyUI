@@ -170,6 +170,9 @@
 - 修复图像对比节点**滑动视图的 A/B 图层与角标左右颠倒**：B 图层原先用 `inset(0 X% 0 0)` 从右侧裁剪，导致分割线以左显示的是 B、以右显示的是 A，而左下角角标标注的是 `A`（CHANGELOG 2.1.0 已明确约定「A 为左下角胶囊、B 为右下角胶囊」）。现改为 `inset(0 0 0 X%)` 从左侧裁剪，图像内容与角标语义一致，也与新增的双拼视图（A 恒在左/上）保持一致。此缺陷由本轮像素级验收发现（几何断言无法察觉）。
 - 修复图像对比节点 DOM 控件高度估算所用内边距与 CSS 不同源的问题：估算读的是 `--ws-compare-swap-size / 2`（17px），而 CSS 的 `padding-inline` 用的是 `--ws-compare-handle-size / 2`（14px），首帧按节点宽度估算时每侧偏 3px，高度契约在挂载前存在 6px 偏差。现统一读手柄令牌。
 - 修复图像对比节点视图类名与 CSS 选择器不一致的问题：视图状态类若挂在根容器上，而样式选择器写的是 `.wosai-image-compare-stage.is-view-*`，双拼布局会整体不生效且无任何报错。现已统一挂在 stage 上，并由 `compare-view-contract.test.mjs` 锁定。
+- 修复 **浮层面板被两套拖拽实现各绑一次**的问题。项目里存在两份同名的 `makeDraggable`：`web/panel-drag.js`（`mousedown` 系，靠 `panel._wosaiDraggable` 去重，并由 MutationObserver 全局自动接管所有 `[data-wosai-panel]`）与 `web/shared/shared-utils.js`（`pointerdown` 系，供 `link-fx` / `visual-fx` / `color-bar` / `save-node` 显式调用）。后者**不写那个去重标记**，于是带 `data-wosai-panel` 的面板会被观察器判定为「未绑定」而补绑第二套 —— 拖拽时两个 handler 同时改写 `left` / `top`，且两者基准算法不同（`offsetLeft` vs `getBoundingClientRect`），行为不可预期。现让 `shared-utils` 版本也维护同一标记（并在其返回的清理函数里复位），使全局自动接管正确跳过已绑定的面板。
+- 修复 **`node-color.js` 面板初始化链上的未捕获 Promise**：`initStore().then(() => { renderRecentPicks(); buildPresets(); })` 没有 `.catch`。`initStore()` 自身虽吞掉了后端 fetch 错误，但 `then` 回调内部抛错仍会产生 `unhandledrejection`，并让配色面板停在半初始化状态。现补上 `catch` 并打点告警（同步那一行已先渲染过一次，故失败不会白屏）。
+- 修复 **两个 Python 测试模块在缺可选依赖时以 ERROR 失败**的问题。`tests/test_media_preview.py` 顶层直接 `from PIL import Image`、`tests/test_http_routes.py` 直接 `from aiohttp import web`，在没有 Pillow / aiohttp 的环境（打包环境即如此）会因导入失败被 unittest 记成 **ERROR**，掩盖真正的回归；本次环境下 `python -m unittest discover` 即报 `FAILED (errors=2)`。现改为条件导入 + `@unittest.skipIf(...)`（skip 标记会被子类继承，`MediaPreviewTestCase` 一处即可覆盖其 5 个子类），`test_http_routes` 模块级的 `_register_routes()` 调用在缺依赖时同样跳过。修复后为 `OK (skipped=53)` —— 在装齐依赖的 ComfyUI 运行环境中这些用例照常执行。
 
 ## [2.1.0] - 2026-09-27
 
