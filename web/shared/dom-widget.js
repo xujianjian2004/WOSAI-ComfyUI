@@ -1,4 +1,5 @@
 import { createHiddenObserver, ghostWidget } from "./nodes2-hide.js";
+import { forwardWheelToCanvas } from "./wheel-forward.js";
 
 const BASE_STYLES = [
     ["wosai-vars-link", new URL("../styles/wosai-variables.css?v=28", import.meta.url).href],
@@ -85,6 +86,12 @@ export function addSizedDOMWidget(node, name, type, element, options = {}) {
         getHeight,
     });
     if (!widget) return null;
+    // 节点内 DOM widget 是覆盖在画布上的兄弟元素，滚轮不会冒泡到 canvas
+    // （LiteGraph 的缩放监听绑在 canvas 自身），鼠标一进节点区域就缩放失效。
+    // 这里统一转发：内部有可滚动容器的控件会自动让位，所以默认全开。
+    if (options.forwardWheel !== false) {
+        forwardWheelToCanvas(element, { signal: options.signal });
+    }
     widget.computeSize = (width) => [
         Math.max(0, Number(width) || Number(node.size?.[0]) || 0),
         getHeight(),

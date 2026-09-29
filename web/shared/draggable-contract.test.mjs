@@ -66,7 +66,8 @@ test("所有调用点都使用选项对象形式（不再传裸 handle）", () =
 function loadMakeDraggable() {
     const start = SHARED.indexOf("export function makeDraggable");
     assert.notEqual(start, -1, "未找到 makeDraggable 定义");
-    const body = SHARED.slice(start).replace("export function", "function");
+    // 全局替换：文件尾部新增的导出若只替换首个匹配，会让下面 new Function 语法错
+    const body = SHARED.slice(start).replace(/export function/g, "function");
     return new Function("document", "window", `${body}; return makeDraggable;`);
 }
 

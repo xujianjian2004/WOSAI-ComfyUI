@@ -21,6 +21,7 @@ import { getGlassTheme, getGlassMode, setGlassMode, onGlassChange } from "./shar
 import { t, applyNodeDefTranslation, onLangChange } from "./shared/i18n.js";
 import { WOSAI_COPYRIGHT, STORAGE_KEYS } from "./shared/constants.js";
 import { getWOSAIVar, getWOSAIVarNum } from "./shared/shared-utils.js";
+import { forwardWheelToCanvas } from "./shared/wheel-forward.js";
 import { registerSelectionFollower } from "./shared/selection-follow.js";
 import { readIgnoreGroupsState, writeIgnoreGroupsState } from "./shared/ignore-groups-state.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
@@ -312,20 +313,9 @@ function buildWosaiIgnoreGroupsUI(node) {
     }
 
     /* ── 滚轮转发 ────────────────────────────────────────── */
-    function forwardWheelToCanvas(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-            const canvasEl = (app.canvas && app.canvas.canvas) || document.querySelector("canvas");
-            if (canvasEl) {
-                canvasEl.dispatchEvent(new WheelEvent("wheel", {
-                    clientX: e.clientX, clientY: e.clientY,
-                    deltaY: e.deltaY, deltaX: e.deltaX,
-                    deltaMode: e.deltaMode, bubbles: true, cancelable: true,
-                }));
-            }
-        } catch (_) {}
-    }
+    // 复用 shared/wheel-forward.js 的唯一实现，保持本节点原有的
+    // 「一律转发给画布」语义：编组面板自己不吃滚轮。
+    const bindWheelToCanvas = (el) => forwardWheelToCanvas(el, { respectInnerScroll: false });
 
     /* ── 编组工具函数 ───────────────────────────────────── */
     /* ── rawGroups 缓存 ────────────────────────────────── */
@@ -539,7 +529,7 @@ function buildWosaiIgnoreGroupsUI(node) {
     rootEl.style.visibility = "hidden";
     updateAccent();
 
-    rootEl.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+    bindWheelToCanvas(rootEl);
 
     let _lastBuildSig = "";
     let lastSig = "";
@@ -638,7 +628,7 @@ function buildWosaiIgnoreGroupsUI(node) {
                 }
             });
             btn.addEventListener("pointerdown", (e) => e.stopPropagation());
-            btn.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+            bindWheelToCanvas(btn);
             tabsWrap.appendChild(btn);
         });
         contentEl.appendChild(tabsWrap);
@@ -712,14 +702,14 @@ function buildWosaiIgnoreGroupsUI(node) {
                     locateGroup(g);
                 });
                 locate.addEventListener("pointerdown", (e) => e.stopPropagation());
-                locate.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+                bindWheelToCanvas(locate);
 
                 row.addEventListener("mousedown", (e) => {
                     e.preventDefault(); e.stopPropagation();
                     handleToggle(g.key);
                 });
                 row.addEventListener("pointerdown", (e) => e.stopPropagation());
-                row.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+                bindWheelToCanvas(row);
 
                 listEl.appendChild(row);
             });
@@ -969,7 +959,7 @@ function buildWosaiIgnoreGroupsUI(node) {
         input.addEventListener("mousedown", (e) => e.stopPropagation());
         input.addEventListener("pointerdown", (e) => e.stopPropagation());
         input.addEventListener("dblclick", (e) => e.stopPropagation());
-        input.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+        bindWheelToCanvas(input);
 
         let finished = false;
         const finish = (commit) => {
@@ -1023,7 +1013,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             position: "fixed", inset: "0", zIndex: "99998",
             background: "transparent", cursor: "default",
         });
-        overlay.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+        bindWheelToCanvas(overlay);
         document.body.appendChild(overlay);
 
         const pop = document.createElement("div");
@@ -1043,7 +1033,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             color: "var(--ws-text)", fontFamily: "var(--ws-font-family)",
             fontSize: "var(--ws-text-base)",
         });
-        pop.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+        bindWheelToCanvas(pop);
 
         let _followCleanup = () => {};
 
@@ -1296,7 +1286,7 @@ function buildWosaiIgnoreGroupsUI(node) {
                 backdropFilter: "var(--ws-glass-blur)",
                 WebkitBackdropFilter: "var(--ws-glass-blur)",
             });
-            cdPanel.addEventListener("wheel", forwardWheelToCanvas, { passive: false });
+            bindWheelToCanvas(cdPanel);
             function makeColorItem(bgColor, label, value, isTransparent, isNone) {
                 const item = document.createElement("div");
                 Object.assign(item.style, {
