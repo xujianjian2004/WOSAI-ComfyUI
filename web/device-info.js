@@ -22,7 +22,7 @@ const label = (key, fallback) => t(`menus.deviceInfo.${key}`, fallback);
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=5", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=7", import.meta.url).href],
     ]);
 }
 
@@ -42,6 +42,59 @@ function valueOf(item, fallback = "—") {
 function resourceValue(item) {
     return valueOf(item).replace(/\s+(?=[KMGTPE]?B\b)/g, "");
 }
+
+const BYTE_UNITS = { B: 1, KB: 1024, MB: 1024 ** 2, GB: 1024 ** 3, TB: 1024 ** 4, PB: 1024 ** 5 };
+
+/** 把后端已格式化的容量串（如 "20.2 GB"）还原成字节数；格式不符时返回 null。 */
+function parseSize(text) {
+    const match = /^([\d.]+)\s*([KMGTPE]?B)$/i.exec(String(text ?? "").trim());
+    if (!match) return null;
+    const bytes = Number(match[1]) * (BYTE_UNITS[match[2].toUpperCase()] ?? 1);
+    return Number.isFinite(bytes) ? bytes : null;
+}
+
+/** 占用率（0–100，保留一位小数）。任一侧缺失或总量为 0 时返回 null，由调用方退化为纯文本。 */
+function percentOf(used, total) {
+    const part = parseSize(used);
+    const whole = parseSize(total);
+    if (part === null || whole === null || whole <= 0) return null;
+    return Math.min(100, Math.round((part / whole) * 1000) / 10);
+}
+
+/** `Number(null)` 与 `Number("")` 都是 0，必须先挡掉，否则缺失的占用率会渲染成误导性的 0% 空条。 */
+function numberOrNull(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** 占用条的三档阈值。90% 与后端 `_health()` 的磁盘告警判据同源，不另造一套标准。 */
+function usageTone(percent) {
+    if (percent === null) return "unknown";
+    if (percent >= 90) return "crit";
+    if (percent >= 70) return "warn";
+    return "ok";
+}
+
+/** 展示用短名：抹掉厂商前缀，"NVIDIA GeForce RTX 5090" → "RTX 5090"。 */
+function gpuShortName(gpu) {
+    const name = valueOf(gpu.name, "").replace(/^(NVIDIA|AMD|Intel)\s+(GeForce|Radeon|Arc)?\s*/i, "");
+    return name || label("gpu", "GPU");
+}
+
+/** 紧凑用量："20.2 GB 已用 / 3.7 GB 可用 / 总计 24.0 GB" → "20.2 / 24.0 GB"。 */
+function pairText(usedItem, totalItem) {
+    const used = valueOf(usedItem, "—").replace(/\s*[KMGTPE]?B\b/, "").trim() || "—";
+    return `${used} / ${valueOf(totalItem, "—")}`;
+}
+
+const RING_CIRCUMFERENCE = 2 * Math.PI * 18;
+// 静态模板，不含任何插值：数值与配色一律在写入后由 JS / CSS 赋予
+const HEALTH_RING = "<svg viewBox=\"0 0 46 46\" aria-hidden=\"true\">"
+    + "<circle class=\"ws-di-ring-track\" cx=\"23\" cy=\"23\" r=\"18\"></circle>"
+    + "<circle class=\"ws-di-ring-value\" cx=\"23\" cy=\"23\" r=\"18\" transform=\"rotate(-90 23 23)\"></circle>"
+    + "<text class=\"ws-di-ring-text\" x=\"23\" y=\"23\" text-anchor=\"middle\" dominant-baseline=\"central\"></text>"
+    + "</svg>";
 
 function titleCase(value) {
     return String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -98,27 +151,201 @@ function pill(text, type = "neutral") {
     return make("span", `ws-di-pill is-${type}`, text);
 }
 
-function renderHealth(target) {
-    const section = card(label("health", "Environment Health"), "pi-heart");
-    const health = data.health || { score: 0, issues: [] };
-    const score = make("div", "ws-di-score");
-    const scoreValue = make("strong", "", `${health.score}/100`);
-    score.append(scoreValue, make("span", "", label("healthScore", "Health score")));
-    const tone = health.score >= 80 ? "good" : health.score >= 60 ? "warning" : "danger";
-    score.classList.add(`is-${tone}`);
-    const issues = make("div", "ws-di-issues");
-    if (!health.issues?.length) issues.append(pill(label("healthy", "No issues detected"), "good"));
-    else health.issues.forEach((issue) => issues.append(pill(label(`issues.${issue}`, titleCase(issue)), issue === "cuda_unavailable" ? "warning" : "danger")));
-    score.append(make("span", "ws-di-health-separator", "|"), issues);
-    section.append(score);
+function okGpus() {
+    return (data.dynamic?.gpus || []).filter((gpu) => gpu.status === "ok");
+}
+
+/**
+ * 一根占用条。percent 为 null 时不画填充（避免渲染成 0% 这种误导性的空条），只留占位以维持行内对齐。
+ * 同时写入 role=progressbar 与 aria-valuenow，屏幕阅读器可直接读出占用率。
+ */
+function usageBar(percent, { large = false, name = "" } = {}) {
+    const bar = make("span", `ws-di-bar is-${usageTone(percent)}${large ? " is-large" : ""}`);
+    if (percent === null) return bar;
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuenow", String(Math.round(percent)));
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    if (name) bar.setAttribute("aria-label", name);
+    const fill = make("i");
+    fill.style.width = `${percent}%`;
+    bar.append(fill);
+    return bar;
+}
+
+function percentText(percent) {
+    const text = percent === null ? label("unavailable", "Unavailable") : `${percent}%`;
+    return make("span", `ws-di-percent is-${usageTone(percent)}`, text);
+}
+
+/** 概览磁贴：名称 / 大号占用率 + 用量 / 占用条。 */
+function tile(name, percent, detail) {
+    const element = make("div", "ws-di-metric");
+    element.dataset.search = `${name} ${detail}`.toLowerCase();
+    element.append(make("span", "ws-di-metric-name", name));
+    const line = make("div", "ws-di-metric-value");
+    line.append(make("strong", "", percent === null ? label("unavailable", "Unavailable") : `${percent}%`));
+    line.append(make("span", "ws-di-metric-detail", detail));
+    element.append(line);
+    element.append(usageBar(percent, { name }));
+    return element;
+}
+
+/** 带占用条的行：名称 / 条 / 占用率 / 紧凑用量。 */
+function usageRow(parent, name, percent, detail) {
+    const element = make("div", "ws-di-row ws-di-usage-row");
+    element.dataset.search = `${name} ${detail}`.toLowerCase();
+    element.append(make("span", "ws-di-label", name));
+    element.append(usageBar(percent, { name }));
+    element.append(percentText(percent));
+    element.append(make("span", "ws-di-value", detail));
+    parent.append(element);
+    return element;
+}
+
+function legendItem(kind, text) {
+    const item = make("span");
+    item.append(make("i", `ws-di-swatch${kind ? ` is-${kind}` : ""}`));
+    item.append(document.createTextNode(text));
+    return item;
+}
+
+/**
+ * 显存的四层口径：`allocated ⊆ reserved ⊆ 驱动已用 ⊆ 总量` 是**包含**关系而非相加。
+ * 拆成段宽展示后，"驱动占了 20 G、PyTorch 只认领 1 G" 这类碎片问题一眼可见。
+ * 任一层缺失时返回 null，退回单段总占用条。
+ */
+function vramSegments(gpu) {
+    const total = parseSize(valueOf(gpu.total, ""));
+    if (!total) return null;
+    const allocated = Math.max(parseSize(valueOf(gpu.pytorch_allocated, "")) ?? 0, 0);
+    const reserved = Math.max(parseSize(valueOf(gpu.pytorch_reserved, "")) ?? allocated, allocated);
+    const used = Math.max(parseSize(valueOf(gpu.smi_used, "")) ?? reserved, reserved);
+    const occupied = Math.min(used, total);
+    return {
+        total,
+        allocated,
+        reserved: Math.min(reserved, occupied),
+        used: occupied,
+        free: Math.max(total - occupied, 0),
+        percent: Math.round((occupied / total) * 1000) / 10,
+    };
+}
+
+function vramBar(segments) {
+    const bar = make("span", "ws-di-bar is-large is-stacked");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-valuenow", String(Math.round(segments.percent)));
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-label", label("vram", "VRAM"));
+    const parts = [
+        ["allocated", segments.allocated],
+        ["reserved", segments.reserved - segments.allocated],
+        ["other", segments.used - segments.reserved],
+    ];
+    for (const [kind, bytes] of parts) {
+        const fill = make("i", `is-${kind}`);
+        fill.style.width = `${(bytes / segments.total) * 100}%`;
+        bar.append(fill);
+    }
+    return bar;
+}
+
+function gpuBlock(gpu, indexed) {
+    const block = make("div", "ws-di-gpu");
+    const head = make("div", "ws-di-gpu-head");
+    head.append(make("h3", "", indexed ? `${label("gpu", "GPU")} ${gpu.id}` : label("gpu", "GPU")));
+    head.append(make("span", "ws-di-gpu-name", valueOf(gpu.name, label("unavailable", "Unavailable"))));
+    block.append(head);
+
+    const segments = vramSegments(gpu);
+    const percent = segments?.percent ?? percentOf(valueOf(gpu.smi_used, ""), valueOf(gpu.total, ""));
+    const usage = make("div", "ws-di-gpu-usage");
+    usage.append(segments ? vramBar(segments) : usageBar(percent, { large: true, name: label("vram", "VRAM") }));
+    usage.append(percentText(percent));
+    block.append(usage);
+
+    // 只有四层口径齐备时才画图例，否则色块的语义会对不上
+    if (segments && valueOf(gpu.smi_used, "")) {
+        const legend = make("div", "ws-di-legend");
+        [
+            ["", "pytorchAllocated", gpu.pytorch_allocated],
+            ["reserved", "pytorchReserved", gpu.pytorch_reserved],
+            ["other", "smiUsed", gpu.smi_used],
+            ["free", "free", gpu.smi_free],
+        ].forEach(([kind, key, item]) => legend.append(legendItem(kind, `${label(key, titleCase(key))} ${resourceValue(item)}`)));
+        block.append(legend);
+    }
+
+    const chips = make("div", "ws-di-chips");
+    [
+        ["vramTotal", gpu.total],
+        ["temperature", gpu.temperature],
+        ["power", gpu.power],
+        ["driver", gpu.driver],
+    ].forEach(([key, item]) => {
+        if (valueOf(item, "")) chips.append(pill(`${label(key, titleCase(key))}: ${valueOf(item)}`));
+    });
+    if (chips.childElementCount) block.append(chips);
+    return block;
+}
+
+/** 概览：把最该一眼看到的数字提到最前，细节仍留在下方各卡里。 */
+function renderOverview(target) {
+    const section = card(label("summary", "Overview"), "pi-chart-bar");
+    const tiles = make("div", "ws-di-tiles");
+    const gpus = okGpus();
+    if (gpus.length) {
+        const gpu = gpus[0];
+        const name = gpus.length > 1 ? `${label("gpu", "GPU")} ${gpu.id}` : label("vram", "VRAM");
+        tiles.append(tile(`${name} · ${gpuShortName(gpu)}`, percentOf(valueOf(gpu.smi_used, ""), valueOf(gpu.total, "")), pairText(gpu.smi_used, gpu.total)));
+    }
+    const memory = data.dynamic?.memory || {};
+    tiles.append(tile(label("memory", "RAM"), numberOrNull(memory.percent?.value) ?? percentOf(valueOf(memory.used, ""), valueOf(memory.total, "")), pairText(memory.used, memory.total)));
+    (data.dynamic?.disks || []).forEach((disk) => {
+        tiles.append(tile(`${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total)));
+    });
+    section.append(tiles);
     target.append(section);
 }
 
-function renderSummary(target) {
-    renderHardware(target);
+function renderHealth(target) {
+    const section = card(label("health", "Environment Health"), "pi-heart");
+    const health = data.health || { score: 0, issues: [] };
+    const body = make("div", "ws-di-health");
+    body.append(healthRing(Number(health.score) || 0));
+    const text = make("div", "ws-di-health-text");
+    text.append(make("span", "", `${label("healthScore", "Health score")} / 100`));
+    const issues = make("div", "ws-di-issues");
+    if (!health.issues?.length) issues.append(pill(label("healthy", "No issues detected"), "good"));
+    else health.issues.forEach((issue) => issues.append(pill(label(`issues.${issue}`, titleCase(issue)), issue === "cuda_unavailable" ? "warning" : "danger")));
+    text.append(issues);
+    body.append(text);
+    section.append(body);
+    target.append(section);
 }
 
-function renderSystem(target) {
+function healthRing(score) {
+    const tone = score >= 80 ? "good" : score >= 60 ? "warning" : "danger";
+    const ring = make("div", `ws-di-ring is-${tone}`);
+    ring.setAttribute("role", "img");
+    ring.setAttribute("aria-label", `${label("healthScore", "Health score")} ${score}/100`);
+    ring.innerHTML = HEALTH_RING;
+    const clamped = Math.max(0, Math.min(100, score));
+    const value = ring.querySelector(".ws-di-ring-value");
+    value.setAttribute("stroke-dasharray", RING_CIRCUMFERENCE.toFixed(2));
+    value.setAttribute("stroke-dashoffset", (RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2));
+    ring.querySelector(".ws-di-ring-text").textContent = String(score);
+    return ring;
+}
+
+/**
+ * 运行环境卡：环境标识（系统 / Python / PyTorch / Git）与关键依赖版本同处一卡。
+ * 依赖作为卡内分节，用小节标签把「环境本身」与「装了哪些包」分开——否则 `Git` 下面紧跟
+ * 一行 `Torch`，会被读成 `PyTorch` 那一行的重复。
+ */
+function renderEnvironment(target) {
     const section = card(label("system", "Runtime Environment"), "pi-desktop");
     const system = data.static?.system || {};
     const runtime = data.static?.runtime || {};
@@ -126,28 +353,27 @@ function renderSystem(target) {
     row(section, "python", system.python, { label: label("python", "Python") });
     row(section, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
     row(section, "git", data.static?.comfyui?.git, { label: label("git", "Git") });
+    section.append(make("h3", "ws-di-group-label", label("dependencies", "Key Dependencies")));
+    for (const [name, item] of Object.entries(data.static?.dependencies || {})) row(section, name, item, { label: capitalizeInitial(name) });
     target.append(section);
 }
 
 function renderHardware(target) {
     const section = card(label("hardware", "Hardware Resources"), "pi-microchip");
     const system = data.static?.system || {};
-    const gpus = (data.dynamic?.gpus || []).filter((gpu) => gpu.status === "ok");
+    const gpus = okGpus();
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
-    for (const gpu of gpus) {
-        row(section, `vram-${gpu.id}`, { value: usageText(gpu.smi_used, gpu.total, gpu.smi_free) }, {
-            label: gpus.length > 1 ? `${label("vram", "VRAM")} ${gpu.id}` : label("vram", "VRAM"),
-        });
-    }
+    gpus.forEach((gpu) => section.append(gpuBlock(gpu, gpus.length > 1)));
     const memory = data.dynamic?.memory || {};
-    row(section, "memory", { value: usageText(memory.used, memory.total, memory.available) }, { label: label("memory", "RAM") });
+    usageRow(section, label("memory", "RAM"), numberOrNull(memory.percent?.value) ?? percentOf(valueOf(memory.used, ""), valueOf(memory.total, "")), pairText(memory.used, memory.total));
     (data.dynamic?.disks || []).forEach((disk) => {
-        row(section, `disk-${disk.path}`, { value: usageText(disk.used, disk.total, disk.free) }, { label: `${label("storage", "Disk")} ${disk.path}` });
+        usageRow(section, `${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total));
     });
     row(section, "processor", system.cpu, { label: label("processor", "Processor") });
     target.append(section);
 }
 
+/** 导出报告沿用的三段式用量文本；面板内已改用占用条 + 紧凑用量。 */
 function usageText(used, total, available) {
     return `${resourceValue(used)} ${label("used", "Used")} / ${resourceValue(available)} ${label("available", "Available")} / ${label("totalLabel", "Total")} ${resourceValue(total)}`;
 }
@@ -201,12 +427,6 @@ async function openPath(key, index) {
     } catch (_) {
         showToast(label("openPathFailed", "Could not open this directory."), { icon: "exclamation-triangle" });
     }
-}
-
-function renderDependencies(target) {
-    const section = card(label("dependencies", "Key Dependencies"), "pi-box");
-    for (const [name, item] of Object.entries(data.static?.dependencies || {})) row(section, name, item, { label: capitalizeInitial(name) });
-    target.append(section);
 }
 
 function exportText(format) {
@@ -373,11 +593,11 @@ function render() {
     else if (data?.error) root.append(make("div", "ws-di-error", `${label("loadFailed", "Could not load device information.")} ${data.error}`));
     else if (data) {
         const content = make("main", "ws-di-content");
+        renderEnvironment(content);
+        renderOverview(content);
         renderHealth(content);
-        renderSummary(content);
-        renderSystem(content);
+        renderHardware(content);
         renderPaths(content);
-        renderDependencies(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
         root.append(content);
     } else root.append(make("div", "ws-di-loading", label("loading", "Collecting device information…")));

@@ -986,6 +986,19 @@
   /* ── Device information sidebar ── */
   --ws-di-row-min-height: 29px;
   --ws-di-pill-min-height: 20px;
+  /* 资源占用条。注意：这里只放**几何**令牌 —— 颜色一律在消费处直接引用基础令牌
+     （如 var(--ws-surface-2)）。若在此处把颜色包一层 `--ws-di-*: var(--ws-surface-2)`，
+     它会在 :root / [data-theme="dark"] 处就解析成具体颜色，而面板的 data-theme 是挂在
+     面板元素上的，覆盖不到已解析的派生令牌，浅色主题下会拿到深色值。 */
+  --ws-di-bar-height: 6px;
+  --ws-di-bar-height-lg: 9px;
+  --ws-di-bar-min-fill: 2px;
+  --ws-di-swatch-size: 7px;
+  /* 概览磁贴的最小列宽：侧栏窄至约 300px 时仍保持两列 */
+  --ws-di-tile-min-width: 148px;
+  /* 健康度环形 */
+  --ws-di-ring-size: 46px;
+  --ws-di-ring-width: 5px;
 }
 
 /* ═══ 浅色主题 ═══ */

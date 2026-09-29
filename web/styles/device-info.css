@@ -65,10 +65,11 @@
 .ws-di-card-heading > i { color: var(--ws-accent); }
 .ws-di-card-heading h2 { margin: 0; color: var(--ws-text); font-size: var(--ws-text-md); font-weight: 600; }
 .ws-di-card > .ws-di-row,
-.ws-di-card > .ws-di-gpu,
-.ws-di-card > .ws-di-subtitle { margin-left: var(--ws-gap-lg); margin-right: var(--ws-gap-lg); }
+.ws-di-card > .ws-di-gpu { margin-left: var(--ws-gap-lg); margin-right: var(--ws-gap-lg); }
 .ws-di-row { justify-content: space-between; gap: var(--ws-gap); min-height: var(--ws-di-row-min-height); border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted); }
 .ws-di-card > .ws-di-row:last-child { border-bottom: 0; }
+/* 卡内分节标签：运行环境卡把「环境本身」与「关键依赖」分成两段，靠它划界 */
+.ws-di-card > .ws-di-group-label { margin: var(--ws-gap-md) var(--ws-gap-lg) 0; color: var(--ws-text-muted); font-size: var(--ws-text-sm); font-weight: 600; letter-spacing: var(--ws-letter-spacing-wide); }
 .ws-di-label { flex: 0 0 40%; color: var(--ws-text-muted); }
 .ws-di-value { min-width: 0; color: var(--ws-text-secondary); text-align: right; overflow-wrap: anywhere; white-space: pre-line; user-select: text; }
 .ws-di-value.is-error { color: var(--ws-warning); }
@@ -79,28 +80,65 @@
 .ws-di-open-icon { margin-left: var(--ws-gap-xs); color: var(--ws-accent); font-size: var(--ws-text-sm); }
 .ws-di-path-row.is-missing .ws-di-value { color: var(--ws-danger); }
 
-.ws-di-score { display: flex; align-items: baseline; gap: var(--ws-gap); flex-wrap: wrap; padding: var(--ws-gap-lg) var(--ws-gap-lg) var(--ws-gap-sm); }
-.ws-di-score strong { font-size: var(--ws-text-3xl); letter-spacing: -0.04em; }
-.ws-di-score span { color: var(--ws-text-muted); }
-.ws-di-score > .ws-di-health-separator { color: var(--ws-text-muted); }
-.ws-di-score > .ws-di-issues { padding: 0; }
-.ws-di-score.is-good strong { color: var(--ws-syntax-complete); }
-.ws-di-score.is-warning strong { color: var(--ws-warning); }
-.ws-di-score.is-danger strong { color: var(--ws-danger); }
-.ws-di-issues { gap: var(--ws-gap-xs); flex-wrap: wrap; padding: 0 var(--ws-gap-lg) var(--ws-gap-lg); }
+.ws-di-health { display: flex; align-items: center; gap: var(--ws-gap-lg); padding: var(--ws-gap-lg); }
+.ws-di-health-text { display: flex; flex-direction: column; gap: var(--ws-gap-xs); min-width: 0; }
+.ws-di-health-text > span { color: var(--ws-text-muted); }
+.ws-di-ring { flex: 0 0 auto; width: var(--ws-di-ring-size); height: var(--ws-di-ring-size); }
+.ws-di-ring svg { display: block; width: 100%; height: 100%; }
+.ws-di-ring-track { fill: none; stroke: var(--ws-surface-2); stroke-width: var(--ws-di-ring-width); }
+.ws-di-ring-value { fill: none; stroke: var(--ws-accent); stroke-width: var(--ws-di-ring-width); stroke-linecap: round; transition: stroke-dashoffset var(--ws-transition-slow); }
+.ws-di-ring-text { fill: var(--ws-text); font-size: var(--ws-text-md); font-weight: 600; }
+.ws-di-ring.is-good .ws-di-ring-value { stroke: var(--ws-syntax-complete); }
+.ws-di-ring.is-good .ws-di-ring-text { fill: var(--ws-syntax-complete); }
+.ws-di-ring.is-warning .ws-di-ring-value { stroke: var(--ws-warning); }
+.ws-di-ring.is-warning .ws-di-ring-text { fill: var(--ws-warning); }
+.ws-di-ring.is-danger .ws-di-ring-value { stroke: var(--ws-danger); }
+.ws-di-ring.is-danger .ws-di-ring-text { fill: var(--ws-danger); }
+.ws-di-issues { gap: var(--ws-gap-xs); flex-wrap: wrap; }
 .ws-di-pill { display: inline-flex; align-items: center; min-height: var(--ws-di-pill-min-height); padding: 0 var(--ws-gap-sm); border-radius: var(--ws-radius-pill); background: var(--ws-surface-2); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
 .ws-di-pill.is-good { background: var(--ws-success-bg); color: var(--ws-syntax-complete); }
 .ws-di-pill.is-warning { background: color-mix(in srgb, var(--ws-warning) 14%, transparent); color: var(--ws-warning); }
 .ws-di-pill.is-danger { background: var(--ws-danger-bg); color: var(--ws-danger); }
 
-.ws-di-metric { min-width: 0; padding: var(--ws-gap-md) var(--ws-gap-lg); background: var(--ws-surface); }
-.ws-di-metric span { display: block; margin-bottom: var(--ws-gap-xs); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
-.ws-di-metric strong { display: block; overflow-wrap: anywhere; color: var(--ws-text-secondary); font-size: var(--ws-text-base); font-weight: 500; }
-.ws-di-gpu { padding: var(--ws-gap-sm) 0; }
+/* ── 概览磁贴：一屏一眼看到的关键数字 ── */
+.ws-di-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--ws-di-tile-min-width), 1fr)); gap: var(--ws-gap); padding: var(--ws-gap-lg); }
+.ws-di-metric { min-width: 0; padding: var(--ws-gap-md); border-radius: var(--ws-radius-lg); background: var(--ws-surface-2); }
+.ws-di-metric-name { display: block; overflow: hidden; color: var(--ws-text-muted); font-size: var(--ws-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.ws-di-metric-value { display: flex; align-items: baseline; gap: var(--ws-gap-xs); margin: var(--ws-gap-xs) 0 var(--ws-gap-sm); min-width: 0; }
+.ws-di-metric-value strong { color: var(--ws-text); font-size: var(--ws-text-lg); font-weight: 600; }
+.ws-di-metric-detail { overflow: hidden; color: var(--ws-text-muted); font-size: var(--ws-text-xs); text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── 资源占用条 ── */
+.ws-di-bar { display: block; flex: 1 1 auto; min-width: 0; height: var(--ws-di-bar-height); border-radius: var(--ws-radius-pill); background: var(--ws-surface-2); overflow: hidden; }
+.ws-di-bar.is-large { height: var(--ws-di-bar-height-lg); }
+.ws-di-bar > i { display: block; height: 100%; min-width: var(--ws-di-bar-min-fill); background: var(--ws-accent); transition: width var(--ws-transition-slow); }
+.ws-di-bar.is-stacked { display: flex; }
+.ws-di-bar.is-stacked > i { min-width: 0; transition: none; }
+.ws-di-bar.is-warn > i { background: var(--ws-warning); }
+.ws-di-bar.is-crit > i { background: var(--ws-danger); }
+.ws-di-bar > i.is-allocated { background: var(--ws-accent); }
+.ws-di-bar > i.is-reserved { background: color-mix(in srgb, var(--ws-accent) 45%, transparent); }
+.ws-di-bar > i.is-other { background: color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2)); }
+.ws-di-percent { flex: 0 0 auto; color: var(--ws-text-secondary); font-variant-numeric: tabular-nums; }
+.ws-di-percent.is-warn { color: var(--ws-warning); }
+.ws-di-percent.is-crit { color: var(--ws-danger); }
+.ws-di-legend { display: flex; gap: var(--ws-gap-md); flex-wrap: wrap; margin-top: var(--ws-gap-sm); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
+.ws-di-legend > span { display: inline-flex; align-items: center; gap: var(--ws-gap-xs); min-width: 0; }
+.ws-di-swatch { display: block; flex: 0 0 auto; width: var(--ws-di-swatch-size); height: var(--ws-di-swatch-size); border-radius: var(--ws-radius-sm); background: var(--ws-accent); }
+.ws-di-swatch.is-reserved { background: color-mix(in srgb, var(--ws-accent) 45%, transparent); }
+.ws-di-swatch.is-other { background: color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2)); }
+.ws-di-swatch.is-free { background: var(--ws-surface-3); }
+.ws-di-chips { display: flex; gap: var(--ws-gap-xs); flex-wrap: wrap; margin-top: var(--ws-gap-sm); }
+/* 带占用条的行：栅格布局覆盖 .ws-di-row 的 flex 两端对齐 */
+.ws-di-usage-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content max-content; align-items: center; gap: var(--ws-gap-sm); }
+
+/* ── 单张 GPU 的体征区块 ── */
+.ws-di-gpu { padding: var(--ws-gap-md) 0; }
 .ws-di-gpu + .ws-di-gpu { border-top: var(--ws-border-width-thin) solid var(--ws-border-muted); }
-.ws-di-gpu h3,
-.ws-di-subtitle { margin-top: var(--ws-gap-sm); margin-bottom: var(--ws-gap-sm); color: var(--ws-text-secondary); font-size: var(--ws-text-base); font-weight: 600; }
-.ws-di-gpu .ws-di-row:last-child { border-bottom: 0; }
+.ws-di-gpu-head { display: flex; align-items: center; gap: var(--ws-gap-sm); min-width: 0; margin-bottom: var(--ws-gap-sm); }
+.ws-di-gpu-head h3 { flex: 0 0 auto; margin: 0; color: var(--ws-text); font-size: var(--ws-text-base); font-weight: 600; }
+.ws-di-gpu-name { overflow: hidden; color: var(--ws-text-muted); font-size: var(--ws-text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.ws-di-gpu-usage { display: flex; align-items: center; gap: var(--ws-gap-sm); }
 .ws-di-empty,
 .ws-di-loading,
 .ws-di-error { margin: 0; padding: var(--ws-panel-padding-md); border-radius: var(--ws-radius); background: var(--ws-surface); color: var(--ws-text-muted); text-align: center; }

@@ -39,6 +39,19 @@
 
 ### Changed
 
+- **设备面板（侧栏「设备」）改为可视化优先的布局，把后端已经采集、此前却几乎没渲染的数字真正显示出来。** 原面板五张卡片全是「标签 + 右对齐文本」的同一种形态，且丢掉了一批更有用的数据：`memory.percent` / `disk.percent` 已由后端算好却**零引用**；GPU 的型号、温度、功耗、驱动、显存分配口径从未显示；`row()` 里写好的 `dataset.search` 没有任何输入框消费；`locales` 的 `deviceInfo` 共 65 项中 **28 项**从未被渲染（`temperature` / `power` / `pytorchAllocated` / `pytorchReserved` / `smiUsed` / `cudnn` / `network` / `startup` / `simple` / `advanced` / `search` …）；`device-info.css` 里 **36.1%（2.7 KiB）** 的规则没有任何 JS 消费者——这一版其实是一个更完整的设计被砍剩的结果。本次补齐为：
+  - **「运行环境」与「关键依赖」合并为一张卡，并移到内容区首位**（概览顺延至第二位）：两张卡都是「标签 + 右对齐值」的短行清单，分列首尾只让首屏平白多一道边界；合并后 `操作系统 / Python / PyTorch / Git` 与 6 项依赖版本同处一卡。卡内用一枚 h3 小节标签「关键依赖」划界（新增 `.ws-di-group-label`）——否则 `Git` 之下紧跟一行 `Torch`，会被读成上方 `PyTorch` 那一行的重复。
+  - **新增「概览」卡**：显存 / 内存 / 磁盘各一块磁贴，显示占用率 + 紧凑用量 + 占用条，一屏之内先看到最该看到的数字。
+  - **占用条取代三段式文本**：`20.2GB 已用 / 3.7GB 可用 / 总计 24.0GB` → `84.2%　20.2 / 24.0 GB` + 条形。分档阈值 <70% 用品牌橙、70–89% 用 `--ws-warning`、≥90% 用 `--ws-danger`，与后端 `_health()` 现有的 90% 磁盘判据**同源**，不另造一套标准。
+  - **GPU 区块补上身份与体征**：显示型号（抹掉 `NVIDIA GeForce` 前缀以适配窄侧栏）、温度、功耗、驱动版本，作为 chip 排在显存条下方。
+  - **显存改为三层嵌套条**：`pytorch_allocated ⊆ pytorch_reserved ⊆ smi_used ⊆ total` 是**包含**关系而非相加，分段后「驱动占了 20.2 GB、PyTorch 只认领 1.2 GB」这类碎片问题一眼可见，并配四色图例（分配 / 保留 / 驱动已用 / 空闲）。
+  - **健康度由大号数字改为环形进度**（内联 SVG + `stroke-dasharray`，随 2s 实时刷新平滑过渡），问题清单仍以 pill 呈现。
+  - **数据缺档时逐级退化，绝不画 `0%` 的误导性空条**：无法计算占用率时条不渲染填充、不携带 `progressbar` 语义，文本显示「不可用」。所有条与环形均带 `role` / `aria-valuenow` / `aria-label`。
+  - 复用而非重写：`.ws-di-metric`（磁贴）与 `.ws-di-gpu`（GPU 区块）本就是这次要用的形态，直接沿用并收窄子选择器；仅删除确无需要的 `.ws-di-subtitle`，并保留 `.ws-di-search` / `.ws-di-view-switch` / `.ws-di-tools` 供下一步（概览/详细切换与搜索接线）使用。
+  - 新增几何令牌 `--ws-di-bar-height`(6px)、`--ws-di-bar-height-lg`(9px)、`--ws-di-bar-min-fill`(2px)、`--ws-di-swatch-size`(7px)、`--ws-di-tile-min-width`(148px)、`--ws-di-ring-size`(46px)、`--ws-di-ring-width`(5px)。**颜色令牌刻意不在变量表里包一层**，原因见 Fixed 段。
+  - 缓存破坏：`device-info.js` `?v=9 → 10`、`device-info.css` `?v=5 → 7`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增，本轮合并卡片后再次递增）、`wosai-variables.css` `?v=22 → 23`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
+  - 体积：主 JavaScript **1361.0 → 1371.1 KiB**（余 44.9 KiB）、样式 **232.0 → 236.5 KiB**（余 13.5 KiB），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。
@@ -66,6 +79,8 @@
 
 ### Fixed
 
+- 修复设备面板**占用率缺失时被渲染成 `0%` 空条**的问题。`Number(null)` 与 `Number("")` 都等于 `0`，取值函数把「无数据」当成了「0%」，于是画出一条 `--ws-di-bar-min-fill`(2px) 的品牌橙填充并附带 `role="progressbar"` —— 肉眼与读屏都会理解成「几乎没占用」，恰好是这套可视化最不该犯的错。现于转换前先挡掉 `null` / `undefined` / `""`。此缺陷由真实浏览器验收（容量字段全空场景）发现。
+- 修复设备面板新增配色在**浅色主题下不跟随切换**的问题。把颜色包一层派生令牌写在 `:root` / `[data-theme="dark"]` 块里（如 `--ws-di-segment-reserved: color-mix(in srgb, var(--ws-accent) 45%, transparent)`）时，自定义属性会在**声明处**就解析成具体颜色；而面板的 `data-theme` 是挂在面板元素上的，覆盖不到已固化的派生值——浅色主题下占用条轨道与显存分段仍是深色。现改为在**消费处**直接引用基础令牌（`background: var(--ws-surface-2)`、`color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2))`），表达式在面板作用域内重新解析；`wosai-variables.css` 中因此只保留几何令牌，并留下注释说明为何不在此处包装颜色。
 - 修复画布右键菜单里 **WOSAI 四个动作被拆成「3 + 1」** 的问题（「桌面壁纸」被隔到别的扩展条目之后）。根因在 `rgthree-comfy` 的 `initializeContextMenu()`：它用一串 `idx = idx || list.findIndex(…)` 定位插入点，前两级带 `+1`（未命中得 `0`，假值会继续往下找），后两级（`"Convert to Group"` / `"Arrange ("`）**没有 `+1`**，未命中直接得 `-1` —— 而 `-1` 在 JS 里是**真值**，被 `||` 链锁死，最终 `splice(-1, 0, …)` 等价于「插到倒数第一项之前」。WOSAI 的条目恰好排在菜单数组尾部，末项（桌面壁纸）就这样被顶开了。数组层没有稳定的规避办法（谁最后包装 `getCanvasMenuOptions` 谁才说了算，扩展之间的包装次序不受我们控制），故新增 `web/shared/context-menu-coalesce.js`：在菜单渲染完成后于 **DOM 层**把画布条目重新聚成一块 —— 只搬动节点，不重建、不读写条目的属性与显隐状态，与「菜单隐藏」等功能互不干扰；思路与节点菜单既有的 DOM 收拢一致。附带补上「组后补一道分隔符」与「清掉转成悬空的分隔线」两处收尾，重复调用为幂等。
 - 合并画布菜单与节点菜单**两套功能等价的 DOM 收拢实现**：`layout-toolkit.js` 此前另有一份 `_coalesceWosaiNodeMenuItems`（自带条目选择器、分隔符选择器、分隔符构造与匹配循环），与 `web/shared/context-menu-coalesce.js` 行为等价却各自维护 —— 同一处缺陷要改两遍，且只有其中一份被验收覆盖。合并后统一由 `coalesceMenuItems()` 承担，两者只以锚点策略区分（画布 `anchor:"group"` 保持组当前层级位置、节点菜单 `anchor:"top"` 一律收到最前），菜单根选择器收敛为共享模块导出的 `MENU_ROOT_SELECTOR` 单一来源。合并过程中暴露并修复了三个此前被掩盖的缺陷：①**幂等判据未考虑锚点** —— 只判断「组内是否连续」时，节点菜单在「组已连续但位置靠后」的情况下会直接返回 `false`，「一律收到最前」永远不生效，现 `anchor:"top"` 额外要求组前面只剩分隔符；②**条目数下限** —— 原先要求命中 ≥ 2 条才处理，而节点菜单在只选中一个普通节点、且收藏功能不可用时确实只注册一条 WOSAI 项，会被静默跳过，现不设下限（单条在 `anchor:"group"` 下天然「已收拢」而直接返回）；③**连续分隔线** —— 本组搬走后原位置遗留的分隔符会与新补的相邻而渲染成双线，现合并为一条。
 - 新增 `web/shared/context-menu-coalesce.test.mjs`（9 项）锁定两处消费者共用同一实现、菜单根选择器单一来源、锚点策略差异、`anchor:"top"` 的幂等分支存在，以及 `normalizeMenuLabel` / `isMenuSeparator` / 非法入参安全返回；仓库外的真实 Chrome 验收同步扩展到 **50 项**，新增节点菜单的四个场景（散落条目一律收到最前、只注册一条仍收到最前、已在最前时幂等、同一形态下 `group` 不搬而 `top` 要搬）。同步 `web/layout-toolkit.js` 的缓存破坏版本号 `?v=3` → `?v=4`。
