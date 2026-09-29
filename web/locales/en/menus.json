@@ -403,6 +403,8 @@
     "git": "Git",
     "openPathHint": "Open directory",
     "openPathFailed": "Could not open this directory.",
+    "openPathBlocked": "The browser blocked this request (cross-site origin).",
+    "openPathMissing": "This directory is missing or has moved.",
     "cudaRuntime": "CUDA runtime",
     "cudnn": "cuDNN",
     "comfyui": "ComfyUI",

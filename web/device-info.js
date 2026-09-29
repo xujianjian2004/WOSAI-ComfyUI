@@ -477,16 +477,40 @@ function pathLabel(key, path = "") {
     return label(`pathLabels.${key}`, fallbacks[key] || titleCase(key));
 }
 
+/** HTTP 状态 → 可解释的原因。兜底文案与面板其它行一致为英文，本地化由 locale 承担。 */
+const OPEN_PATH_REASONS = {
+    403: ["openPathBlocked", "The browser blocked this request (cross-site origin)."],
+    404: ["openPathMissing", "This directory is missing or has moved."],
+};
+
+/**
+ * 请后端在系统文件管理器中打开该目录。
+ *
+ * 这一跳的结果在前端无从验证——浏览器拿不到「资源管理器是否真的弹出来了」，
+ * 所以后端没报错就等于成功。反过来，失败原因**全在服务端**，而只弹一句
+ * 「无法打开此目录」会把「点了没反应」这个最难排查的形态固化下来：用户既
+ * 不知道是目录没了、请求被拒，还是自定义节点压根没加载。故按状态码给出可
+ * 读的原因，原始响应写进控制台。
+ */
 async function openPath(key, index) {
+    const generic = () => label("openPathFailed", "Could not open this directory.");
     try {
         const response = await api.fetchApi("/wosai/device_info/open_path", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ key, index }),
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    } catch (_) {
-        showToast(label("openPathFailed", "Could not open this directory."), { icon: "exclamation-triangle" });
+        if (response.ok) return;
+        let detail = null;
+        // 反代 / 节点未加载时常回 HTML，解析失败不能盖掉状态码本身
+        try { detail = await response.json(); } catch (_) { /* 非 JSON 响应，忽略 */ }
+        console.error(`[WOSAI] open_path ${key}[${index}] → HTTP ${response.status}`, detail || response);
+        const [reasonKey, reasonFallback] = OPEN_PATH_REASONS[response.status] || [];
+        showToast(reasonKey ? label(reasonKey, reasonFallback) : `${generic()} (HTTP ${response.status})`,
+            { icon: "exclamation-triangle", duration: 4000 });
+    } catch (error) {
+        console.error(`[WOSAI] open_path ${key}[${index}] 请求未送达`, error);
+        showToast(generic(), { icon: "exclamation-triangle", duration: 4000 });
     }
 }
 
@@ -712,8 +736,8 @@ function render() {
         renderTools(root);
         const content = make("main", "ws-di-content");
         renderHealth(content);
-        renderEnvironment(content);
         renderHardware(content);
+        renderEnvironment(content);
         renderPaths(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
         root.append(content);

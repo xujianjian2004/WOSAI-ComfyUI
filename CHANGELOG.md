@@ -105,6 +105,12 @@
   - 缓存破坏：`device-info.js` `?v=16 → 17`（`device-info.css` 与 `wosai-variables.css` 均未改动，故不递增）。
   - 体积：主 JavaScript **1378.4 KiB**（余 37.6 KiB，与上一条持平——仅移动一行的追加位置与改写注释）、样式 **238.1 KiB**（余 11.9 KiB），预算内。
 
+- **设备面板：「硬件资源」与「运行环境」互换位置。** 卡片顺序现为「环境健康度 → **硬件资源** → 运行环境 → ComfyUI 路径」。前两张卡现在都是「一眼扫读」型（结论性的健康度环形 + 硬件磁贴），两张明细卡（环境行表、路径表）跟在后面。
+- **设备面板：ComfyUI 路径的打开失败现在说明原因。** 点击路径行请求后端在系统文件管理器里打开该目录——这条链路一直在（后端 `POST /wosai/device_info/open_path`，Windows 走 `os.startfile`、macOS `open`、Linux `xdg-open`），但**所有失败都只弹一句「无法打开此目录」**，把「点了没反应」这个最难排查的形态固化下来：无法区分是目录被移走、请求被浏览器判为跨站，还是自定义节点压根没加载。现按状态码给出可读的原因——404 说「目录不存在或已被移走」、403 说「浏览器拒绝了这个请求（跨站来源）」、其余附带 HTTP 状态码；服务端返回的英文原文同时写入控制台（本地化会把它抹平，排查需要它）。
+  - 新增 `openPathBlocked` / `openPathMissing` 两条文案键（`locales` 键数 1343 → **1345**）。代码里的兜底文案仍为英文（与面板其它行一致），中文由 locale 承担。
+  - 缓存破坏：`device-info.js` `?v=17 → 18`（CSS 未改动，故不递增）。
+  - 体积：主 JavaScript **1378.4 → 1379.9 KiB**（余 36.1 KiB）、样式 **238.1 KiB**（余 11.9 KiB，无变化），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。

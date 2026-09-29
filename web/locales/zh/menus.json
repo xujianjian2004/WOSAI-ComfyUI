@@ -403,6 +403,8 @@
     "git": "Git",
     "openPathHint": "打开目录",
     "openPathFailed": "无法打开此目录。",
+    "openPathBlocked": "浏览器拒绝了这个请求（跨站来源）。",
+    "openPathMissing": "目录不存在或已被移走。",
     "cudaRuntime": "CUDA 运行时",
     "cudnn": "cuDNN",
     "comfyui": "ComfyUI",
