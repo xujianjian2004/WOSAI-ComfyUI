@@ -35,7 +35,7 @@
     "web/size-select.js",
     "web/preset-prompt.js?v=12",
     "web/reset-defaults.js",
-    "web/device-info.js?v=14"
+    "web/device-info.js?v=15"
   ],
   "css": [
     "web/styles/wosai-variables.css?v=24",

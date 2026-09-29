@@ -87,6 +87,11 @@
   - 缓存破坏：`device-info.js` `?v=12 → 13`、`device-info.css` `?v=9 → 10`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）、`wosai-variables.css` `?v=23 → 24`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
   - 体积：主 JavaScript **1380.2 → 1380.0 KiB**（余 36.0 KiB）、样式 **236.8 → 238.1 KiB**（余 11.9 KiB），预算内。
 
+- **设备面板：运行环境卡移除「操作系统」「系统架构」「Python 解释器」三行。** 这三行是「装完就不再变」的机器指纹——系统版本与架构在报错信息里总能顺带看到，解释器路径更是只有多环境串台时才需要——却占着左栏最贵的前三行。移除后左栏由九行收缩为六行（Python / PyTorch / CUDA 运行时 / cuDNN / ComfyUI / Git），卡高 317 → **230px**，比单栏排列的 319px 少近三成。
+  - **只动渲染，不动数据**：后端 `system.os` / `system.machine` / `system.executable` 三项照旧采集。其中 `system.os` 仍是**活键**——导出报告的 `compactReport()` 经 `Object.entries(report.system)` + `label(key, …)` **动态**取它，与三条静态行是否渲染无关；`machine` / `executable` 两条文案随之停用，但**不从 locale 删除**，与上一轮 `network` / `startup` 等 8 条同一处置：`deviceInfo` 里存在大量动态键消费（键名来自数组与对象，如 `Object.entries(report.system)`、`` label(`issues.${issue}`) ``），静态判据无法可靠区分死键与动态键，误删风险大于收益。
+  - 缓存破坏：`device-info.js` `?v=14 → 15`（`device-info.css` 未改动，故不递增）。
+  - 体积：主 JavaScript **1377.6 → 1377.5 KiB**（余 38.5 KiB，缩进与注释改写抵消了大部分删减的 3 行）、样式 **237.6 KiB**（余 12.4 KiB，无变化），预算内。
+
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。
 - `WOSAI_ImageCompare` 不再无条件写 temp 副本：能通过 `/view` 直引磁盘文件时（LoadImage 之类的磁盘来源，或沿执行图反查到上游 loader 的 widget 值）直接返回 `{filename, subfolder, type}` 引用，仅对计算得到的张量落盘。少一次 PNG 编解码，也保住原始分辨率与元数据。

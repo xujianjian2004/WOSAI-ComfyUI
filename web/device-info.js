@@ -322,8 +322,10 @@ function healthRing(score) {
 }
 
 /**
- * 运行环境卡：环境标识（系统 / Python / PyTorch / Git）与关键依赖版本同处一卡。
- * 一卡两栏——左栏答「环境是什么」，右栏答「装了哪些包」——纵向 15 行压到 9 行左右。
+ * 运行环境卡：环境标识（Python / PyTorch / CUDA / cuDNN / ComfyUI / Git）与关键依赖版本同处一卡。
+ * 一卡两栏——左栏答「环境是什么」，右栏答「装了哪些包」——同样的信息少占约四成高度。
+ * 左栏不列操作系统 / 系统架构 / 解释器路径：装完就不再变的机器指纹，不参与排障决策
+ * （数据仍由后端采集，导出报告里照样能读到 `system.os`）。
  * 依赖原先靠小节标签在纵向划界（否则 `Git` 下面紧跟一行 `Torch` 会被读成 `PyTorch` 的重复），
  * 改横向分栏后这个歧义自然消失，标签改为栏标题留在右栏顶部，与左栏首行同高对齐。
  * 窄侧边栏下由栅格 auto-fit 自动塌成单栏；右栏因数据缺失整栏隐藏时，左栏作为唯一栅格项占满整行。
@@ -337,10 +339,7 @@ function renderEnvironment(target) {
     const columns = make("div", "ws-di-columns");
     const identity = make("div", "ws-di-column");
     identity.dataset.column = "identity";
-    row(identity, "os", system.os, { label: label("os", "OS") });
-    row(identity, "machine", system.machine, { label: label("machine", "Architecture") });
     row(identity, "python", system.python, { label: label("python", "Python") });
-    row(identity, "executable", system.executable, { label: label("executable", "Python executable") });
     row(identity, "pytorch", runtime.pytorch, { label: label("pytorch", "PyTorch") });
     row(identity, "cudaRuntime", runtime.cuda_runtime, { label: label("cudaRuntime", "CUDA runtime") });
     row(identity, "cudnn", runtime.cudnn, { label: label("cudnn", "cuDNN") });
