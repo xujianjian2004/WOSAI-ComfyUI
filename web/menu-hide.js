@@ -10,6 +10,7 @@ import { calcSnapToNodeSide } from "./shared/canvas-utils.js";
 import { WOSAI_COPYRIGHT } from "./shared/constants.js";
 import { registerHubBarButton, unregisterHubBarButton } from "./hub-bar.js";
 import { getHudTab } from "./shared/hud-kit.js";
+import { MENU_ROOT_SELECTOR, coalesceMenuItems } from "./shared/context-menu-coalesce.js";
 
 const KEY_ENABLED = "wosai-menu-hide-enabled";
 const KEY_CONFIG = "wosai-menu-hide";
@@ -160,7 +161,7 @@ const MenuHide = {
     },
 
     _applyHideToOpenMenus() {
-        const menus = document.querySelectorAll(".litecontextmenu, .context-menu, .litegraph-contextmenu");
+        const menus = document.querySelectorAll(MENU_ROOT_SELECTOR);
         menus.forEach((menu) => {
             if (this._enabled) this._hideFromDOM(menu);
             else {
@@ -231,7 +232,7 @@ const MenuHide = {
 
     collectCurrentMenu(menuType) {
         this._lastMenuType = menuType === "node" ? "node" : "canvas";
-        document.querySelectorAll(".litecontextmenu, .context-menu, .litegraph-contextmenu")
+        document.querySelectorAll(MENU_ROOT_SELECTOR)
             .forEach((menu) => this._collectFromDOM(menu));
     },
 
@@ -267,12 +268,33 @@ const MenuHide = {
         return [null, ...options];
     },
 
-    _getProtectedCanvasMenuLabels() {
-        return new Set([
+    /** 四个画布动作的渲染文案，数组顺序即期望的排列顺序。 */
+    _canvasActionLabels() {
+        return [
             t("menus.canvasMenu.favorite"),
             `🟠 ${t("menus.layoutToolkit.quickAlign")}`,
             t("menus.canvasMenu.manageContextMenu"),
             t("menus.canvasMenu.desktopWallpaper"),
+        ];
+    },
+
+    /**
+     * 画布菜单合并：第三方扩展会以 `splice(-1, 0, …)` 把自身条目插到菜单末项之前
+     * （成因见 shared/context-menu-coalesce.js），而 WOSAI 的条目排在菜单数组尾部，
+     * 于是末项「桌面壁纸」被顶开、与前三项分离。这里在菜单渲染完成后把四项重新聚成一块。
+     */
+    _coalesceCanvasMenuItems(menuEl) {
+        return coalesceMenuItems(menuEl, { labels: this._canvasActionLabels(), anchor: "group" });
+    },
+
+    _scheduleCanvasMenuCoalesce(menuEl) {
+        // 菜单插入 DOM 后宿主仍可能继续调整，等两帧再收拢
+        requestAnimationFrame(() => requestAnimationFrame(() => this._coalesceCanvasMenuItems(menuEl)));
+    },
+
+    _getProtectedCanvasMenuLabels() {
+        return new Set([
+            ...this._canvasActionLabels(),
             t("menus.canvasMenu.legacyFavoriteZh"),
             t("menus.canvasMenu.legacyManageContextMenuZh"),
             t("menus.canvasMenu.legacyDesktopWallpaperZh"),
@@ -349,20 +371,20 @@ const MenuHide = {
                     if (node.nodeType !== 1) continue;
                     let menuEl = null;
                     const el = node;
-                    if (el.classList && (
-                        el.classList.contains("litecontextmenu") ||
-                        el.classList.contains("context-menu") ||
-                        el.classList.contains("litegraph-contextmenu") ||
+                    if (el.matches && (
+                        el.matches(MENU_ROOT_SELECTOR) ||
                         (el.tagName === "DIV" && el.querySelector?.(".litemenu-title"))
                     )) menuEl = el;
                     if (!menuEl) {
-                        const inner = el.querySelector?.(".litecontextmenu, .context-menu, .litegraph-contextmenu");
+                        const inner = el.querySelector?.(MENU_ROOT_SELECTOR);
                         if (inner) menuEl = inner;
                     }
                     if (menuEl) {
                         self._collectFromDOM(menuEl);
                         self._hideFromDOM(menuEl);
                         requestAnimationFrame(() => self._hideFromDOM(menuEl));
+                        // 只对画布菜单有效：labels 取自画布的四个动作文案，与节点菜单的文案集合不重叠
+                        self._scheduleCanvasMenuCoalesce(menuEl);
                     }
                 }
             }

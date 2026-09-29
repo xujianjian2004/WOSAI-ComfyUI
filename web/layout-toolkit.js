@@ -29,6 +29,7 @@ import {
 import { _unregisterLayoutCommands } from "./shared/layout-commands.js";
 import { registerSelectionFollower } from "./shared/selection-follow.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
+import { MENU_ROOT_SELECTOR, coalesceMenuItems } from "./shared/context-menu-coalesce.js";
 
 if (typeof window !== "undefined") window.__wosaiOpenAlignPanel = openPanel;
 
@@ -668,62 +669,26 @@ function _getWosaiNodeMenuItems(node) {
     } catch (e) { return []; }
 }
 
-const _WOSAI_NODE_MENU_ENTRY_SELECTOR = ".litemenu-entry, .context-menu-item, .menu-item, .lite-menu-item, [class*='menu-entry'], [class*='menu-item']";
-const _WOSAI_NODE_MENU_SEPARATOR_SELECTOR = ".separator, .litemenu-separator, hr";
-
-function _menuEntryLabel(entry) {
-    return String(entry?.innerText || entry?.textContent || "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function _createNodeMenuSeparator(parent) {
-    const template = [...parent.children].find((child) => child.matches?.(_WOSAI_NODE_MENU_SEPARATOR_SELECTOR));
-    const separator = template?.cloneNode(false) || document.createElement("div");
-    if (!template) separator.className = "litemenu-separator";
-    separator.removeAttribute?.("id");
-    separator.dataset.wosaiNodeMenuSeparator = "";
-    return separator;
-}
-
-function _coalesceWosaiNodeMenuItems(items) {
-    const labels = items
+/** 节点菜单里的 WOSAI 条目文案（数组顺序即期望的排列顺序）；`wosaiNodeAction` 由 _getWosaiNodeMenuItems 标记。 */
+function _wosaiNodeMenuLabels(items) {
+    return items
         .filter((item) => item && typeof item === "object" && item.wosaiNodeAction)
         .map((item) => String(item.content || "").replace(/<[^>]*>/g, "").trim())
         .filter(Boolean);
+}
+
+/**
+ * 节点菜单收拢：把 WOSAI 条目聚成一块并收到菜单最前。
+ *
+ * 与画布菜单共用 shared/context-menu-coalesce.js —— 两者原先各有一份功能等价的实现
+ * （同一处缺陷要改两遍、且只有一份被测试覆盖），2026-09-29 合并为单一实现，
+ * 差异只剩 anchor："top"（一律收到最前）与 "group"（保持组当前层级位置）。
+ */
+function _coalesceWosaiNodeMenuItems(items) {
+    const labels = _wosaiNodeMenuLabels(items);
     if (!labels.length) return;
-
-    const wanted = new Set(labels);
-    document.querySelectorAll(".litecontextmenu, .context-menu, .litegraph-contextmenu").forEach((menu) => {
-        const matchesByParent = new Map();
-        menu.querySelectorAll(_WOSAI_NODE_MENU_ENTRY_SELECTOR).forEach((entry) => {
-            const label = _menuEntryLabel(entry);
-            if (!wanted.has(label) || !entry.parentElement) return;
-            const entries = matchesByParent.get(entry.parentElement) || new Map();
-            if (!entries.has(label)) entries.set(label, entry);
-            matchesByParent.set(entry.parentElement, entries);
-        });
-
-        const [parent, entries] = [...matchesByParent.entries()]
-            .sort((a, b) => b[1].size - a[1].size)[0] || [];
-        if (!parent || !entries?.size) return;
-
-        const orderedEntries = labels.map((label) => entries.get(label)).filter(Boolean);
-        if (!orderedEntries.length) return;
-
-        parent.querySelectorAll("[data-wosai-node-menu-separator]").forEach((separator) => separator.remove());
-        const actionEntries = new Set(orderedEntries);
-        const firstNonWosaiEntry = [...parent.children].find((child) =>
-            child.matches?.(_WOSAI_NODE_MENU_ENTRY_SELECTOR) && !actionEntries.has(child));
-        const block = document.createDocumentFragment();
-        orderedEntries.forEach((entry) => block.appendChild(entry));
-
-        if (firstNonWosaiEntry) {
-            parent.insertBefore(block, firstNonWosaiEntry);
-            parent.insertBefore(_createNodeMenuSeparator(parent), firstNonWosaiEntry);
-        } else {
-            parent.appendChild(block);
-        }
+    document.querySelectorAll(MENU_ROOT_SELECTOR).forEach((menu) => {
+        coalesceMenuItems(menu, { labels, anchor: "top" });
     });
 }
 
