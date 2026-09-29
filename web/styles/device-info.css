@@ -105,8 +105,10 @@
 .ws-di-pill.is-warning { background: color-mix(in srgb, var(--ws-warning) 14%, transparent); color: var(--ws-warning); }
 .ws-di-pill.is-danger { background: var(--ws-danger-bg); color: var(--ws-danger); }
 
-/* ── 概览磁贴：一屏一眼看到的关键数字 ── */
+/* ── 概况磁贴：一屏一眼看到的关键数字 ── */
 .ws-di-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--ws-di-tile-min-width), 1fr)); gap: var(--ws-gap); padding: var(--ws-gap-lg); }
+/* 磁贴作为卡内首个区段时（硬件资源卡），下面还要接 GPU 体征区块，靠这条线划开 */
+.ws-di-card > .ws-di-tiles { border-bottom: var(--ws-border-width-thin) solid var(--ws-border-muted); }
 .ws-di-metric { min-width: 0; padding: var(--ws-gap-md); border-radius: var(--ws-radius-lg); background: var(--ws-surface-2); }
 .ws-di-metric-name { display: block; overflow: hidden; color: var(--ws-text-muted); font-size: var(--ws-text-sm); text-overflow: ellipsis; white-space: nowrap; }
 .ws-di-metric-value { display: flex; align-items: baseline; gap: var(--ws-gap-xs); margin: var(--ws-gap-xs) 0 var(--ws-gap-sm); min-width: 0; }
@@ -124,9 +126,6 @@
 .ws-di-bar > i.is-allocated { background: var(--ws-accent); }
 .ws-di-bar > i.is-reserved { background: color-mix(in srgb, var(--ws-accent) 45%, transparent); }
 .ws-di-bar > i.is-other { background: color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2)); }
-.ws-di-percent { flex: 0 0 auto; color: var(--ws-text-secondary); font-variant-numeric: tabular-nums; }
-.ws-di-percent.is-warn { color: var(--ws-warning); }
-.ws-di-percent.is-crit { color: var(--ws-danger); }
 .ws-di-legend { display: flex; gap: var(--ws-gap-md); flex-wrap: wrap; margin-top: var(--ws-gap-sm); color: var(--ws-text-muted); font-size: var(--ws-text-sm); }
 .ws-di-legend > span { display: inline-flex; align-items: center; gap: var(--ws-gap-xs); min-width: 0; }
 .ws-di-swatch { display: block; flex: 0 0 auto; width: var(--ws-di-swatch-size); height: var(--ws-di-swatch-size); border-radius: var(--ws-radius-sm); background: var(--ws-accent); }
@@ -134,8 +133,6 @@
 .ws-di-swatch.is-other { background: color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2)); }
 .ws-di-swatch.is-free { background: var(--ws-surface-3); }
 .ws-di-chips { display: flex; gap: var(--ws-gap-xs); flex-wrap: wrap; margin-top: var(--ws-gap-sm); }
-/* 带占用条的行：栅格布局覆盖 .ws-di-row 的 flex 两端对齐 */
-.ws-di-usage-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) max-content max-content; align-items: center; gap: var(--ws-gap-sm); }
 
 /* ── 单张 GPU 的体征区块 ── */
 .ws-di-gpu { padding: var(--ws-gap-md) 0; }

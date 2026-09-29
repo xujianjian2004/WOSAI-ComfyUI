@@ -40,8 +40,8 @@
 ### Changed
 
 - **设备面板（侧栏「设备」）改为可视化优先的布局，把后端已经采集、此前却几乎没渲染的数字真正显示出来。** 原面板五张卡片全是「标签 + 右对齐文本」的同一种形态，且丢掉了一批更有用的数据：`memory.percent` / `disk.percent` 已由后端算好却**零引用**；GPU 的型号、温度、功耗、驱动、显存分配口径从未显示；`row()` 里写好的 `dataset.search` 没有任何输入框消费；`locales` 的 `deviceInfo` 共 65 项中 **28 项**从未被渲染（`temperature` / `power` / `pytorchAllocated` / `pytorchReserved` / `smiUsed` / `cudnn` / `network` / `startup` / `simple` / `advanced` / `search` …）；`device-info.css` 里 **36.1%（2.7 KiB）** 的规则没有任何 JS 消费者——这一版其实是一个更完整的设计被砍剩的结果。本次补齐为：
-  - **「运行环境」与「关键依赖」合并为一张卡，并移到内容区首位**（概览顺延至第二位）：两张卡都是「标签 + 右对齐值」的短行清单，分列首尾只让首屏平白多一道边界；合并后 `操作系统 / Python / PyTorch / Git` 与 6 项依赖版本同处一卡。卡内用一枚 h3 小节标签「关键依赖」划界（新增 `.ws-di-group-label`）——否则 `Git` 之下紧跟一行 `Torch`，会被读成上方 `PyTorch` 那一行的重复。
-  - **新增「概览」卡**：显存 / 内存 / 磁盘各一块磁贴，显示占用率 + 紧凑用量 + 占用条，一屏之内先看到最该看到的数字。
+  - **「运行环境」与「关键依赖」合并为一张卡，并移到内容区首位**：两张卡都是「标签 + 右对齐值」的短行清单，分列首尾只让首屏平白多一道边界；合并后 `操作系统 / Python / PyTorch / Git` 与 6 项依赖版本同处一卡。卡内用一枚 h3 小节标签「关键依赖」划界（新增 `.ws-di-group-label`）——否则 `Git` 之下紧跟一行 `Torch`，会被读成上方 `PyTorch` 那一行的重复。
+  - **新增概览磁贴**：显存 / 内存 / 磁盘各一块磁贴，显示占用率 + 紧凑用量 + 占用条，一屏之内先看到最该看到的数字。这组磁贴排在「硬件资源」卡顶部，与该卡的 GPU 体征区块共用一张卡（下一轮去重时合并，见下方条目）。
   - **占用条取代三段式文本**：`20.2GB 已用 / 3.7GB 可用 / 总计 24.0GB` → `84.2%　20.2 / 24.0 GB` + 条形。分档阈值 <70% 用品牌橙、70–89% 用 `--ws-warning`、≥90% 用 `--ws-danger`，与后端 `_health()` 现有的 90% 磁盘判据**同源**，不另造一套标准。
   - **GPU 区块补上身份与体征**：显示型号（抹掉 `NVIDIA GeForce` 前缀以适配窄侧栏）、温度、功耗、驱动版本，作为 chip 排在显存条下方。
   - **显存改为三层嵌套条**：`pytorch_allocated ⊆ pytorch_reserved ⊆ smi_used ⊆ total` 是**包含**关系而非相加，分段后「驱动占了 20.2 GB、PyTorch 只认领 1.2 GB」这类碎片问题一眼可见，并配四色图例（分配 / 保留 / 驱动已用 / 空闲）。
@@ -51,7 +51,7 @@
   - 新增几何令牌 `--ws-di-bar-height`(6px)、`--ws-di-bar-height-lg`(9px)、`--ws-di-bar-min-fill`(2px)、`--ws-di-swatch-size`(7px)、`--ws-di-tile-min-width`(148px)、`--ws-di-ring-size`(46px)、`--ws-di-ring-width`(5px)。**颜色令牌刻意不在变量表里包一层**，原因见 Fixed 段。
   - 缓存破坏：`device-info.js` `?v=9 → 10`、`device-info.css` `?v=5 → 7`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增，本轮合并卡片后再次递增）、`wosai-variables.css` `?v=22 → 23`（`extension.json` 与 `web/shared/dom-widget.js` 成对递增）。
 - **设备面板补齐「简洁 / 高级」两级视图与搜索过滤 —— 即原设计中被砍掉的那一半。** `simple` / `advanced` / `search` / `searchPlaceholder` 四条文案与 `.ws-di-tools` / `.ws-di-search` / `.ws-di-view-switch` 的全部样式从落库起就在仓库里，却没有任何代码引用；本次把这条链路接上：
-  - **分段控件**：简洁版只留「运行环境（基础四项）+ 概览 + 环境健康度 + 硬件资源」四张卡；高级版追加系统架构、Python 解释器、CUDA 运行时、cuDNN、ComfyUI 版本、6 项依赖清单，以及「网络与启动参数」「ComfyUI 路径」两张卡。偏好写入 `localStorage`（`wosai.device-info.view`），跨会话保留。
+  - **分段控件**：简洁版只留「运行环境（基础四项）+ 硬件资源（含概览磁贴）+ 环境健康度」三张卡；高级版追加系统架构、Python 解释器、CUDA 运行时、cuDNN、ComfyUI 版本、5 项依赖清单，以及「网络与启动参数」「ComfyUI 路径」两张卡。偏好写入 `localStorage`（`wosai.device-info.view`），跨会话保留。
   - **搜索框**：消费 `row()` / `tile()` 早已写好却无人读取的 `dataset.search`。搜索语料收录**英文键 + 本地化标签 + 实际值**三者，中英文查询都能命中；多词按「与」匹配。卡片标题命中则保留整卡，否则只保留命中自身的条目；卡内无一命中即整卡隐藏，全部隐藏时显示「没有匹配的设备信息。」
   - 切换视图只改显隐、**不整块重渲染**，因此滚动位置与正在输入的搜索词都不会丢；后台 2s 刷新在搜索框持有焦点时主动跳过——否则整块重建会打断输入法组合，并把光标抢回去。
 - **设备面板补齐后端已采集、前端从未渲染的诊断数据**：`system.machine`（系统架构）、`system.executable`（Python 解释器）、`runtime.cuda_runtime` / `runtime.cudnn`、`comfyui.version`——以上归入高级版，让简洁版保持精简；新增「网络与启动参数」卡，展示 `network.http_proxy` / `https_proxy` / `no_proxy` 与 `runtime.arguments`（启动参数为空时显示「无」而不是一行空白）；路径行开始消费 `paths.*.value[].writable`，对可读不可写的目录标出「只读」（目录不存在时后端同样报 `writable=false`，那是「缺失」不是「只读」，不标）。代理项后端只回报 `Set` / `Not set` 两个英文串，前端映射为界面语言，其余取值原样透出——宁可显示原文，也不谎报一个语义。
@@ -59,6 +59,14 @@
 - 新增 9 条 i18n 文案（zh / en 同步）：`machine`、`executable`、`httpProxy`、`httpsProxy`、`noProxy`、`set`、`notSet`、`readonly`、`noMatch`。另有 8 条由「已存在但无人使用」转为实际渲染：`simple`、`advanced`、`search`、`searchPlaceholder`、`network`、`startup`、`cudaRuntime`、`cudnn`。
 - 缓存破坏：`device-info.js` `?v=10 → 11`、`device-info.css` `?v=7 → 8`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
 - 体积：主 JavaScript **1361.0 → 1380.5 KiB**（余 35.5 KiB）、样式 **232.0 → 237.0 KiB**（余 13.0 KiB），预算内。
+
+- **设备面板合并同类项：删掉重复的「概览」卡，并把「Torch」与「PyTorch」合为一行。** 概览卡与硬件资源卡讲的是同一件事——显存、内存、各磁盘在两处各画一遍，连取值表达式都逐字相同（`numberOrNull(memory.percent?.value) ?? percentOf(...)` 在两张卡里各出现一次），并排只会让人怀疑哪里渲染错了。
+  - 合并为一张「硬件资源」卡，卡内自顶向下为「磁贴行（一眼可见的占用率）→ GPU 体征区块 → 处理器」，磁贴与 GPU 区之间以一道分隔线划开。GPU 块**不再复述百分比**，只保留磁贴给不出的三层显存构成、四色图例与温度 / 功耗 / 驱动。
+  - 卡片总数 6 → 5，硬件资源卡上移至环境健康度之前（它承接了原概览卡的位置职责）。简洁版因此由四张卡收敛为三张。
+  - 合并后 `usageRow()` / `percentText()` 两个函数与 `.ws-di-usage-row` / `.ws-di-percent` 两条样式规则失去全部引用，一并删除（`.ws-di-percent` 同时带走了它的两档配色变体）。
+  - `Torch` 与 `PyTorch` 是同一个包被 `importlib.metadata.version("torch")` 与 `torch.__version__` 各报了一次，版本号逐字相同却在同一张卡里并排两行。保留运行环境基础区的 `PyTorch` 行（简洁版可见的关键标识），依赖清单剔除 `Torch`（6 项 → 5 项）。**仅当两个版本号一致时才剔除**：口径不同意味着它们可能不一致（源码构建或可编辑安装时 `__version__` 带本地后缀而元数据不带），那时两行并存本身就是值得暴露的信号，不该静默吞掉。
+  - 缓存破坏：`device-info.js` `?v=11 → 12`、`device-info.css` `?v=8 → 9`（后者在 `extension.json` 与 `web/device-info.js` 内成对递增）。
+  - 体积：主 JavaScript **1380.5 → 1380.2 KiB**（余 35.8 KiB）、样式 **237.0 → 236.8 KiB**（余 13.2 KiB），预算内。
 
 - `web/shared/media-preview.js` 扩展为对比节点的纯函数层：新增 `normalizeViewMode` / `resolveViewMode` / `stageAspectRatio` / `mediaSourceRatio` / `formatMediaSize` / `formatMediaBadgeLabel`，配套单测由 3 项扩到 15 项。
 - 图像对比的前端载荷宽高比改由载荷尺寸先行给出（不必等图片解码），首帧不再先按 16:9 兜底再跳变。

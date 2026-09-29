@@ -46,7 +46,7 @@ function storeView(mode) {
 // never falls back to unstyled native controls.
 function ensureCSS() {
     ensureWosaiStyles([
-        ["wosai-device-info-css", new URL("./styles/device-info.css?v=8", import.meta.url).href],
+        ["wosai-device-info-css", new URL("./styles/device-info.css?v=9", import.meta.url).href],
     ]);
 }
 
@@ -213,11 +213,6 @@ function usageBar(percent, { large = false, name = "" } = {}) {
     return bar;
 }
 
-function percentText(percent) {
-    const text = percent === null ? label("unavailable", "Unavailable") : `${percent}%`;
-    return make("span", `ws-di-percent is-${usageTone(percent)}`, text);
-}
-
 /** 概览磁贴：名称 / 大号占用率 + 用量 / 占用条。 */
 function tile(name, percent, detail) {
     const element = make("div", "ws-di-metric");
@@ -228,18 +223,6 @@ function tile(name, percent, detail) {
     line.append(make("span", "ws-di-metric-detail", detail));
     element.append(line);
     element.append(usageBar(percent, { name }));
-    return element;
-}
-
-/** 带占用条的行：名称 / 条 / 占用率 / 紧凑用量。 */
-function usageRow(parent, name, percent, detail) {
-    const element = make("div", "ws-di-row ws-di-usage-row");
-    element.dataset.search = `${name} ${detail}`.toLowerCase();
-    element.append(make("span", "ws-di-label", name));
-    element.append(usageBar(percent, { name }));
-    element.append(percentText(percent));
-    element.append(make("span", "ws-di-value", detail));
-    parent.append(element);
     return element;
 }
 
@@ -305,7 +288,6 @@ function gpuBlock(gpu, indexed) {
     const percent = segments?.percent ?? percentOf(valueOf(gpu.smi_used, ""), valueOf(gpu.total, ""));
     const usage = make("div", "ws-di-gpu-usage");
     usage.append(segments ? vramBar(segments) : usageBar(percent, { large: true, name: label("vram", "VRAM") }));
-    usage.append(percentText(percent));
     block.append(usage);
 
     // 只有四层口径齐备时才画图例，否则色块的语义会对不上
@@ -331,25 +313,6 @@ function gpuBlock(gpu, indexed) {
     });
     if (chips.childElementCount) block.append(chips);
     return block;
-}
-
-/** 概览：把最该一眼看到的数字提到最前，细节仍留在下方各卡里。 */
-function renderOverview(target) {
-    const section = card(label("summary", "Overview"), "pi-chart-bar", { id: "summary" });
-    const tiles = make("div", "ws-di-tiles");
-    const gpus = okGpus();
-    if (gpus.length) {
-        const gpu = gpus[0];
-        const name = gpus.length > 1 ? `${label("gpu", "GPU")} ${gpu.id}` : label("vram", "VRAM");
-        tiles.append(tile(`${name} · ${gpuShortName(gpu)}`, percentOf(valueOf(gpu.smi_used, ""), valueOf(gpu.total, "")), pairText(gpu.smi_used, gpu.total)));
-    }
-    const memory = data.dynamic?.memory || {};
-    tiles.append(tile(label("memory", "RAM"), numberOrNull(memory.percent?.value) ?? percentOf(valueOf(memory.used, ""), valueOf(memory.total, "")), pairText(memory.used, memory.total)));
-    (data.dynamic?.disks || []).forEach((disk) => {
-        tiles.append(tile(`${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total)));
-    });
-    section.append(tiles);
-    target.append(section);
 }
 
 function renderHealth(target) {
@@ -405,12 +368,26 @@ function renderEnvironment(target) {
     row(section, "comfyui", comfyui.version, { label: label("comfyui", "ComfyUI"), advanced: true });
     row(section, "git", comfyui.git, { label: label("git", "Git") });
 
-    const dependencies = Object.entries(data.static?.dependencies || {});
+    const dependencies = dependencyEntries(runtime);
     if (dependencies.length) {
         section.append(dependenciesHeading(dependencies));
         for (const [name, item] of dependencies) row(section, name, item, { label: capitalizeInitial(name), advanced: true });
     }
     target.append(section);
+}
+
+/**
+ * 依赖清单里剔除已被上方基础行覆盖的包。`Torch` 与 `PyTorch` 是同一个包被
+ * `importlib.metadata.version` 与 `torch.__version__` 各报了一次，同一张卡里并排两行、
+ * 版本号逐字相同，读者只会当成渲染重复。
+ * 仅当两个版本号一致时才剔除：口径不同意味着它们**可能**不一致（源码构建或可编辑安装时
+ * `__version__` 带本地后缀而元数据不带），那时两行并存本身就是值得暴露的信号。
+ */
+function dependencyEntries(runtime) {
+    const runtimeVersion = valueOf(runtime.pytorch, "");
+    return Object.entries(data.static?.dependencies || {}).filter(([name, item]) => (
+        !(name === "torch" && runtimeVersion && valueOf(item, "") === runtimeVersion)
+    ));
 }
 
 /**
@@ -426,17 +403,32 @@ function dependenciesHeading(entries) {
     return heading;
 }
 
+/**
+ * 硬件资源：概览磁贴 → GPU 体征区块 → 处理器。
+ * 磁贴与 GPU 块讲的是同一件事的两层——磁贴答「满了多少」，GPU 块答「这些占用由什么构成」——
+ * 所以 GPU 块不再复述百分比，只留磁贴给不出的三层显存构成、图例与温度/功耗/驱动。
+ * 上一版把磁贴单独放在「概览」卡里，与这里的行逐项重复（连取值表达式都逐字相同）。
+ */
 function renderHardware(target) {
     const section = card(label("hardware", "Hardware Resources"), "pi-microchip", { id: "hardware" });
     const system = data.static?.system || {};
     const gpus = okGpus();
+
+    const tiles = make("div", "ws-di-tiles");
+    if (gpus.length) {
+        const gpu = gpus[0];
+        const name = gpus.length > 1 ? `${label("gpu", "GPU")} ${gpu.id}` : label("vram", "VRAM");
+        tiles.append(tile(`${name} · ${gpuShortName(gpu)}`, percentOf(valueOf(gpu.smi_used, ""), valueOf(gpu.total, "")), pairText(gpu.smi_used, gpu.total)));
+    }
+    const memory = data.dynamic?.memory || {};
+    tiles.append(tile(label("memory", "RAM"), numberOrNull(memory.percent?.value) ?? percentOf(valueOf(memory.used, ""), valueOf(memory.total, "")), pairText(memory.used, memory.total)));
+    (data.dynamic?.disks || []).forEach((disk) => {
+        tiles.append(tile(`${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total)));
+    });
+    section.append(tiles);
+
     if (!gpus.length) section.append(make("p", "ws-di-empty", label("noGpu", "No GPU information available.")));
     gpus.forEach((gpu) => section.append(gpuBlock(gpu, gpus.length > 1)));
-    const memory = data.dynamic?.memory || {};
-    usageRow(section, label("memory", "RAM"), numberOrNull(memory.percent?.value) ?? percentOf(valueOf(memory.used, ""), valueOf(memory.total, "")), pairText(memory.used, memory.total));
-    (data.dynamic?.disks || []).forEach((disk) => {
-        usageRow(section, `${label("storage", "Disk")} ${disk.path}`, numberOrNull(disk.percent?.value) ?? percentOf(valueOf(disk.used, ""), valueOf(disk.total, "")), pairText(disk.used, disk.total));
-    });
     row(section, "processor", system.cpu, { label: label("processor", "Processor") });
     target.append(section);
 }
@@ -775,9 +767,8 @@ function render() {
         renderTools(root);
         const content = make("main", "ws-di-content");
         renderEnvironment(content);
-        renderOverview(content);
-        renderHealth(content);
         renderHardware(content);
+        renderHealth(content);
         renderNetwork(content);
         renderPaths(content);
         content.append(make("footer", "ws-di-copyright", WOSAI_COPYRIGHT));
