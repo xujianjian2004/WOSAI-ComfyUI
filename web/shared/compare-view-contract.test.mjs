@@ -45,6 +45,29 @@ test("CSS 里所有视图规则都以 .wosai-image-compare-stage 限定", () => 
     }
 });
 
+// 图像对比节点里的图片不再带圆角：用户在深色/暖色调图片上更需要看到完整画幅，
+// 且舞台本身的圆角会在分割线走到边缘时裁掉十字手柄/热区。
+test("舞台与图片层四角为直角", () => {
+    assert.match(CSS, /\.wosai-image-compare-stage \{\n[^}]*border-radius: 0;/s);
+    assert.match(CSS, /\.wosai-image-compare-top \{\n[^}]*border-radius: 0;/s);
+});
+
+// 橙色品牌色在暖色调图片上融进去，分割线与活跃控件改用主文本色，
+// 该颜色在深浅主题下都是最高对比度。
+test("分割线与活跃控件颜色使用主文本色而非橙色强调色", () => {
+    const lineRule = CSS.match(/\.wosai-image-compare-line \{[^}]*\}/s)?.[0] ?? "";
+    assert.match(lineRule, /background:\s*var\(--ws-text\)/, "分割线必须用主文本色");
+    const handleRule = CSS.match(/\.wosai-image-compare-grab:hover \+ \.wosai-image-compare-handle[^}]*\}/s)?.[0] ?? "";
+    assert.match(handleRule, /color:\s*var\(--ws-text\)/, "十字手柄必须用主文本色");
+    assert.match(handleRule, /border-color:\s*var\(--ws-text\)/, "十字手柄边框必须用主文本色");
+    const viewRule = CSS.match(/\.wosai-image-compare-view\.is-active \{[^}]*\}/s)?.[0] ?? "";
+    assert.match(viewRule, /color:\s*var\(--ws-text\)/, "视图按钮 active 必须用主文本色");
+    assert.doesNotMatch(viewRule, /color:\s*var\(--ws-accent\)/, "视图按钮 active 不得再用橙色");
+    const swapRule = CSS.match(/\.wosai-image-compare-swap\.is-active \{[^}]*\}/s)?.[0] ?? "";
+    assert.match(swapRule, /color:\s*var\(--ws-text\)/, "交换按钮 active 必须用主文本色");
+    assert.doesNotMatch(swapRule, /color:\s*var\(--ws-accent\)/, "交换按钮 active 不得再用橙色");
+});
+
 test("双拼视图把图层切成半幅并补上主轴尺寸", () => {
     // left/top 偏移必须与主轴尺寸成对出现，否则 100% 尺寸会把面板推出舞台边界
     // 底层（B）占右/下半、上层（A）占左/上半：与滑动视图「左端是 A」同向
@@ -54,11 +77,11 @@ test("双拼视图把图层切成半幅并补上主轴尺寸", () => {
     assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*bottom: auto;[^}]*height: 50%;/s);
 });
 
-test("双拼视图补外侧圆角，内缝保持直角", () => {
-    assert.match(CSS, /is-view-side > img \{[^}]*border-radius: 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0;/s);
-    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*border-radius: var\(--ws-radius-lg\) 0 0 var\(--ws-radius-lg\);/s);
-    assert.match(CSS, /is-view-stack > img \{[^}]*border-radius: 0 0 var\(--ws-radius-lg\) var\(--ws-radius-lg\);/s);
-    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*border-radius: var\(--ws-radius-lg\) var\(--ws-radius-lg\) 0 0;/s);
+test("双拼视图所有圆角为直角", () => {
+    assert.match(CSS, /is-view-side > img \{[^}]*border-radius: 0;/s);
+    assert.match(CSS, /is-view-side \.wosai-image-compare-top \{[^}]*border-radius: 0;/s);
+    assert.match(CSS, /is-view-stack > img \{[^}]*border-radius: 0;/s);
+    assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*border-radius: 0;/s);
 });
 
 test("双拼视图隐藏分割线 / 热区 / 十字手柄，只留分隔缝", () => {

@@ -142,7 +142,7 @@
      使图像区的内容原点与 0–100% 分割坐标严格对齐（用 border 会恒定偏 1px） */
   outline: var(--ws-border-width-thin) solid var(--ws-border);
   outline-offset: calc(-1 * var(--ws-border-width-thin));
-  border-radius: var(--ws-radius-lg);
+  border-radius: 0;
   background: var(--ws-surface-3);
 }
 
@@ -176,7 +176,7 @@
 
 .wosai-image-compare-top {
   overflow: hidden;
-  border-radius: var(--ws-radius-lg);
+  border-radius: 0;
 }
 
 .wosai-image-compare-line {
@@ -184,7 +184,7 @@
   top: 0;
   bottom: 0;
   width: var(--ws-border-width);
-  background: var(--ws-accent);
+  background: var(--ws-text);
   box-shadow: var(--ws-shadow-sm);
   /* 居中于 --wosai-compare-split，使线心与拇指/手柄圆心严格同 x */
   transform: translateX(-50%);
@@ -236,8 +236,8 @@
 .wosai-image-compare-grab:hover + .wosai-image-compare-handle,
 .wosai-image-compare:has(.wosai-image-compare-range:focus-visible) .wosai-image-compare-handle,
 .wosai-image-compare-stage.is-dragging .wosai-image-compare-handle {
-  border-color: var(--ws-accent);
-  color: var(--ws-accent);
+  border-color: var(--ws-text);
+  color: var(--ws-text);
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
 }
@@ -283,25 +283,25 @@
 .wosai-image-compare-stage.is-view-side > img {
   left: 50%;
   width: 50%;
-  border-radius: 0 var(--ws-radius-lg) var(--ws-radius-lg) 0;
+  border-radius: 0;
 }
 
 .wosai-image-compare-stage.is-view-side .wosai-image-compare-top {
   right: auto;
   width: 50%;
-  border-radius: var(--ws-radius-lg) 0 0 var(--ws-radius-lg);
+  border-radius: 0;
 }
 
 .wosai-image-compare-stage.is-view-stack > img {
   top: 50%;
   height: 50%;
-  border-radius: 0 0 var(--ws-radius-lg) var(--ws-radius-lg);
+  border-radius: 0;
 }
 
 .wosai-image-compare-stage.is-view-stack .wosai-image-compare-top {
   bottom: auto;
   height: 50%;
-  border-radius: var(--ws-radius-lg) var(--ws-radius-lg) 0 0;
+  border-radius: 0;
 }
 
 /* 面板分隔缝：只在双拼视图出现，滑动视图由分割线承担视觉分隔 */
@@ -390,9 +390,9 @@
 }
 
 .wosai-image-compare-view.is-active {
-  border-color: var(--ws-accent);
-  background: var(--ws-accent-dim);
-  color: var(--ws-accent);
+  border-color: var(--ws-text);
+  background: color-mix(in srgb, var(--ws-text) 12%, transparent);
+  color: var(--ws-text);
 }
 
 .wosai-image-compare-view:focus-visible {
@@ -448,9 +448,9 @@
 }
 
 .wosai-image-compare-swap.is-active {
-  border-color: var(--ws-accent);
-  background: var(--ws-accent-dim);
-  color: var(--ws-accent);
+  border-color: var(--ws-text);
+  background: color-mix(in srgb, var(--ws-text) 12%, transparent);
+  color: var(--ws-text);
 }
 
 .wosai-image-compare-swap:focus-visible {
