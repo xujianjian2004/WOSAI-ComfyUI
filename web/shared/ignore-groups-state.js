@@ -13,7 +13,9 @@ export function normalizeIgnoreGroupsScale(value) {
 
 export function readIgnoreGroupsState(properties = {}) {
     const mode = stringOr(properties.wosai_ig_mode, "default");
-    const sortOrder = stringOr(properties.wosai_ig_sort_order, "position");
+    // 默认按字母排序：编组数量一多，位置排序会随画布布局变化而跳动，
+    // 字母序才是稳定可预期的顺序（改动默认值不影响已持久化的显式取值）。
+    const sortOrder = stringOr(properties.wosai_ig_sort_order, "alphabet");
     return {
         filter: stringOr(properties.wosai_ig_filter, ""),
         mode: MODES.has(mode) ? mode : "default",
@@ -27,7 +29,7 @@ export function readIgnoreGroupsState(properties = {}) {
             ? properties.wosai_ig_name_color
             : null,
         disabled: Boolean(properties.wosai_ig_disable),
-        sortOrder: SORT_ORDERS.has(sortOrder) ? sortOrder : "position",
+        sortOrder: SORT_ORDERS.has(sortOrder) ? sortOrder : "alphabet",
         colorFilter: stringOr(properties.wosai_ig_color_filter, "none"),
         scale: normalizeIgnoreGroupsScale(properties.wosai_ig_scale),
     };

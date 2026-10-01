@@ -366,6 +366,7 @@ function buildWosaiIgnoreGroupsUI(node) {
                 return g.color && g.color.toLowerCase() === colorFilter.toLowerCase();
             });
         }
+        // 默认按字母排序（sortOrder 由 readIgnoreGroupsState 归一化为二者之一）
         if (sortOrder === "position") {
             list.sort((a, b) => {
                 const ax = a.bounds[0], ay = a.bounds[1];
@@ -1412,12 +1413,12 @@ function buildWosaiIgnoreGroupsUI(node) {
             activeSet = null;
             nameColor = null;
             igDisable = false;
-            sortOrder = "position";
+            sortOrder = "alphabet";
             colorFilter = "none";
             igScale   = 1;
             // 2) 复位 UI 临时变量
             uiDisable = false;
-            uiSort    = "position";
+            uiSort    = "alphabet";
             uiMode    = "default";
             // 3) 同步控件显示到默认
             fInput.value = "";
@@ -1426,7 +1427,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             cInput.value = accent; cHex.value = accent.toUpperCase();
             zSlider.value = "1"; zVal.textContent = Number(1).toFixed(1) + "×";
             dSeg.setActive(false);       // 控制器 → 绕过
-            sSeg.setActive("position");  // 排序 → 按位置
+            sSeg.setActive("alphabet");  // 排序 → 按字母
             // 4) 实时缩放复位
             _applyScale();
             // 5) 应用并持久化（nameColor 取默认强调色，视觉等价于初始 null）

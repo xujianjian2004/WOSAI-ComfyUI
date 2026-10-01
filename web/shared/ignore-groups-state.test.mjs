@@ -18,8 +18,13 @@ test("IgnoreGroups state recovers invalid workflow properties", () => {
     assert.equal(state.filter, "");
     assert.equal(state.mode, "default");
     assert.deepEqual(state.activeSet, ["A", "B"]);
-    assert.equal(state.sortOrder, "position");
+    assert.equal(state.sortOrder, "alphabet");
     assert.equal(state.scale, 5);
+});
+
+test("IgnoreGroups defaults to alphabetical sorting for fresh nodes", () => {
+    const state = readIgnoreGroupsState({});
+    assert.equal(state.sortOrder, "alphabet");
 });
 
 test("IgnoreGroups scale follows the half-step UI contract", () => {
