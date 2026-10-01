@@ -309,7 +309,10 @@ function buildWosaiIgnoreGroupsUI(node) {
         contentEl.style.zoom = s === 1 ? "" : String(s);
         // 外层 rootEl 高度随缩放增长（宽度由 DOM Widget 100% 跟随 node.size）
         rootEl.style.height = (bh * s) + "px";
+        // 缩放是用户主动操作，node.size 必须严格跟随档位（包括缩小）。
+        // _igEnsureMinimumSize 只保证不小于最小尺寸，不会把当前较大的 node.size 缩回来。
         _igEnsureMinimumSize();
+        _igSetNodeSize(scaledSize());
     }
 
     /* ── 滚轮转发 ────────────────────────────────────────── */
