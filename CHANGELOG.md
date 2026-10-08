@@ -168,7 +168,8 @@
 
 ### Fixed
 
-- 修复选中节点上方操作栏「遮罩编辑器」按钮只有图标没有文字的问题。ComfyUI 的 MaskEditorButton 没有 `data-testid`，WOSAI 的 MiniBar 皮肤化逻辑此前只按 `data-testid` 匹配，导致选中图像节点（如「加载图像」「图像对比」）时该按钮未被皮肤化、底部无文字标签。现增加按图标类匹配（`icon-[comfy--mask]`），并为其补齐「遮罩」/ "Mask" 标签与对应图标。缓存破坏：`hub-bar.js` `?v=80 → 81`。
+- 修复选中节点上方操作栏「遮罩编辑器」按钮只有图标没有文字的问题。
+- 修复从操作栏弹出的菜单（配色 / 节点等 ColorBar HUD）背景透显下方操作栏图标、视觉上不易辨别的问题。`web/shared/hud-kit.js::applyGlassBar()` 原使用玻璃背景 + 模糊，现改为不透明 `var(--ws-surface)` 并移除 `backdrop-filter`，让弹出的胶囊菜单完全覆盖下方内容。缓存破坏：`color-bar.js` `?v=3 → 4`。ComfyUI 的 MaskEditorButton 没有 `data-testid`，WOSAI 的 MiniBar 皮肤化逻辑此前只按 `data-testid` 匹配，导致选中图像节点（如「加载图像」「图像对比」）时该按钮未被皮肤化、底部无文字标签。现增加按图标类匹配（`icon-[comfy--mask]`），并为其补齐「遮罩」/ "Mask" 标签与对应图标。缓存破坏：`hub-bar.js` `?v=80 → 81`。
 - 修复**忽略编组节点操作缩放比后，节点尺寸不跟随缩放**的问题。`_applyScale()` 原先只调用 `_igEnsureMinimumSize()`，而该函数会保留当前较大的 `node.size`（只抬升、不收缩），导致用户把缩放档位从 3.0× 调回 1.0× 时节点的视觉内容已缩小，外框却仍保持放大状态。现仍在 `_applyScale()` 中先更新 `minSize` 与 DOM 最小约束，随后直接按 `scaledSize()` 写入 `node.size`，使节点外框在放大与缩小两个方向都严格跟随档位。新增 `web/shared/ignore-groups-scale-contract.test.mjs`（4 项）锁定：`_applyScale` 必须调用 `_igSetNodeSize(scaledSize())`、且必须先设最小约束再写精确尺寸，同时 `_igEnsureMinimumSize` 保持「只抬升」语义不变。缓存破坏：`ignore-groups.js` `?v=3 → 4`。
 - 修复设备面板**占用率缺失时被渲染成 `0%` 空条**的问题。`Number(null)` 与 `Number("")` 都等于 `0`，取值函数把「无数据」当成了「0%」，于是画出一条 `--ws-di-bar-min-fill`(2px) 的品牌橙填充并附带 `role="progressbar"` —— 肉眼与读屏都会理解成「几乎没占用」，恰好是这套可视化最不该犯的错。现于转换前先挡掉 `null` / `undefined` / `""`。此缺陷由真实浏览器验收（容量字段全空场景）发现。
 - 修复设备面板新增配色在**浅色主题下不跟随切换**的问题。把颜色包一层派生令牌写在 `:root` / `[data-theme="dark"]` 块里（如 `--ws-di-segment-reserved: color-mix(in srgb, var(--ws-accent) 45%, transparent)`）时，自定义属性会在**声明处**就解析成具体颜色；而面板的 `data-theme` 是挂在面板元素上的，覆盖不到已固化的派生值——浅色主题下占用条轨道与显存分段仍是深色。现改为在**消费处**直接引用基础令牌（`background: var(--ws-surface-2)`、`color-mix(in srgb, var(--ws-text-muted) 55%, var(--ws-surface-2))`），表达式在面板作用域内重新解析；`wosai-variables.css` 中因此只保留几何令牌，并留下注释说明为何不在此处包装颜色。

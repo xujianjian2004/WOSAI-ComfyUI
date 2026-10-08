@@ -91,10 +91,10 @@ export function mkDivider(orient) {
     return d;
 }
 
-// 给元素套上 ColorBar 同款胶囊玻璃外观（含初始 opacity:0 / scale(.92) 入场态）
+// 给元素套上 ColorBar 同款胶囊外观（含初始 opacity:0 / scale(.92) 入场态）。
+// 背景使用不透明 surface，避免弹出的菜单透显出下方操作栏图标。
 export function applyGlassBar(el, orient = 'h') {
-    const T = glassT();
-    el.style.cssText = `position:fixed;z-index:var(--ws-z-hud);display:flex;flex-direction:${orient === 'v' ? 'column' : 'row'};align-items:center;gap:${orient === 'v' ? 'var(--ws-hk-bar-gap-v)' : 'var(--ws-hk-bar-gap)'};padding:var(--ws-hk-bar-padding);border-radius:var(--ws-hk-bar-radius);background:${T.glass};backdrop-filter:${T.blur};-webkit-backdrop-filter:${T.blur};border:${T.border};box-shadow:${T.shadow};opacity:0;transform:scale(.92);transition:opacity .18s ease,transform .18s ease;width:fit-content;max-width:96vw;height:auto;min-height:0;max-height:${window.innerHeight - 20}px;overflow:visible`;
+    el.style.cssText = `position:fixed;z-index:var(--ws-z-hud);display:flex;flex-direction:${orient === 'v' ? 'column' : 'row'};align-items:center;gap:${orient === 'v' ? 'var(--ws-hk-bar-gap-v)' : 'var(--ws-hk-bar-gap)'};padding:var(--ws-hk-bar-padding);border-radius:var(--ws-hk-bar-radius);background:var(--ws-surface);backdrop-filter:none;-webkit-backdrop-filter:none;border:var(--ws-border-width-thin) solid var(--ws-border);box-shadow:var(--ws-shadow-panel);opacity:0;transform:scale(.92);transition:opacity .18s ease,transform .18s ease;width:fit-content;max-width:96vw;height:auto;min-height:0;max-height:${window.innerHeight - 20}px;overflow:visible`;
 }
 
 // 模式切换（圆形按钮）：与其它 HUD 按钮同款(圆底图标 + 下方文字)，文字显示当前 HUD 模式(配色/对齐)，
