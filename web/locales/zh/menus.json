@@ -276,6 +276,7 @@
     "nativeColor": "颜色",
     "nativeSubgraph": "子图",
     "nativeIgnore": "忽略",
+    "nativeMask": "遮罩",
     "nativeFrame": "框选",
     "nativeArrange": "排列",
     "commandAlignPanel": "🟠 节点对齐 - WOSAI 画布整理",

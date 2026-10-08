@@ -62,6 +62,8 @@ const NATIVE_MINI_ACTIONS = Object.freeze([
     { testId: "color-picker-button", key: "color", labelKey: "nativeColor" },
     { testId: "convert-to-subgraph-button", key: "subgraph", labelKey: "nativeSubgraph" },
     { testId: "bypass-button", key: "ignore", labelKey: "nativeIgnore" },
+    // ComfyUI's mask editor button only ships with an icon class (no data-testid).
+    { iconClass: "icon-[comfy--mask]", key: "mask", labelKey: "nativeMask" },
     { testId: "more-options-button", key: "more", labelKey: null },
 ]);
 const MINI_ICON = Object.freeze({
@@ -71,6 +73,7 @@ const MINI_ICON = Object.freeze({
     frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/><path d="M8 12h8M12 8v8"/></svg>',
     subgraph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/><path d="M8 8l8 8M16 8l-8 8"/></svg>',
     ignore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.5-5.8L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-13.5 5.8L4 15"/></svg>',
+    mask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M12 7v13"/><path d="M7 14c2.5 1.5 7.5 1.5 10 0"/></svg>',
     palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 0-4H12a1.7 1.7 0 0 1 0-3.4h2a4 4 0 0 0 0-8Z"/><circle cx="7.5" cy="11" r=".8" fill="currentColor"/><circle cx="10" cy="7.5" r=".8" fill="currentColor"/><circle cx="14" cy="7.5" r=".8" fill="currentColor"/></svg>',
     arrange: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
     align: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h16M7 12h10M5 18h14"/><path d="M12 3v18" stroke-dasharray="1 3"/></svg>',
@@ -707,7 +710,14 @@ function _applyNativeSelectionToolboxCaptions() {
         toolbox.setAttribute("data-theme", getGlassTheme());
         _selectionToolboxContent(toolbox).setAttribute("data-wosai-mini-bar", "");
         for (const action of NATIVE_MINI_ACTIONS) {
-            const button = toolbox.querySelector(`button[data-testid="${action.testId}"]`);
+            let button = null;
+            if (action.testId) {
+                button = toolbox.querySelector(`button[data-testid="${action.testId}"]`);
+            } else if (action.iconClass) {
+                const icon = [...toolbox.querySelectorAll("i")]
+                    .find((el) => el.classList.contains(action.iconClass));
+                button = _buttonAnchor(icon);
+            }
             if (button) {
                 const label = action.labelKey
                     ? t(`menus.layoutToolkit.${action.labelKey}`)

@@ -276,6 +276,7 @@
     "nativeColor": "Color",
     "nativeSubgraph": "Subgraph",
     "nativeIgnore": "Bypass",
+    "nativeMask": "Mask",
     "nativeFrame": "Frame",
     "nativeArrange": "Arrange",
     "commandAlignPanel": "🟠 Node Align",
