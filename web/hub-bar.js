@@ -64,6 +64,9 @@ const NATIVE_MINI_ACTIONS = Object.freeze([
     { testId: "bypass-button", key: "ignore", labelKey: "nativeIgnore" },
     // ComfyUI's mask editor button only ships with an icon class (no data-testid).
     { iconClass: "icon-[comfy--mask]", key: "mask", labelKey: "nativeMask" },
+    // Subgraph edit/publish buttons only have Lucide icon classes (no testid).
+    { iconClass: "icon-[lucide--settings-2]", key: "editSubgraph", labelKey: "nativeEditSubgraph" },
+    { iconClass: "icon-[lucide--book-open]", key: "publishSubgraph", labelKey: "nativePublishSubgraph" },
     { testId: "more-options-button", key: "more", labelKey: null },
 ]);
 const MINI_ICON = Object.freeze({
@@ -72,6 +75,8 @@ const MINI_ICON = Object.freeze({
     color: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="8"/></svg>',
     frame: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/><path d="M8 12h8M12 8v8"/></svg>',
     subgraph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M21 16v5h-5"/><path d="M8 8l8 8M16 8l-8 8"/></svg>',
+    editSubgraph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>',
+    publishSubgraph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>',
     ignore: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 13.5-5.8L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-13.5 5.8L4 15"/></svg>',
     mask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M12 7v13"/><path d="M7 14c2.5 1.5 7.5 1.5 10 0"/></svg>',
     palette: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18h1.2a2 2 0 0 0 0-4H12a1.7 1.7 0 0 1 0-3.4h2a4 4 0 0 0 0-8Z"/><circle cx="7.5" cy="11" r=".8" fill="currentColor"/><circle cx="10" cy="7.5" r=".8" fill="currentColor"/><circle cx="14" cy="7.5" r=".8" fill="currentColor"/></svg>',
@@ -112,8 +117,9 @@ let _instantActiveAnchor = null;
 let _miniBarExpanded = false;
 let _miniBarPositionListenerInstalled = false;
 let _miniBarPositionListener = null;
-// 标记当前是否有操作栏因 HUD 弹出而被隐藏，便于关闭时精确恢复。
-let _popupHiddenMiniBars = false;
+// 标记当前有哪些原因导致操作栏因弹出菜单而被隐藏（支持多 reason，
+// 避免 color-bar.js 的 HUD 与原生颜色选择器等并发弹出时互相恢复）。
+const _popupHideReasons = new Set();
 
 function _isMiniBarCompactMode() {
     try {
@@ -353,20 +359,18 @@ function _hideMiniBarAfterAction(button) {
 // 与 _hideMiniBarAfterAction 的区别：后者按「动作完成」语义隐藏（关闭后保持
 // 隐藏），本函数按「弹出态」语义隐藏（关闭后立即恢复），且覆盖了原生取色器
 // 之外的所有 HUD 触发路径。
-function _hideMiniBarForPopup() {
-    let hiddenAny = false;
+function _hideMiniBarForPopup(reason = "default") {
+    if (reason) _popupHideReasons.add(reason);
     document.querySelectorAll('[data-testid="selection-toolbox"]').forEach((toolbox) => {
         if (toolbox.hasAttribute("data-wosai-mini-suppressed")) return;
         if (toolbox.hasAttribute("data-wosai-mini-popup-hidden")) return;
         toolbox.setAttribute("data-wosai-mini-popup-hidden", "");
-        hiddenAny = true;
     });
-    if (hiddenAny) _popupHiddenMiniBars = true;
 }
 
-function _restoreMiniBarsAfterPopup() {
-    if (!_popupHiddenMiniBars) return;
-    _popupHiddenMiniBars = false;
+function _restoreMiniBarsAfterPopup(reason = "default") {
+    if (reason) _popupHideReasons.delete(reason);
+    if (_popupHideReasons.size > 0) return;
     document.querySelectorAll('[data-testid="selection-toolbox"][data-wosai-mini-popup-hidden]')
         .forEach((toolbox) => toolbox.removeAttribute("data-wosai-mini-popup-hidden"));
     _syncMiniBarCompactMode();
@@ -376,10 +380,40 @@ function _restoreMiniBarsAfterPopup() {
 export function hideMiniBarForPopup() { _hideMiniBarForPopup(); }
 export function restoreMiniBarsAfterPopup() { _restoreMiniBarsAfterPopup(); }
 
+// 原生 ComfyUI 颜色选择器（ColorPickerButton）没有 data-testid，也不走
+// color-bar.js 的 HUD。监听其弹窗容器的出现/消失，同步操作栏显隐。
+const NATIVE_COLOR_PICKER_REASON = "nativeColor";
+let _nativeColorObserver = null;
+
+function _isNativeColorPickerOpen(toolbox) {
+    const button = toolbox.querySelector('button[data-testid="color-picker-button"]');
+    if (!button) return false;
+    const wrapper = button.closest(".relative");
+    if (!wrapper) return false;
+    const popup = wrapper.querySelector(":scope > .absolute");
+    return !!popup && popup.querySelectorAll("button").length > 0;
+}
+
+function _syncNativeColorPickerPopupState() {
+    let anyOpen = false;
+    document.querySelectorAll('[data-testid="selection-toolbox"]').forEach((toolbox) => {
+        if (_isNativeColorPickerOpen(toolbox)) anyOpen = true;
+    });
+    if (anyOpen) _hideMiniBarForPopup(NATIVE_COLOR_PICKER_REASON);
+    else _restoreMiniBarsAfterPopup(NATIVE_COLOR_PICKER_REASON);
+}
+
+function _observeNativeColorPicker() {
+    if (_nativeColorObserver || !document.body) return;
+    _nativeColorObserver = new MutationObserver(() => _syncNativeColorPickerPopupState());
+    _nativeColorObserver.observe(document.body, { childList: true, subtree: true });
+}
+
 function _ensureSelectionToolboxCaptions() {
     _installMiniBarGlassTheme();
     _installMiniBarSelectionRestore();
     _installMiniBarPositionSync();
+    _observeNativeColorPicker();
     if (document.getElementById("wosai-selection-toolbox-captions")) return;
     const style = document.createElement("style");
     style.id = "wosai-selection-toolbox-captions";
@@ -886,6 +920,9 @@ function _installInstantSelectionToolboxTooltips() {
 function _disposeHubBarRuntime() {
     _tooltipObserver?.disconnect();
     _tooltipObserver = null;
+    _nativeColorObserver?.disconnect();
+    _nativeColorObserver = null;
+    _popupHideReasons.clear();
     _tooltipRefreshQueued = false;
     _offHubBarLangChange?.();
     _offHubBarLangChange = null;

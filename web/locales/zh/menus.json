@@ -277,6 +277,8 @@
     "nativeSubgraph": "子图",
     "nativeIgnore": "忽略",
     "nativeMask": "遮罩",
+    "nativeEditSubgraph": "编辑组件",
+    "nativePublishSubgraph": "发布子图",
     "nativeFrame": "框选",
     "nativeArrange": "排列",
     "commandAlignPanel": "🟠 节点对齐 - WOSAI 画布整理",

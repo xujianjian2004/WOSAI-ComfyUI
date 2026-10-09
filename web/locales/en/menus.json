@@ -277,6 +277,8 @@
     "nativeSubgraph": "Subgraph",
     "nativeIgnore": "Bypass",
     "nativeMask": "Mask",
+    "nativeEditSubgraph": "Edit Widgets",
+    "nativePublishSubgraph": "Publish",
     "nativeFrame": "Frame",
     "nativeArrange": "Arrange",
     "commandAlignPanel": "🟠 Node Align",
