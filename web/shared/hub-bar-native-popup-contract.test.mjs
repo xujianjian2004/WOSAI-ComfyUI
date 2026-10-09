@@ -28,6 +28,15 @@ test("observes the native ComfyUI color picker popup", () => {
     assert.match(hubBar, /_observeNativeColorPicker\(\)/);
 });
 
+test("coalesces native color picker mutations into one per-frame pass (no main-thread pin)", () => {
+    assert.match(hubBar, /let _nativeColorSyncQueued = false/);
+    assert.match(hubBar, /function _queueNativeColorSync\(\)/);
+    // The MutationObserver callback must NOT call _syncNativeColorPickerPopupState
+    // synchronously; it must route through the throttled _queueNativeColorSync.
+    assert.match(hubBar, /new MutationObserver\(\(\) => _queueNativeColorSync\(\)\)/);
+    assert.match(hubBar, /requestAnimationFrame\(\(\) => \{/);
+});
+
 test("detects the native color picker by its relative + absolute popup structure", () => {
     assert.match(hubBar, /button\[data-testid="color-picker-button"\]/);
     assert.match(hubBar, /button\.closest\("\.relative"\)/);

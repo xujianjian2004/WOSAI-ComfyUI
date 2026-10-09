@@ -384,6 +384,7 @@ export function restoreMiniBarsAfterPopup() { _restoreMiniBarsAfterPopup(); }
 // color-bar.js 的 HUD。监听其弹窗容器的出现/消失，同步操作栏显隐。
 const NATIVE_COLOR_PICKER_REASON = "nativeColor";
 let _nativeColorObserver = null;
+let _nativeColorSyncQueued = false;
 
 function _isNativeColorPickerOpen(toolbox) {
     const button = toolbox.querySelector('button[data-testid="color-picker-button"]');
@@ -403,9 +404,23 @@ function _syncNativeColorPickerPopupState() {
     else _restoreMiniBarsAfterPopup(NATIVE_COLOR_PICKER_REASON);
 }
 
+// ComfyUI mounts the whole Vue app under document.body, so body churns with
+// childList mutations while the canvas loads. Mirror the existing _tooltipObserver
+// and coalesce rapid mutations into a single per-frame pass; otherwise the
+// synchronous _syncNativeColorPickerPopupState runs on every mutation and pins
+// the main thread (canvas freeze on load).
+function _queueNativeColorSync() {
+    if (_nativeColorSyncQueued) return;
+    _nativeColorSyncQueued = true;
+    requestAnimationFrame(() => {
+        _nativeColorSyncQueued = false;
+        _syncNativeColorPickerPopupState();
+    });
+}
+
 function _observeNativeColorPicker() {
     if (_nativeColorObserver || !document.body) return;
-    _nativeColorObserver = new MutationObserver(() => _syncNativeColorPickerPopupState());
+    _nativeColorObserver = new MutationObserver(() => _queueNativeColorSync());
     _nativeColorObserver.observe(document.body, { childList: true, subtree: true });
 }
 
