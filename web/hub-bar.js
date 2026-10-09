@@ -366,6 +366,11 @@ function _hideMiniBarForPopup(reason = "default") {
         if (toolbox.hasAttribute("data-wosai-mini-popup-hidden")) return;
         toolbox.setAttribute("data-wosai-mini-popup-hidden", "");
     });
+    // The compact toggle is a body-fixed sibling; hide it as well so it does
+    // not linger on top of the popup.
+    document.querySelectorAll(".wosai-mini-compact-toggle").forEach((toggle) => {
+        toggle.setAttribute("data-wosai-mini-popup-hidden", "");
+    });
 }
 
 function _restoreMiniBarsAfterPopup(reason = "default") {
@@ -373,6 +378,8 @@ function _restoreMiniBarsAfterPopup(reason = "default") {
     if (_popupHideReasons.size > 0) return;
     document.querySelectorAll('[data-testid="selection-toolbox"][data-wosai-mini-popup-hidden]')
         .forEach((toolbox) => toolbox.removeAttribute("data-wosai-mini-popup-hidden"));
+    document.querySelectorAll(".wosai-mini-compact-toggle[data-wosai-mini-popup-hidden]")
+        .forEach((toggle) => toggle.removeAttribute("data-wosai-mini-popup-hidden"));
     _syncMiniBarCompactMode();
 }
 
@@ -389,10 +396,16 @@ let _nativeColorSyncQueued = false;
 function _isNativeColorPickerOpen(toolbox) {
     const button = toolbox.querySelector('button[data-testid="color-picker-button"]');
     if (!button) return false;
+    // Modern ComfyUI toggles the inline popup via component state; the button
+    // may expose aria-expanded when it is implemented as a menu trigger.
+    if (button.getAttribute("aria-expanded") === "true") return true;
     const wrapper = button.closest(".relative");
     if (!wrapper) return false;
     const popup = wrapper.querySelector(":scope > .absolute");
-    return !!popup && popup.querySelectorAll("button").length > 0;
+    if (!popup) return false;
+    // The popup is rendered conditionally, so presence means open. Guard
+    // against a hidden state just in case future versions use display:none.
+    return popup.offsetParent !== null && getComputedStyle(popup).visibility !== "hidden";
 }
 
 function _syncNativeColorPickerPopupState() {
@@ -506,8 +519,23 @@ function _ensureSelectionToolboxCaptions() {
             opacity:0!important;
             pointer-events:none!important;
         }
+        /* Use visibility instead of opacity because the native color picker
+           popup is a child of the selection-toolbox. Opacity would hide the
+           popup along with the bar; visibility can be overridden by the popup
+           itself, so the bar disappears while the color menu stays visible. */
         [data-testid="selection-toolbox"][data-wosai-mini-popup-hidden] {
-            opacity:0!important;
+            visibility:hidden!important;
+        }
+        /* Keep the native ComfyUI color picker popup and its contents visible
+           even though its parent toolbox is hidden. */
+        [data-testid="selection-toolbox"][data-wosai-mini-popup-hidden] button[data-testid="color-picker-button"] ~ .absolute,
+        [data-testid="selection-toolbox"][data-wosai-mini-popup-hidden] button[data-testid="color-picker-button"] ~ .absolute * {
+            visibility:visible!important;
+            opacity:1!important;
+            pointer-events:auto!important;
+        }
+        .wosai-mini-compact-toggle[data-wosai-mini-popup-hidden] {
+            visibility:hidden!important;
             pointer-events:none!important;
         }
         [data-testid="selection-toolbox"][data-wosai-mini-suppressed] {

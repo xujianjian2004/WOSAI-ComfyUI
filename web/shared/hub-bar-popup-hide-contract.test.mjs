@@ -27,11 +27,15 @@ test("hideMiniBarForPopup / restoreMiniBarsAfterPopup are exported", () => {
     assert.match(hubBar, /export function restoreMiniBarsAfterPopup\(\)/);
 });
 
-test("popup-hidden attribute hides the toolbox via CSS", () => {
+test("popup-hidden attribute hides the toolbox via CSS without hiding the color picker popup", () => {
     const rule = hubBar.match(/\[data-testid="selection-toolbox"\]\[data-wosai-mini-popup-hidden\] \{[\s\S]*?\}/);
     assert.ok(rule, "popup-hidden CSS rule not found");
-    assert.match(rule[0], /opacity:0!important/);
-    assert.match(rule[0], /pointer-events:none!important/);
+    assert.match(rule[0], /visibility:hidden!important/);
+    // The native color picker popup is a child of the toolbox; make sure we
+    // keep it visible instead of hiding it together with the bar.
+    assert.match(hubBar, /button\[data-testid="color-picker-button"\] ~ \.absolute/);
+    assert.match(hubBar, /visibility:visible!important/);
+    assert.match(hubBar, /opacity:1!important/);
 });
 
 test("color-bar hides the hub bar when the HUD opens", () => {

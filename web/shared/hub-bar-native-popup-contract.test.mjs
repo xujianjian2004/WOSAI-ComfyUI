@@ -41,6 +41,10 @@ test("detects the native color picker by its relative + absolute popup structure
     assert.match(hubBar, /button\[data-testid="color-picker-button"\]/);
     assert.match(hubBar, /button\.closest\("\.relative"\)/);
     assert.match(hubBar, /wrapper\.querySelector\(":scope > \.absolute"\)/);
+    // Detection must not rely on the popup containing <button> elements; the
+    // swatch list uses icon elements, so presence of a visible popup is enough.
+    assert.match(hubBar, /popup\.offsetParent !== null/);
+    assert.doesNotMatch(hubBar, /popup\.querySelectorAll\("button"\)\.length > 0/);
 });
 
 test("skins subgraph edit and publish buttons by their Lucide icon classes", () => {
