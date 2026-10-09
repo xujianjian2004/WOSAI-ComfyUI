@@ -63,8 +63,8 @@ test("provides SVG icons for the new subgraph actions", () => {
 });
 
 test("has bilingual labels for subgraph edit and publish actions", () => {
-    assert.equal(zhMenus.layoutToolkit.nativeEditSubgraph, "编辑组件");
-    assert.equal(zhMenus.layoutToolkit.nativePublishSubgraph, "发布子图");
+    assert.equal(zhMenus.layoutToolkit.nativeEditSubgraph, "编辑");
+    assert.equal(zhMenus.layoutToolkit.nativePublishSubgraph, "发布");
     assert.equal(enMenus.layoutToolkit.nativeEditSubgraph, "Edit Widgets");
     assert.equal(enMenus.layoutToolkit.nativePublishSubgraph, "Publish");
 });
