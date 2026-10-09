@@ -86,7 +86,7 @@ function closeThemeMenu() {
     if (_themeMenu) { _themeMenu.remove(); _themeMenu = null; }
 }
 
-function closeBar() {
+function closeBar(opts = {}) {
     closeThemeMenu();
     _barDragCleanup?.();
     _barDragCleanup = null;
@@ -102,6 +102,9 @@ function closeBar() {
     }
     if (_escHandler) { document.removeEventListener('keydown', _escHandler); _escHandler = null; }
     if (_canvasClickHandler) { app.canvas?.canvas?.removeEventListener('pointerdown', _canvasClickHandler, true); _canvasClickHandler = null; }
+    // 仅在“真实关闭”时恢复操作栏；切换 tab / 语言时的关闭紧接着重开，
+    // 传 keepHidden 以避免操作栏闪现。
+    if (!opts.keepHidden) _hubBarMod?.restoreMiniBarsAfterPopup?.();
 }
 window.__wosaiCloseBar = closeBar;
 
@@ -179,7 +182,7 @@ export function openHud(tab) {
     }
     if (_bar && _hudTab === tab) { closeBar(); return; }
     _hudTab = tab || 'color';
-    if (_bar) { closeBar(); scheduleBarOpen(); }   // 切 tab：收起再展开
+    if (_bar) { closeBar({ keepHidden: true }); scheduleBarOpen(); }   // 切 tab：收起再展开（不恢复操作栏）
     else openBar();
 }
 // 挂载到 window 供 hub-bar.js 桥接调用
@@ -368,6 +371,8 @@ async function openBar() {
 
     document.body.appendChild(bar);
     _bar = bar;
+    // 弹出 HUD 前先隐藏选中节点上方的操作栏，避免两者互相遮挡。
+    _hubBarMod?.hideMiniBarForPopup?.();
     applyHudModuleTheme(bar, _hudTab);
     positionBar();
     _barDragCleanup = makeDraggable(bar, {
@@ -452,7 +457,7 @@ app.registerExtension({
         _offLangChange = onLangChange(() => {
             if (_bar) {
                 const wasTab = _hudTab;
-                closeBar();
+                closeBar({ keepHidden: true });
                 _hudTab = wasTab;
                 scheduleBarOpen();
             }

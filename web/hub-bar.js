@@ -43,7 +43,7 @@ const EXTRA_ICONS = Object.freeze({
 });
 const CAPTIONED_COMMANDS = new Set();
 const AUTO_HIDE_MINI_ACTIONS = new Set([
-    "palette", "node", "align", "autoConnect",
+    "align", "autoConnect",
     "replace", "collapse", "expand", "clone", "lock",
 ]);
 const COMMAND_MINI_ACTIONS = Object.freeze({
@@ -112,6 +112,8 @@ let _instantActiveAnchor = null;
 let _miniBarExpanded = false;
 let _miniBarPositionListenerInstalled = false;
 let _miniBarPositionListener = null;
+// 标记当前是否有操作栏因 HUD 弹出而被隐藏，便于关闭时精确恢复。
+let _popupHiddenMiniBars = false;
 
 function _isMiniBarCompactMode() {
     try {
@@ -346,6 +348,34 @@ function _hideMiniBarAfterAction(button) {
     }
 }
 
+// HUD（ColorBar 配色 / 节点 / 对齐等弹出菜单）打开时调用：把选中节点上方
+// 的操作栏整体隐藏，避免弹出菜单与下方操作栏互相遮挡。关闭弹出菜单时再恢复。
+// 与 _hideMiniBarAfterAction 的区别：后者按「动作完成」语义隐藏（关闭后保持
+// 隐藏），本函数按「弹出态」语义隐藏（关闭后立即恢复），且覆盖了原生取色器
+// 之外的所有 HUD 触发路径。
+function _hideMiniBarForPopup() {
+    let hiddenAny = false;
+    document.querySelectorAll('[data-testid="selection-toolbox"]').forEach((toolbox) => {
+        if (toolbox.hasAttribute("data-wosai-mini-suppressed")) return;
+        if (toolbox.hasAttribute("data-wosai-mini-popup-hidden")) return;
+        toolbox.setAttribute("data-wosai-mini-popup-hidden", "");
+        hiddenAny = true;
+    });
+    if (hiddenAny) _popupHiddenMiniBars = true;
+}
+
+function _restoreMiniBarsAfterPopup() {
+    if (!_popupHiddenMiniBars) return;
+    _popupHiddenMiniBars = false;
+    document.querySelectorAll('[data-testid="selection-toolbox"][data-wosai-mini-popup-hidden]')
+        .forEach((toolbox) => toolbox.removeAttribute("data-wosai-mini-popup-hidden"));
+    _syncMiniBarCompactMode();
+}
+
+// 导出供 color-bar.js 在 HUD 弹出 / 关闭时显式隐藏与恢复操作栏。
+export function hideMiniBarForPopup() { _hideMiniBarForPopup(); }
+export function restoreMiniBarsAfterPopup() { _restoreMiniBarsAfterPopup(); }
+
 function _ensureSelectionToolboxCaptions() {
     _installMiniBarGlassTheme();
     _installMiniBarSelectionRestore();
@@ -424,6 +454,10 @@ function _ensureSelectionToolboxCaptions() {
             transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
         }
         [data-testid="selection-toolbox"][data-wosai-mini-hidden] {
+            opacity:0!important;
+            pointer-events:none!important;
+        }
+        [data-testid="selection-toolbox"][data-wosai-mini-popup-hidden] {
             opacity:0!important;
             pointer-events:none!important;
         }

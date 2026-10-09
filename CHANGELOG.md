@@ -168,6 +168,7 @@
 
 ### Fixed
 
+- 修复**操作栏弹出菜单后下方操作栏仍可见、与弹出菜单互相遮挡**的问题。选中节点后点击操作栏「颜色 / 节点」等按钮会弹出 ColorBar HUD 菜单，而原生 MiniBar 操作栏仍停留在节点上方，两者紧邻、视觉混杂。现改为：**HUD 弹出时（`openBar`）显式隐藏操作栏、关闭（Esc / 点击画布等真实关闭）时恢复**；切换 tab 与语言切换时的「收起再展开」传 `keepHidden` 不恢复，避免操作栏闪现。配套地，`palette` / `node` 不再走「点击即隐藏并保持」的 `AUTO_HIDE_MINI_ACTIONS`，统一由弹出态语义驱动（关闭即恢复）；其余非 HUD 面板的动作（对齐 / 替换 / 折叠 / 克隆 / 锁定 / 自动连接 / 展开）保持原「动作完成后保持隐藏」语义不变。新增 `web/shared/hub-bar-popup-hide-contract.test.mjs`（5 项）锁定：自动隐藏集合变化、`hideMiniBarForPopup` / `restoreMiniBarsAfterPopup` 已导出、弹出态隐藏的 CSS、以及 `color-bar.js` 三处接线。缓存破坏：`hub-bar.js` `?v=81 → 82`、`color-bar.js` `?v=4 → 5`。
 - 修复选中节点上方操作栏「遮罩编辑器」按钮只有图标没有文字的问题。
 - 修复从操作栏弹出的菜单（配色 / 节点等 ColorBar HUD）背景透显下方操作栏图标、视觉上不易辨别的问题。`web/shared/hud-kit.js::applyGlassBar()` 原使用玻璃背景 + 模糊，现改为不透明 `var(--ws-surface)` 并移除 `backdrop-filter`，让弹出的胶囊菜单完全覆盖下方内容。缓存破坏：`color-bar.js` `?v=3 → 4`。ComfyUI 的 MaskEditorButton 没有 `data-testid`，WOSAI 的 MiniBar 皮肤化逻辑此前只按 `data-testid` 匹配，导致选中图像节点（如「加载图像」「图像对比」）时该按钮未被皮肤化、底部无文字标签。现增加按图标类匹配（`icon-[comfy--mask]`），并为其补齐「遮罩」/ "Mask" 标签与对应图标。缓存破坏：`hub-bar.js` `?v=80 → 81`。
 - 修复**忽略编组节点操作缩放比后，节点尺寸不跟随缩放**的问题。`_applyScale()` 原先只调用 `_igEnsureMinimumSize()`，而该函数会保留当前较大的 `node.size`（只抬升、不收缩），导致用户把缩放档位从 3.0× 调回 1.0× 时节点的视觉内容已缩小，外框却仍保持放大状态。现仍在 `_applyScale()` 中先更新 `minSize` 与 DOM 最小约束，随后直接按 `scaledSize()` 写入 `node.size`，使节点外框在放大与缩小两个方向都严格跟随档位。新增 `web/shared/ignore-groups-scale-contract.test.mjs`（4 项）锁定：`_applyScale` 必须调用 `_igSetNodeSize(scaledSize())`、且必须先设最小约束再写精确尺寸，同时 `_igEnsureMinimumSize` 保持「只抬升」语义不变。缓存破坏：`ignore-groups.js` `?v=3 → 4`。

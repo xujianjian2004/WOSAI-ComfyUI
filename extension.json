@@ -9,8 +9,8 @@
   "js": [
     "web/omni-slider.js?v=3",
     "web/node-color.js?v=3",
-    "web/color-bar.js?v=4",
-    "web/hub-bar.js?v=81",
+    "web/color-bar.js?v=5",
+    "web/hub-bar.js?v=82",
     "web/auto-connect.js?v=3",
     "web/shake-disconnect.js?v=3",
     "web/layout-toolkit.js?v=7",
