@@ -31,7 +31,7 @@
   margin: 0 !important;
 }
 
-/* ── 4按钮控制行（预设｜自定义｜等比缩放｜中心裁剪） ── */
+/* ── 5按钮控制行（预设｜自定义｜裁剪｜适配｜缩放） ── */
 .ss-control-row {
   display: flex;
   gap: var(--ws-ss-control-gap);
@@ -322,11 +322,6 @@
 }
 .ss-scale-slider-row:hover {
   box-shadow: var(--ws-os-shadow-active);
-}
-.ss-scale-slider-row.ss-disabled {
-  opacity: .4;
-  filter: saturate(0);
-  cursor: not-allowed;
 }
 
 .ss-scale-track {

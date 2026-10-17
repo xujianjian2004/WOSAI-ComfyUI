@@ -115,6 +115,15 @@ test("the fit edge switch reuses the slider row instead of adding a row", () => 
     assert.match(rule[0], /gap: var\(--ws-ss-control-gap\)/);
 });
 
+test("the second row only shows up in the modes that use it", () => {
+    // Crop 下既没有滑条也没有适配边 ⇒ 整行收起，不留一个压灰的空药丸白占地方；
+    // Fit 下行是活的（按钮可点），更不能被 .4 压成禁用相。
+    assert.match(sizeSelectJs, /sliderRow\.classList\.toggle\("ss-hidden", !isScale && !isFit\);/);
+    // 折叠后 ss-disabled 已不可达：JS 切换与 CSS 规则都必须删掉，不许留死样式
+    assert.ok(!/ss-disabled/.test(sizeSelectJs), "ss-disabled 已不可达，JS 不应再切换它");
+    assert.ok(!/ss-disabled/.test(css), ".ss-disabled 的 CSS 规则必须一并删除");
+});
+
 test("fit_edge is serialized so the choice survives save and load", () => {
     // V1 签名顺序：Manual_Mode, scale_method, scale_multiplier, Resolution,
     // Aspect_Ratio, Custom_Width, Custom_Height, align_multiple, fit_edge

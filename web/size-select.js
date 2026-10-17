@@ -427,13 +427,16 @@ function buildUI(node) {
         _ssUpdateTrack(initVal);
 
         // ── 缩放方式按钮事件 ──
-        // ── 缩放倍数滑条锁定/解锁（仅 Scale 模式可拖动） ──
-        //   同一行还承载 Fit 模式的「长边 / 短边」切换：三者互斥，行高不变。
+        // ── 第二行：缩放滑条 / 适配边，只在用得上它的模式出现 ──
+        //   Scale → 显示滑条；Fit → 显示长边/短边按钮；Crop → 两者都用不上，整行收起。
+        //   一直挂着一个透明度 .4 的空药丸只会白占一块地方（用户反馈视觉效果不佳），
+        //   而且 Fit 模式下行是活的（按钮可点），却同样被 .4 压灰，看着像禁用。
+        //   节点高度是 getFixedHeight() 的固定值，收起一行不会撑出空洞。
         const _ssSetSliderLock = (val) => {
             if (!sliderRow) return;
             const isScale = val === "Scale";
             const isFit = val === "Fit";
-            sliderRow.classList.toggle("ss-disabled", !isScale);
+            sliderRow.classList.toggle("ss-hidden", !isScale && !isFit);
             // Crop 保持旧语义：整行不可点（滑条对它没有意义）；Fit 要留给适配边按钮
             sliderRow.style.pointerEvents = (isScale || isFit) ? "" : "none";
             sliderRow.title = isScale ? t('menus.sizeSelect.tipScaleMul')
@@ -1166,7 +1169,7 @@ app.registerExtension({
             const link = document.createElement("link");
             link.id = "wosai-os-size-css";
             link.rel = "stylesheet";
-            link.href = new URL("./styles/os-size.css?v=3", import.meta.url).href;
+            link.href = new URL("./styles/os-size.css?v=4", import.meta.url).href;
             document.head.appendChild(link);
             _injectedCss = link;
         }
