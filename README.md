@@ -48,7 +48,8 @@ git clone https://github.com/xujianjian2004/WOSAI-ComfyUI.git
 
 - 预设分辨率：SD 480P、HD 720P、FHD 1080P、QHD 2K+。
 - 支持 3:2、2:3、4:3、3:4、16:9、9:16、21:9、1:1。
-- 手动宽高最小 256、按 8 对齐，UI 输入上限 16384（ComfyUI 通用分辨率上限，原为 2048；通过 API 调用时后端不夹上限）；超大尺寸会显著增加显存/内存占用，请按需设置。
+- 手动宽高最小 256、按 `align_multiple` 对齐（默认 8 = latent 压缩率，可在节点上改，1–128），UI 输入上限 16384（ComfyUI 通用分辨率上限，原为 2048；通过 API 调用时后端不夹上限）；超大尺寸会显著增加显存/内存占用，请按需设置。
+- 节点底部实时回显**真实像素总量（MP）与 latent 网格**：同一档位切换宽高比时面积并不守恒（例：FHD 档位 1:1 为 1.00 MP，21:9 为 2.64 MP），显存与采样耗时正比于面积而非单边长度，超过 4 MP 会以警示色提示。
 - `Crop` 按目标比例中心裁剪后缩放；`Scale` 按输入尺寸与倍率缩放。
 - 连接 image 时同步处理 image/mask；仅连接 latent 时处理 latent；无图像和 latent 时输出尺寸与空 latent。
 - latent 缩放保留 `batch_index` 等附加元数据，支持 VAE/latent 声明的非 8× 空间压缩比，并同步处理 `noise_mask`。

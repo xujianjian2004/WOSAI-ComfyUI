@@ -30,22 +30,39 @@ DEFAULT_CUSTOM_HEIGHT = int(_RESOLUTION_CONFIG["default_custom_height"])
 #   这里取 ComfyUI 官方口径 `MAX_RESOLUTION`（EmptyLatentImage 等节点同款），
 #   仅用于喂给 UI；后端计算与校验**不夹这个值**（见 _determine_target_size）。
 MAX_DIMENSION = 16384
+# 像素对齐粒度的默认值：8 = SD / SDXL / Flux 一系的 latent 空间压缩率。
+# 可由节点上的 align_multiple（advanced）覆盖，用于下采样率不同的模型。
+DEFAULT_ALIGN_MULTIPLE = 8
 DEFAULT_RES = _RESOLUTION_CONFIG["default_resolution"]
 DEFAULT_RATIO = _RESOLUTION_CONFIG["default_ratio"]
 
 
-def _r8(v: int) -> int:
-    return max(0, math.floor(v / 8) * 8)
+def _lcm(a: int, b: int) -> int:
+    """两个步长的公倍数。
+
+    像素尺寸要同时满足两个约束：落在「网格粒度」multiple 上，且能被 latent 的
+    空间压缩率 ratio 整除（否则 latent 形状只能靠整除截断，与输出的 width/height
+    对不上）。同时满足两者 = 落在 lcm(multiple, ratio) 上。
+    """
+    a = max(1, int(a))
+    b = max(1, int(b))
+    return a * b // math.gcd(a, b)
 
 
-def _scale_r8(v: float) -> int:
-    """Scale-mode dimensions must still describe a valid latent grid."""
-    return max(8, _r8(int(v)))
+def _align(value: float, step: int) -> int:
+    """吸附到网格：**四舍五入**，不是向下取整。
+
+    向下取整（`floor`）会让实际尺寸系统性偏小——最多差 step-1 个像素，且 Scale
+    模式下连续取整会累积；四舍五入把误差压在 ±0.5 个步长内，与 ComfyUI 原生
+    `ResolutionSelector` 的 `round(v / multiple) * multiple` 同口径。
+    """
+    step = max(1, int(step or 1))
+    return max(step, int(round(float(value) / step)) * step)
 
 
-def _aligned_dimension(value: float, ratio: int) -> int:
-    ratio = max(1, int(ratio))
-    return max(ratio, math.floor(float(value) / ratio) * ratio)
+def _align_grid(value: float, multiple: int, ratio: int = 1) -> int:
+    """按「网格粒度 + latent 压缩率」的公倍数吸附。"""
+    return _align(value, _lcm(multiple, ratio))
 
 
 def _latent_spatial_ratio(latent: Optional[dict] = None, vae=None) -> int:
@@ -85,6 +102,7 @@ class WOSAI_SizeSelect:
                 "Aspect_Ratio":  (ASPECT_RATIOS, {"default": DEFAULT_RATIO, "tooltip": "Select aspect ratio | 选择画面宽高比"}),
                 "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom width (manual mode only, max {MAX_DIMENSION}) | 自定义宽度（仅手动模式，上限 {MAX_DIMENSION}）"}),
                 "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"}),
+                "align_multiple": ("INT", {"default": DEFAULT_ALIGN_MULTIPLE, "min": 1, "max": 128, "step": 1, "tooltip": "Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"}),
                 "image":         ("IMAGE",),
                 "mask":          ("MASK",),
                 "latent":        ("LATENT",),
@@ -98,10 +116,10 @@ class WOSAI_SizeSelect:
     OUTPUT_NODE  = False
 
     def _determine_target_size(self, Manual_Mode, Resolution, Aspect_Ratio,
-                                Custom_Width, Custom_Height):
+                                Custom_Width, Custom_Height, align_multiple=DEFAULT_ALIGN_MULTIPLE):
         """确定目标像素尺寸（与现有逻辑一致）"""
         if Manual_Mode == "on":
-            # 无上限：只保留最小值约束，8px 网格对齐由 _r8 完成。
+            # 无上限：只保留最小值约束，网格对齐由 _align 完成（四舍五入）。
             w = max(MIN_DIMENSION, int(Custom_Width or MIN_DIMENSION))
             h = max(MIN_DIMENSION, int(Custom_Height or MIN_DIMENSION))
         else:
@@ -115,7 +133,7 @@ class WOSAI_SizeSelect:
             if aspect_key not in RESOLUTION_DATA[Resolution]:
                 raise ValueError(f"[WOSAI_SizeSelect] Invalid aspect ratio: {Aspect_Ratio!r}")
             w, h = RESOLUTION_DATA[Resolution][aspect_key]
-        return _r8(w), _r8(h)
+        return _align(w, align_multiple), _align(h, align_multiple)
 
     def _center_crop_tensor(self, tensor, target_width, target_height):
         """中心裁剪到目标宽高比"""
@@ -139,6 +157,7 @@ class WOSAI_SizeSelect:
         Aspect_Ratio: Optional[str] = None,
         Custom_Width: int = 256,
         Custom_Height: int = 2048,
+        align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
         image: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
         latent: Optional[dict] = None,
@@ -146,27 +165,29 @@ class WOSAI_SizeSelect:
         **kwargs,
     ):
         target_w, target_h = self._determine_target_size(
-            Manual_Mode, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
+            Manual_Mode, Resolution, Aspect_Ratio, Custom_Width, Custom_Height, align_multiple)
 
         has_image = image is not None
         has_latent = latent is not None
         has_vae = vae is not None
         latent_ratio = _latent_spatial_ratio(latent, vae)
-        processing_ratio = latent_ratio if has_latent or has_vae else 8
-        if has_latent or has_vae:
-            target_w = _aligned_dimension(target_w, processing_ratio)
-            target_h = _aligned_dimension(target_h, processing_ratio)
+        processing_ratio = latent_ratio if has_latent or has_vae else 1
+        # 三条路径（预设 / 自定义 / Scale）统一走同一个网格：lcm(对齐粒度, latent 压缩率)。
+        # 无 latent / VAE 输入时压缩率按 1 计，即只按 align_multiple 对齐
+        # （空 latent 与下游真实 VAE 的压缩率差异见 tooltip 说明）。
+        target_w = _align_grid(target_w, align_multiple, processing_ratio)
+        target_h = _align_grid(target_h, align_multiple, processing_ratio)
 
         # ── 计算实际处理尺寸（等比缩放 vs 中心裁剪）──
         if scale_method == "Scale":
             if has_image:
                 _, h1, w1, _ = image.shape
-                actual_w = _aligned_dimension(w1 * scale_multiplier, processing_ratio)
-                actual_h = _aligned_dimension(h1 * scale_multiplier, processing_ratio)
+                actual_w = _align_grid(w1 * scale_multiplier, align_multiple, processing_ratio)
+                actual_h = _align_grid(h1 * scale_multiplier, align_multiple, processing_ratio)
             elif has_latent:
                 _, _, lh, lw = latent["samples"].shape
-                actual_w = _aligned_dimension(lw * latent_ratio * scale_multiplier, latent_ratio)
-                actual_h = _aligned_dimension(lh * latent_ratio * scale_multiplier, latent_ratio)
+                actual_w = _align_grid(lw * latent_ratio * scale_multiplier, align_multiple, latent_ratio)
+                actual_h = _align_grid(lh * latent_ratio * scale_multiplier, align_multiple, latent_ratio)
             else:
                 actual_w, actual_h = target_w, target_h
         else:
@@ -314,8 +335,16 @@ class WOSAI_SizeSelect:
         Aspect_Ratio: Optional[str] = None,
         Custom_Width: int = 256,
         Custom_Height: int = 2048,
+        align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
         **kwargs,
     ):
+        if align_multiple is not None:
+            try:
+                multiple = int(align_multiple)
+            except (TypeError, ValueError):
+                return "对齐粒度必须是不小于 1 的整数"
+            if multiple < 1 or multiple > MAX_DIMENSION:
+                return f"对齐粒度必须在 1-{MAX_DIMENSION} 之间"
         if Manual_Mode == "on":
             try:
                 custom_width = int(Custom_Width)
@@ -341,9 +370,11 @@ class WOSAI_SizeSelect:
         Aspect_Ratio: Optional[str] = None,
         Custom_Width: int = 256,
         Custom_Height: int = 2048,
+        align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
         **kwargs,
-    ) -> tuple[str, str, float, Optional[str], Optional[str], int, int]:
-        return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
+    ) -> tuple[str, str, float, Optional[str], Optional[str], int, int, int]:
+        return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio,
+                Custom_Width, Custom_Height, align_multiple)
 
 
 NODE_CLASS_MAPPINGS = {
@@ -393,6 +424,9 @@ try:
                                   min=MIN_DIMENSION, max=MAX_DIMENSION, step=8,
                                   optional=True,
                                   tooltip=f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"),
+                    _io.Int.Input("align_multiple", default=DEFAULT_ALIGN_MULTIPLE,
+                                  min=1, max=128, step=1, optional=True, advanced=True,
+                                  tooltip="Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"),
                     _io.Image.Input("image", optional=True,
                                     tooltip="Input image (optional, will be scaled to target size) | 输入图像（可选，将缩放至目标尺寸）"),
                     _io.Mask.Input("mask", optional=True,
@@ -415,25 +449,31 @@ try:
 
         @classmethod
         def validate_inputs(cls, Manual_Mode="off", Resolution=None,
-                            Aspect_Ratio=None, Custom_Width=256, Custom_Height=2048):
+                            Aspect_Ratio=None, Custom_Width=256, Custom_Height=2048,
+                            align_multiple=DEFAULT_ALIGN_MULTIPLE):
             return WOSAI_SizeSelect.VALIDATE_INPUTS(
-                Manual_Mode, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
+                Manual_Mode, Resolution, Aspect_Ratio, Custom_Width, Custom_Height, align_multiple)
 
         @classmethod
         def fingerprint_inputs(cls, Manual_Mode: str = "off", scale_method: str = "Crop",
                                scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
-                               Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256, Custom_Height: int = 2048) -> tuple:
-            return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio, Custom_Width, Custom_Height)
+                               Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256,
+                               Custom_Height: int = 2048,
+                               align_multiple: int = DEFAULT_ALIGN_MULTIPLE) -> tuple:
+            return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio,
+                    Custom_Width, Custom_Height, align_multiple)
 
         @classmethod
         def execute(cls, Manual_Mode: str = "off", scale_method: str = "Crop",
                     scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
                     Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256, Custom_Height: int = 2048,
+                    align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
                     image: Optional[torch.Tensor] = None, mask: Optional[torch.Tensor] = None,
                     latent: Optional[dict] = None, vae: Optional[object] = None) -> _io.NodeOutput:
             result = WOSAI_SizeSelect().calculate_size(
                 Manual_Mode, scale_method, scale_multiplier,
                 Resolution, Aspect_Ratio, Custom_Width, Custom_Height,
+                align_multiple=align_multiple,
                 image=image, mask=mask, latent=latent, vae=vae)
             return _io.NodeOutput(*result)
 except ImportError:

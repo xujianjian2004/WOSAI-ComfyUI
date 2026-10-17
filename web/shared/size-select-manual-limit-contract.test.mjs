@@ -25,18 +25,19 @@ test("resolutions.json no longer declares a hard max_dimension", () => {
     assert.ok(Number.isInteger(resolutions.default_custom_height), "default_custom_height replaces max_dimension");
 });
 
-test("front-end roundTo8 clamps to the minimum only", () => {
+test("front-end alignment clamps to the minimum only", () => {
     assert.ok(!/MAX_DIMENSION/.test(sizeSelectJs), "size-select.js must not reference MAX_DIMENSION anymore");
-    const fn = sizeSelectJs.match(/function roundTo8\([\s\S]*?\n\}/);
-    assert.ok(fn, "roundTo8 not found");
-    assert.match(fn[0], /function roundTo8\(v\) \{/, "roundTo8 must not take an upper-bound argument");
-    assert.ok(!/Math\.min\(/.test(fn[0]), "roundTo8 must not clamp to an upper bound");
-    assert.match(fn[0], /Math\.max\(MIN_DIMENSION/, "roundTo8 must still clamp to the minimum");
+    const fn = sizeSelectJs.match(/function alignTo\([\s\S]*?\n\}/);
+    assert.ok(fn, "alignTo not found");
+    assert.match(fn[0], /function alignTo\(v, multiple = DEFAULT_ALIGN_MULTIPLE\) \{/, "alignTo takes the grid step as an argument");
+    assert.ok(!/Math\.min\(/.test(fn[0]), "alignTo must not clamp to an upper bound");
+    assert.ok(!/Math\.floor\(n \/ step\)/.test(fn[0]), "alignTo must not floor to the grid");
+    assert.match(fn[0], /Math\.max\(MIN_DIMENSION/, "alignTo must still clamp to the minimum");
 });
 
 test("front-end seeds the custom dimension widgets without an upper clamp", () => {
-    assert.match(sizeSelectJs, /if \(cusW\) cusW\.value = roundTo8\(cusW\.value\);/);
-    assert.match(sizeSelectJs, /if \(cusH\) cusH\.value = roundTo8\(cusH\.value\);/);
+    assert.match(sizeSelectJs, /if \(cusW\) cusW\.value = alignTo\(cusW\.value, gridStep\(almW\?\.value\)\);/);
+    assert.match(sizeSelectJs, /if \(cusH\) cusH\.value = alignTo\(cusH\.value, gridStep\(almW\?\.value\)\);/);
     assert.match(sizeSelectJs, /let baseHeight\s+= cusH\?\.value \|\| DEFAULT_CUSTOM_HEIGHT;/);
 });
 

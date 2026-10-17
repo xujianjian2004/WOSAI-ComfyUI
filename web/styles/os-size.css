@@ -255,6 +255,19 @@
   letter-spacing: .02em;
   white-space: nowrap;
 }
+/* 面积回显：像素总量 + latent 网格。显存 / 耗时正比于面积，
+   「同一档位换个比例开销翻倍」这件事必须让用户看见。 */
+.ss-preview-meta {
+  font-size: var(--ws-text-sm);
+  color: var(--ws-text-secondary);
+  white-space: nowrap;
+}
+.ss-preview.is-large .ss-preview-meta {
+  color: var(--ws-warning);
+}
+.ss-preview.is-extreme .ss-preview-meta {
+  color: var(--ws-danger);
+}
 
 .ss-scale-slider-row {
   display: flex;

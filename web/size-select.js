@@ -17,6 +17,9 @@ let _injectedCss = null;
 // 自定义模式**不设上限**（与 Scale 模式一致）：该键只作为「自定义高度」的初始值，不是上限。
 const DEFAULT_CUSTOM_HEIGHT = RESOLUTION_CONFIG.default_custom_height;
 const MIN_DIMENSION = RESOLUTION_CONFIG.min_dimension;
+// 与 nodes/size_select.py::DEFAULT_ALIGN_MULTIPLE 同值：默认 8（SD / SDXL / Flux 的
+// latent 空间压缩率）。节点上的 align_multiple（advanced）可覆盖。
+const DEFAULT_ALIGN_MULTIPLE = 8;
 const DEFAULT_RES = RESOLUTION_CONFIG.default_resolution;
 const DEFAULT_RATIO = RESOLUTION_CONFIG.default_ratio;
 
@@ -144,15 +147,33 @@ function _shortAsp(label) {
     return i > 0 ? label.slice(0, i) : label;
 }
 
-// 自定义模式不设上限：只保留最小值约束 + latent 的 8px 网格对齐。
-function roundTo8(v) {
-    const n = Math.max(MIN_DIMENSION, Number(v) || MIN_DIMENSION);
-    return Math.floor(n / 8) * 8;
+// 对齐粒度：与后端 `_align()` 同源 —— **四舍五入**（不是向下取整），
+//   且 .5 取偶（roundHalfToEven），这样前端预览与后端算出的尺寸逐像素一致。
+//   后端还要再叠一层 latent 压缩率（lcm），前端拿不到真实压缩率，故只按粒度换算。
+function roundHalfToEven(v) {
+    const f = Math.floor(v);
+    return v - f === 0.5 ? (f % 2 === 0 ? f : f + 1) : Math.round(v);
 }
 
-function scaleTo8(v) {
-    return Math.max(8, Math.floor((Number(v) || 0) / 8) * 8);
+function gridStep(multiple) {
+    return Math.max(1, Math.floor(Number(multiple)) || DEFAULT_ALIGN_MULTIPLE);
 }
+
+function alignTo(v, multiple = DEFAULT_ALIGN_MULTIPLE) {
+    const step = gridStep(multiple);
+    const n = Math.max(MIN_DIMENSION, Number(v) || MIN_DIMENSION);
+    return Math.max(step, roundHalfToEven(n / step) * step);
+}
+
+function scaleAlign(v, multiple = DEFAULT_ALIGN_MULTIPLE) {
+    const step = gridStep(multiple);
+    return Math.max(step, roundHalfToEven((Number(v) || 0) / step) * step);
+}
+
+// 面积预算提示阈值（MP）：显存 / 耗时正比于像素总量，而不是单边长度。
+//   参考口径：SDXL / Flux 常用 1 MP，2K 档约 3.5 MP。
+const AREA_HINT_MP = 4;
+const AREA_WARN_MP = 8;
 
 const _mqlReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)") ?? null;
 const _prefersReducedMotion = () => _mqlReducedMotion?.matches ?? false;
@@ -207,6 +228,7 @@ function buildUI(node) {
         const cusH = node.widgets.find(w => w.name === "Custom_Height");
         const scmW = node.widgets.find(w => w.name === "scale_method");
         const sclW = node.widgets.find(w => w.name === "scale_multiplier");
+        const almW = node.widgets.find(w => w.name === "align_multiple");
 
         if (manW) manW.label = t('menus.sizeSelect.manualMode');
         if (resW) resW.label = t('menus.sizeSelect.resolution');
@@ -215,6 +237,7 @@ function buildUI(node) {
         if (cusH) cusH.label = t('menus.sizeSelect.customHeight');
         if (scmW) scmW.label = t('menus.sizeSelect.scaleMethod');
         if (sclW) sclW.label = t('menus.sizeSelect.scaleMultiplier');
+        if (almW) almW.label = t('menus.sizeSelect.alignMultiple');
         for (const _hw of [scmW, sclW]) {
             if (!_hw) continue;
             _hw.hidden = true;
@@ -236,8 +259,8 @@ function buildUI(node) {
             }
         }
 
-        if (cusW) cusW.value = roundTo8(cusW.value);
-        if (cusH) cusH.value = roundTo8(cusH.value);
+        if (cusW) cusW.value = alignTo(cusW.value, gridStep(almW?.value));
+        if (cusH) cusH.value = alignTo(cusH.value, gridStep(almW?.value));
 
         let currentRes = (resW?.value && RESOLUTION_DATA[resW.value]) ? resW.value : DEFAULT_RES;
         if (resW && resW.value !== currentRes) resW.value = currentRes;
@@ -259,7 +282,7 @@ function buildUI(node) {
         const _origSerialize = node.serialize?.bind(node);
         node.serialize = function () {
             const data = _origSerialize ? _origSerialize() : {};
-            const coreWidgets = [manW, scmW, sclW, resW, aspW, cusW, cusH].filter(Boolean);
+            const coreWidgets = [manW, scmW, sclW, resW, aspW, cusW, cusH, almW].filter(Boolean);
             data.widgets_values = coreWidgets
                 .filter(w => w.options?.serialize !== false)
                 .map(w => w.value);
@@ -572,6 +595,14 @@ function buildUI(node) {
         const previewVal = preview.querySelector(".ss-preview-val");
         const previewLbl = preview.querySelector(".ss-preview-lbl");
         node._ss_previewLbl = previewLbl;
+        // 面积回显：像素总量（MP）与 latent 网格。
+        //   原生 ResolutionSelector 也回显真实 MP —— 对齐后的尺寸往往不等于设定值，
+        //   不显示就等于默认「和你想的一样」。显存 / 耗时正比于像素总量而非单边长度，
+        //   所以「同一个档位换个比例，开销翻倍」这件事必须让用户看见。
+        const previewMeta = document.createElement("span");
+        previewMeta.className = "ss-preview-meta";
+        preview.appendChild(previewMeta);
+        node._ss_previewMeta = previewMeta;
 
         // ── Scale 模式原图尺寸解析（不依赖后端执行/缓存）──────────────────────────
         //   image 输入：读上游节点本地已加载的预览图（LoadImage 等，选图那一刻就有，无需 Queue Prompt）
@@ -641,21 +672,47 @@ function buildUI(node) {
         }
 
         function syncPreview(opts = {}) {
+            const step = gridStep(almW?.value);
+            let w, h;
             if (scmW?.value === "Scale") {
-                // 对齐 size_select.py：Scale 模式不限制上限，但必须对齐 latent 的 8px 网格。
+                // 对齐 size_select.py：Scale 模式不限制上限，但必须落在 latent 网格上。
                 const mul = parseFloat(sclW?.value) || 1.0;
-                previewVal.textContent = (node._ss_srcW && node._ss_srcH)
-                    ? `${scaleTo8(node._ss_srcW * mul)} × ${scaleTo8(node._ss_srcH * mul)}`
-                    : "-";
+                const src = (node._ss_srcW && node._ss_srcH);
+                w = src ? scaleAlign(node._ss_srcW * mul, step) : 0;
+                h = src ? scaleAlign(node._ss_srcH * mul, step) : 0;
+                previewVal.textContent = src ? `${w} × ${h}` : "-";
             } else if (!isManual) {
                 const d = RESOLUTION_DATA[currentRes]?.[currentAsp];
-                previewVal.textContent = d ? `${d[0]} × ${d[1]}` : "N/A";
+                w = d ? alignTo(d[0], step) : 0;
+                h = d ? alignTo(d[1], step) : 0;
+                previewVal.textContent = d ? `${w} × ${h}` : "N/A";
             } else {
-                const w = roundTo8(_dimVal(cusW, baseWidth));
-                const h = roundTo8(_dimVal(cusH, baseHeight));
+                w = alignTo(_dimVal(cusW, baseWidth), step);
+                h = alignTo(_dimVal(cusH, baseHeight), step);
                 previewVal.textContent = `${w} × ${h}`;
             }
+            renderAreaMeta(w, h, step);
             if (opts.flash !== false) flashPreview();
+        }
+
+        /** 回显真实像素总量与 latent 网格；面积超预算时按级别变色提示。 */
+        function renderAreaMeta(w, h, step) {
+            if (!previewMeta) return;
+            if (!(w > 0) || !(h > 0)) {
+                previewMeta.textContent = "";
+                previewMeta.title = "";
+                preview.classList.remove("is-large", "is-extreme");
+                return;
+            }
+            const mp = (w * h) / (1024 * 1024);
+            previewMeta.textContent = ` · ${mp.toFixed(2)} MP · latent ${w / step} × ${h / step}`;
+            preview.classList.toggle("is-large", mp > AREA_HINT_MP && mp <= AREA_WARN_MP);
+            preview.classList.toggle("is-extreme", mp > AREA_WARN_MP);
+            previewMeta.title = mp > AREA_WARN_MP
+                ? t('menus.sizeSelect.tipAreaExtreme', 'Large area: high VRAM and slow sampling')
+                : (mp > AREA_HINT_MP
+                    ? t('menus.sizeSelect.tipAreaLarge', 'Area above 4 MP: watch your VRAM')
+                    : t('menus.sizeSelect.tipAreaGrid', 'Latent grid is derived from the align multiple'));
         }
 
         function updateWidgetValue(widget, value) {
@@ -771,7 +828,7 @@ function buildUI(node) {
                 const input  = e.target.querySelector("input") || e.target;
                 const rawVal = parseInt(input.value) || 0;
                 if (rawVal <= 0) { if (skipZero) return; syncPreview(); return; }
-                const r = roundTo8(rawVal);
+                const r = alignTo(rawVal, gridStep(almW?.value));
                 input.value  = r;
                 widget.value = r;
                 setBase(r);
@@ -910,7 +967,7 @@ function buildUI(node) {
         });
         _resizeObserver.observe(wrap);
 
-        node._ss_widgets = { manW, resW, aspW, cusW, cusH, scmW, sclW };
+        node._ss_widgets = { manW, resW, aspW, cusW, cusH, scmW, sclW, almW };
         node._ss_refreshLang = () => {
             if (manW) manW.label = t('menus.sizeSelect.manualMode');
             if (resW) resW.label = t('menus.sizeSelect.resolution');
@@ -919,6 +976,7 @@ function buildUI(node) {
             if (cusH) cusH.label = t('menus.sizeSelect.customHeight');
             if (scmW) scmW.label = t('menus.sizeSelect.scaleMethod');
             if (sclW) sclW.label = t('menus.sizeSelect.scaleMultiplier');
+        if (almW) almW.label = t('menus.sizeSelect.alignMultiple');
             if (node._ss_btnAuto) node._ss_btnAuto.textContent = t('menus.sizeSelect.preset');
             if (node._ss_btnMan) node._ss_btnMan.textContent = t('menus.sizeSelect.manual');
             if (node._ss_btnFit) {

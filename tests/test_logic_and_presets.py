@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 from nodes.logic_switch import WOSAI_LogicSwitch
 from nodes.preset_prompt import DEFAULT_PRESETS, WOSAI_PresetPromptSelector, _normalize_presets
 if torch is not None:
-    from nodes.size_select import MIN_DIMENSION, WOSAI_SizeSelect
+    from nodes.size_select import MIN_DIMENSION, WOSAI_SizeSelect, _align, _align_grid
 
 
 class LogicSwitchTests(unittest.TestCase):
@@ -232,3 +232,46 @@ class SizeSelectManualModeLimitTests(unittest.TestCase):
     def test_validation_still_rejects_below_minimum_and_off_grid_values(self):
         self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 128, 2048), str)
         self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 4097, 2048), str)
+
+    def test_validation_rejects_a_bogus_align_multiple(self):
+        self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1024, 1024, 8), True)
+        self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1024, 1024, 0), str)
+
+
+@unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")
+class SizeSelectAlignGridTests(unittest.TestCase):
+    """对齐粒度：口径统一为「四舍五入到 lcm(网格粒度, latent 压缩率)」"""
+
+    def setUp(self):
+        self.node = WOSAI_SizeSelect()
+
+    def test_align_rounds_to_the_nearest_step_instead_of_flooring(self):
+        # 向下取整会系统性偏小：1023 → 1016；四舍五入 → 1024
+        self.assertEqual(_align(1023, 8), 1024)
+        self.assertEqual(_align(1021, 8), 1024)
+        # 1019/8 = 127.375 → 127 → 1016（.5 取偶：与前端 roundHalfToEven 同源）
+        self.assertEqual(_align(1019, 8), 1016)
+        self.assertEqual(_align(1024, 8), 1024)
+        self.assertEqual(_align(4, 8), 8)
+
+    def test_align_grid_also_satisfies_the_latent_compression_ratio(self):
+        # 压缩率 16 时像素必须能被 16 整除：1033 落到 1040，
+        # 否则 latent 形状要靠整除截断，与输出的 width/height 对不上
+        self.assertEqual(_align_grid(1033, 8, 16), 1040)
+        self.assertEqual(_align_grid(1024, 8, 16), 1024)
+        self.assertEqual(_align_grid(1023, 16, 1), 1024)
+
+    def test_manual_mode_honours_a_custom_align_multiple(self):
+        self.assertEqual(
+            self.node._determine_target_size("on", None, None, 1023, 1023, 16),
+            (1024, 1024),
+        )
+
+    def test_latent_output_stays_divisible_by_the_compression_ratio(self):
+        latent = {"samples": torch.rand((1, 4, 8, 8)), "downscale_ratio_spacial": 16}
+        _, _, out, width, height = self.node.calculate_size(
+            "on", "Crop", 1.0, None, None, 1000, 1000, latent=latent)
+        self.assertEqual(width % 16, 0)
+        self.assertEqual(height % 16, 0)
+        self.assertEqual(width // 16, out["samples"].shape[3])
+        self.assertEqual(height // 16, out["samples"].shape[2])
