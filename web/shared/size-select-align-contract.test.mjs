@@ -18,6 +18,8 @@ function source(relativePath) {
 const sizeSelectJs = source("../size-select.js");
 const sizeSelectPy = source("../../nodes/size_select.py");
 const css = source("../styles/os-size.css");
+const zhMenus = JSON.parse(source("../locales/zh/menus.json")).sizeSelect;
+const enMenus = JSON.parse(source("../locales/en/menus.json")).sizeSelect;
 
 test("front-end rounds half to even, matching python round()", () => {
     // Python 的 round() 是银行家舍入；前端若用 Math.round()，.5 处会与后端差 1 个步长。
@@ -71,7 +73,7 @@ test("front-end echoes the real pixel area and the latent grid", () => {
     // 原生 ResolutionSelector 也有这个回显：对齐后的尺寸通常不等于设定值，
     // 不显示就等于默认「和你想的一样」
     assert.match(sizeSelectJs, /const mp = \(w \* h\) \/ \(1024 \* 1024\);/);
-    assert.match(sizeSelectJs, /previewMeta\.textContent = ` · \$\{mp\.toFixed\(2\)\} MP · latent \$\{w \/ step\} × \$\{h \/ step\}`;/);
+    assert.match(sizeSelectJs, /previewMeta\.textContent = `\$\{mp\.toFixed\(2\)\} MP · \$\{grid\}`;/);
     // 面积超预算分级提示（提示而非硬夹：上限形态留给 megapixels 那样的面积预算）
     assert.match(sizeSelectJs, /const AREA_HINT_MP = 4;/);
     assert.match(sizeSelectJs, /const AREA_WARN_MP = 8;/);
@@ -84,4 +86,39 @@ test("front-end echoes the real pixel area and the latent grid", () => {
 test("the align multiple survives save and load", () => {
     // serialize 漏掉新 widget 会让保存再打开后对齐粒度丢回默认
     assert.match(sizeSelectJs, /const coreWidgets = \[manW, scmW, sclW, resW, aspW, cusW, cusH, almW\]/);
+});
+
+test("the preview stays on one line and degrades by truncating, never overflowing", () => {
+    // 单行预算：节点最小宽度 220px，左右内边距后约 204px 可用。
+    // 「1920 × 1080 · 1.98 MP · latent 240 × 135」约 200px 刚好放下；
+    // 节点被拖得更窄时必须截断（省略号），不能把内容挤出节点框。
+    // 顺序即优先级：面积比 latent 网格重要，从尾部省略正好先舍掉最不重要的部分。
+
+    // 装饰性标签已去掉：四个字要吃掉约 44px，留着它必然溢出
+    assert.ok(!/ss-preview-lbl/.test(sizeSelectJs), "预览不再使用「尺寸预览」标签");
+    assert.ok(!/ss-preview-lbl/.test(css), ".ss-preview-lbl 的 CSS 必须一并删除");
+    assert.ok(!/menus\.sizeSelect\.imageDimensions/.test(sizeSelectJs), "imageDimensions 已不再消费");
+    assert.ok(!/"imageDimensions"/.test(zhMenus), "zh menus 不应保留 imageDimensions");
+    assert.ok(!/"imageDimensions"/.test(enMenus), "en menus 不应保留 imageDimensions");
+
+    const box = css.match(/\.ss-preview \{[\s\S]*?\}/);
+    assert.ok(box, ".ss-preview rule not found");
+    assert.match(box[0], /height: var\(--ws-ss-pill-height\)/, "预览保持单行药丸高度");
+    assert.ok(!/flex-direction: column/.test(box[0]), "预览不能拆成两行");
+    assert.match(box[0], /overflow: hidden/, "兜底：任何情况下都不撑破药丸");
+
+    // 两个 span 都必须能收缩 + 省略号，否则 flex 项默认 min-width:auto 会顶开容器
+    for (const sel of [".ss-preview-val", ".ss-preview-meta"]) {
+        // ^ 锚定行首：否则会先匹配到 `.ss-preview.flash .ss-preview-val` 这类状态规则
+        const rule = css.match(new RegExp(`^\\${sel} \\{[\\s\\S]*?\\}`, "m"));
+        assert.ok(rule, `${sel} rule not found`);
+        assert.match(rule[0], /min-width: 0/, `${sel} 必须允许收缩`);
+        assert.match(rule[0], /overflow: hidden/);
+        assert.match(rule[0], /text-overflow: ellipsis/, `${sel} 必须省略号截断`);
+    }
+});
+
+test("the full preview text is recoverable when truncated", () => {
+    // 截断后仍需拿到完整信息：完整串挂到 title 上
+    assert.match(sizeSelectJs, /preview\.title = `\$\{w\} × \$\{h\} · \$\{mp\.toFixed\(2\)\} MP · \$\{grid\}`;/);
 });

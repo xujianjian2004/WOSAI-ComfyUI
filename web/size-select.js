@@ -100,6 +100,8 @@ const _RES_LABEL_MAP = {
   "QHD 2K+": "res2K",
 };
 
+// 预览行不再带「尺寸预览」标签：节点最小宽度 220px，四个字要吃掉约 44px，
+//   留着它必然把后面的尺寸 / 面积挤出节点框，而「宽 × 高」本身已自解释。
 function getFixedHeight(manual) {
     // 5 输出端口(INT×2 + LATENT + IMAGE + MASK) + 缩放区两行(按钮+滑条)
     return manual ? 375 : 455;
@@ -591,10 +593,8 @@ function buildUI(node) {
 
         const preview = document.createElement("div");
         preview.className = "ss-preview";
-        preview.innerHTML = `<span class="ss-preview-lbl">${t('menus.sizeSelect.imageDimensions')} </span><span class="ss-preview-val">-</span>`;
+        preview.innerHTML = `<span class="ss-preview-val">-</span>`;
         const previewVal = preview.querySelector(".ss-preview-val");
-        const previewLbl = preview.querySelector(".ss-preview-lbl");
-        node._ss_previewLbl = previewLbl;
         // 面积回显：像素总量（MP）与 latent 网格。
         //   原生 ResolutionSelector 也回显真实 MP —— 对齐后的尺寸往往不等于设定值，
         //   不显示就等于默认「和你想的一样」。显存 / 耗时正比于像素总量而非单边长度，
@@ -701,11 +701,15 @@ function buildUI(node) {
             if (!(w > 0) || !(h > 0)) {
                 previewMeta.textContent = "";
                 previewMeta.title = "";
+                preview.title = "";
                 preview.classList.remove("is-large", "is-extreme");
                 return;
             }
             const mp = (w * h) / (1024 * 1024);
-            previewMeta.textContent = ` · ${mp.toFixed(2)} MP · latent ${w / step} × ${h / step}`;
+            const grid = `latent ${w / step} × ${h / step}`;
+            previewMeta.textContent = `${mp.toFixed(2)} MP · ${grid}`;
+            // 节点被拖窄时 meta 会被省略号截断，完整信息挂 title 兜底
+            preview.title = `${w} × ${h} · ${mp.toFixed(2)} MP · ${grid}`;
             preview.classList.toggle("is-large", mp > AREA_HINT_MP && mp <= AREA_WARN_MP);
             preview.classList.toggle("is-extreme", mp > AREA_WARN_MP);
             previewMeta.title = mp > AREA_WARN_MP
@@ -994,7 +998,6 @@ function buildUI(node) {
             if (node._ss_sliderRow) node._ss_sliderRow.title = (scmW?.value !== "Scale") ? t('menus.sizeSelect.scaleOnly') : t('menus.sizeSelect.tipScaleMul');
             if (node._ss_resBtns) Object.entries(node._ss_resBtns).forEach(([lv, b]) => { b.innerHTML = t('menus.sizeSelect.' + (_RES_LABEL_MAP[lv] || lv)); });
             if (node._ss_swapBtn) node._ss_swapBtn.textContent = t('menus.sizeSelect.swap');
-            if (node._ss_previewLbl) node._ss_previewLbl.textContent = t('menus.sizeSelect.imageDimensions') + " ";
             const _dimAsp = scmW?.value === "Scale";
             const _aspEl2 = aspW?.element?.parentElement;
             if (_aspEl2) {
@@ -1027,7 +1030,7 @@ app.registerExtension({
             const link = document.createElement("link");
             link.id = "wosai-os-size-css";
             link.rel = "stylesheet";
-            link.href = new URL("./styles/os-size.css", import.meta.url).href;
+            link.href = new URL("./styles/os-size.css?v=1", import.meta.url).href;
             document.head.appendChild(link);
             _injectedCss = link;
         }

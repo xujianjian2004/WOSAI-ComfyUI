@@ -228,6 +228,11 @@
 .ss-swap-btn:active { filter: brightness(.85); transition: none; }
 
 /* ── Preview bar（一体式药丸，同缩放倍数轨道）── */
+/* 单行：去掉了「尺寸预览」标签——它是纯装饰，四个字要吃掉约 44px，
+   而节点最小宽度 220px、左右内边距后仅约 204px 可用，留着它必然把后面的
+   尺寸 / 面积挤出节点框。值本身就是「宽 × 高」，不需要额外标签说明。
+   空间仍然不够时（节点被拖窄）由 meta 先截断：面积比 latent 网格重要，
+   排列顺序即优先级，从尾部省略正好先舍掉最不重要的部分。 */
 .ss-preview {
   display: flex;
   align-items: center;
@@ -242,25 +247,30 @@
   box-shadow: var(--ws-os-ring-default);
   color: var(--ws-text);
   box-sizing: border-box;
-}
-.ss-preview-lbl {
-  font-size: var(--ws-text-sm);
-  color: var(--ws-text-secondary);
-  white-space: nowrap;
+  overflow: hidden;
 }
 .ss-preview-val {
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: var(--ws-text-sm);
   font-weight: 500;
   color: var(--ws-accent);
   letter-spacing: .02em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* 面积回显：像素总量 + latent 网格。显存 / 耗时正比于面积，
-   「同一档位换个比例开销翻倍」这件事必须让用户看见。 */
+   「同一档位换个比例开销翻倍」这件事必须让用户看见。
+   ellipsis + title 兜底：宁可截断，也不撑破节点宽度。 */
 .ss-preview-meta {
-  font-size: var(--ws-text-sm);
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: var(--ws-text-xs);
   color: var(--ws-text-secondary);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .ss-preview.is-large .ss-preview-meta {
   color: var(--ws-warning);
