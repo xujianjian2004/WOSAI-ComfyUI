@@ -68,6 +68,22 @@ def _align_grid(value: float, multiple: int, ratio: int = 1) -> int:
     return _align(value, _lcm(multiple, ratio))
 
 
+def _fit_scale(src_w: float, src_h: float, target_w: float, target_h: float,
+               fit_edge: str = "Long") -> float:
+    """等比适配的缩放系数：**不变形、不裁剪**，只按目标框等比缩放。
+
+    Long（默认）= 长边贴齐目标框（contain）：结果**不会超出**目标，另一边按比例缩小。
+    Short       = 短边贴齐目标框（cover 但不裁剪）：另一边按比例**超出**目标。
+
+    与 Crop（先裁到目标比例再拉伸到目标尺寸）、Scale（按倍数线性缩放）并列第三种。
+    """
+    if src_w <= 0 or src_h <= 0 or target_w <= 0 or target_h <= 0:
+        return 1.0
+    if fit_edge == "Short":
+        return min(target_w, target_h) / min(src_w, src_h)
+    return min(target_w / src_w, target_h / src_h)
+
+
 def _latent_spatial_ratio(latent: Optional[dict] = None, vae=None) -> int:
     """Return the actual spatial compression ratio, falling back to SD's 8x."""
 
@@ -97,7 +113,7 @@ class WOSAI_SizeSelect:
         return {
             "required": {
                 "Manual_Mode":    (["off", "on"], {"default": "off", "tooltip": "Preset mode / Manual mode | 预设模式 / 手动模式"}),
-                "scale_method":   (["Crop", "Scale"], {"default": "Crop", "tooltip": "Crop=center crop to target ratio / Scale=uniform scale by multiplier | Crop=中心裁剪到目标比例 / Scale=按倍数等比缩放"}),
+                "scale_method":   (["Crop", "Fit", "Scale"], {"default": "Crop", "tooltip": "Crop=center crop to target ratio / Fit=uniform fit inside the target / Scale=uniform scale by multiplier | Crop=中心裁剪到目标比例 / Fit=等比适配到目标框内 / Scale=按倍数等比缩放"}),
                 "scale_multiplier": ("FLOAT", {"default": 1.0, "min": 0.1, "max": 4.0, "step": 0.1, "tooltip": "Active in Scale mode, relative to original size | 在Scale模式下生效，相对于原始尺寸"}),
             },
             "optional": {
@@ -106,6 +122,7 @@ class WOSAI_SizeSelect:
                 "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom width (manual mode only, max {MAX_DIMENSION}) | 自定义宽度（仅手动模式，上限 {MAX_DIMENSION}）"}),
                 "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"}),
                 "align_multiple": ("INT", {"default": DEFAULT_ALIGN_MULTIPLE, "min": 1, "max": MAX_ALIGN_MULTIPLE, "step": 1, "advanced": True, "tooltip": "Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"}),
+                "fit_edge":       (["Long", "Short"], {"default": "Long", "advanced": True, "tooltip": "Fit mode only: Long=whole image fits inside the target / Short=short edge fills the target, long edge may exceed | 仅适配模式：Long=整图装进目标框 / Short=短边填满目标，长边可能超出"}),
                 "image":         ("IMAGE",),
                 "mask":          ("MASK",),
                 "latent":        ("LATENT",),
@@ -161,6 +178,7 @@ class WOSAI_SizeSelect:
         Custom_Width: int = 256,
         Custom_Height: int = 2048,
         align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
+        fit_edge: str = "Long",
         image: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
         latent: Optional[dict] = None,
@@ -195,6 +213,18 @@ class WOSAI_SizeSelect:
                 actual_h = _align_grid(lh * latent_ratio * scale_multiplier, align_multiple, latent_ratio)
             else:
                 actual_w, actual_h = target_w, target_h
+        elif scale_method == "Fit" and (has_image or has_latent):
+            # ── 等比适配：不变形、不裁剪，按目标框等比缩放 ──
+            #   没有 image / latent 就没有基准，退化为 Crop（直接用目标尺寸）。
+            if has_image:
+                _, h1, w1, _ = image.shape
+                src_w, src_h = float(w1), float(h1)
+            else:
+                _, _, lh, lw = latent["samples"].shape
+                src_w, src_h = float(lw * latent_ratio), float(lh * latent_ratio)
+            scale_f = _fit_scale(src_w, src_h, target_w, target_h, fit_edge)
+            actual_w = _align_grid(src_w * scale_f, align_multiple, latent_ratio)
+            actual_h = _align_grid(src_h * scale_f, align_multiple, latent_ratio)
         else:
             actual_w, actual_h = target_w, target_h
 
@@ -227,8 +257,8 @@ class WOSAI_SizeSelect:
             original_w = latent_w * latent_ratio
             original_h = latent_h * latent_ratio
 
-            if scale_method == "Scale":
-                # 等比缩放：直接 interpolate 到目标尺寸
+            if scale_method in ("Scale", "Fit"):
+                # 等比缩放 / 等比适配：直接 interpolate 到目标尺寸（不裁剪）
                 scaled = torch.nn.functional.interpolate(
                     samples,
                     size=(actual_h // latent_ratio, actual_w // latent_ratio),
@@ -273,7 +303,7 @@ class WOSAI_SizeSelect:
             #   此前这条路径会掉进下面的 else，用户接的遮罩被静默丢弃。
             #   复用 _resize_spatial_mask（2D / 3D / 4D 通吃，保留原 rank 与 dtype）。
             out_mask = self._resize_spatial_mask(
-                mask, actual_w, actual_h, scale_method != "Scale")
+                mask, actual_w, actual_h, scale_method == "Crop")
             out_latent = {"samples": torch.zeros(
                 (1, 4, actual_h // latent_ratio, actual_w // latent_ratio)),
                 "downscale_ratio_spacial": latent_ratio}
@@ -296,7 +326,8 @@ class WOSAI_SizeSelect:
 
     def _resize_image_and_mask(self, image, mask, target_w, target_h, scale_method="Crop", ratio_w=0, ratio_h=0):
         """缩放图像和遮罩到目标尺寸"""
-        use_crop = scale_method != "Scale"
+        # Fit 也是等比缩放（倍率由目标框算出而已），只有 Crop 需要裁剪
+        use_crop = scale_method == "Crop"
         image_bchw = image.movedim(-1, 1)
         if use_crop:
             image_bchw = self._center_crop_tensor(image_bchw, target_w, target_h)
@@ -392,10 +423,11 @@ class WOSAI_SizeSelect:
         Custom_Width: int = 256,
         Custom_Height: int = 2048,
         align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
+        fit_edge: str = "Long",
         **kwargs,
-    ) -> tuple[str, str, float, Optional[str], Optional[str], int, int, int]:
+    ) -> tuple[str, str, float, Optional[str], Optional[str], int, int, int, str]:
         return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio,
-                Custom_Width, Custom_Height, align_multiple)
+                Custom_Width, Custom_Height, align_multiple, fit_edge)
 
 
 NODE_CLASS_MAPPINGS = {
@@ -425,9 +457,9 @@ try:
                     _io.Combo.Input("Manual_Mode", options=["off", "on"],
                                     default="off",
                 tooltip="Preset mode / Manual mode | 预设模式 / 手动模式"),
-                    _io.Combo.Input("scale_method", options=["Crop", "Scale"],
+                    _io.Combo.Input("scale_method", options=["Crop", "Fit", "Scale"],
                                     default="Crop",
-                                    tooltip="Crop=center crop to target ratio / Scale=uniform scale by multiplier | Crop=中心裁剪到目标比例 / Scale=按倍数等比缩放"),
+                                    tooltip="Crop=center crop to target ratio / Fit=uniform fit inside the target / Scale=uniform scale by multiplier | Crop=中心裁剪到目标比例 / Fit=等比适配到目标框内 / Scale=按倍数等比缩放"),
                     _io.Float.Input("scale_multiplier", default=1.0,
                                     min=0.1, max=4.0, step=0.1,
                                     tooltip="Active in Scale mode, relative to original size | 在Scale模式下生效，相对于原始尺寸"),
@@ -448,6 +480,9 @@ try:
                     _io.Int.Input("align_multiple", default=DEFAULT_ALIGN_MULTIPLE,
                                   min=1, max=MAX_ALIGN_MULTIPLE, step=1, optional=True, advanced=True,
                                   tooltip="Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"),
+                    _io.Combo.Input("fit_edge", options=["Long", "Short"], default="Long",
+                                    optional=True, advanced=True,
+                                    tooltip="Fit mode only: Long=whole image fits inside the target / Short=short edge fills the target, long edge may exceed | 仅适配模式：Long=整图装进目标框 / Short=短边填满目标，长边可能超出"),
                     _io.Image.Input("image", optional=True,
                                     tooltip="Input image (optional, will be scaled to target size) | 输入图像（可选，将缩放至目标尺寸）"),
                     _io.Mask.Input("mask", optional=True,
@@ -480,21 +515,22 @@ try:
                                scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
                                Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256,
                                Custom_Height: int = 2048,
-                               align_multiple: int = DEFAULT_ALIGN_MULTIPLE) -> tuple:
+                               align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
+                               fit_edge: str = "Long") -> tuple:
             return (Manual_Mode, scale_method, scale_multiplier, Resolution, Aspect_Ratio,
-                    Custom_Width, Custom_Height, align_multiple)
+                    Custom_Width, Custom_Height, align_multiple, fit_edge)
 
         @classmethod
         def execute(cls, Manual_Mode: str = "off", scale_method: str = "Crop",
                     scale_multiplier: float = 1.0, Resolution: Optional[str] = None,
                     Aspect_Ratio: Optional[str] = None, Custom_Width: int = 256, Custom_Height: int = 2048,
-                    align_multiple: int = DEFAULT_ALIGN_MULTIPLE,
+                    align_multiple: int = DEFAULT_ALIGN_MULTIPLE, fit_edge: str = "Long",
                     image: Optional[torch.Tensor] = None, mask: Optional[torch.Tensor] = None,
                     latent: Optional[dict] = None, vae: Optional[object] = None) -> _io.NodeOutput:
             result = WOSAI_SizeSelect().calculate_size(
                 Manual_Mode, scale_method, scale_multiplier,
                 Resolution, Aspect_Ratio, Custom_Width, Custom_Height,
-                align_multiple=align_multiple,
+                align_multiple=align_multiple, fit_edge=fit_edge,
                 image=image, mask=mask, latent=latent, vae=vae)
             return _io.NodeOutput(*result)
 except ImportError:

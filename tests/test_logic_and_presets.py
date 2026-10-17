@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 from nodes.logic_switch import WOSAI_LogicSwitch
 from nodes.preset_prompt import DEFAULT_PRESETS, WOSAI_PresetPromptSelector, _normalize_presets
 if torch is not None:
-    from nodes.size_select import MIN_DIMENSION, WOSAI_SizeSelect, _align, _align_grid
+    from nodes.size_select import MIN_DIMENSION, WOSAI_SizeSelect, _align, _align_grid, _fit_scale
 
 
 class LogicSwitchTests(unittest.TestCase):
@@ -272,6 +272,41 @@ class SizeSelectLatentConsistencyTests(unittest.TestCase):
         self.assertEqual(width % 24, 0)
         self.assertEqual(height % 24, 0)
         self.assertEqual(out["samples"].shape[-1] * 8, width)
+
+
+@unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")
+class SizeSelectFitModeTests(unittest.TestCase):
+    """Fit 模式：等比适配目标框——不变形、不裁剪（与 Crop / Scale 并列的第三种）。"""
+
+    def setUp(self):
+        self.node = WOSAI_SizeSelect()
+
+    def test_long_edge_fits_inside_the_box_while_short_edge_may_exceed(self):
+        # 横图 1000×500 装进竖框 500×1000
+        self.assertAlmostEqual(_fit_scale(1000, 500, 500, 1000, "Long"), 0.5)   # → 500×250
+        self.assertAlmostEqual(_fit_scale(1000, 500, 500, 1000, "Short"), 1.0)  # → 1000×500（长边超出）
+
+    def test_fit_keeps_the_source_aspect_and_stays_inside_the_target(self):
+        # 300×400（3:4）装进 FHD 16:9 的 1920×1080 ⇒ scale=2.7 → 810×1080 → 对齐 808×1080
+        image = torch.rand((1, 400, 300, 3))
+        out, _, _, width, height = self.node.calculate_size(
+            "off", "Fit", 1.0, "FHD 1080P", "16:9 Widescreen", fit_edge="Long", image=image)
+        self.assertLessEqual(width, 1920)
+        self.assertLessEqual(height, 1080)
+        self.assertAlmostEqual(width / height, 300 / 400, delta=0.02)  # 比例不变
+        self.assertEqual(tuple(out.shape), (1, height, width, 3))      # 未裁剪，整图都在
+
+    def test_fit_also_works_on_a_latent_input(self):
+        latent = {"samples": torch.rand((1, 4, 64, 48)), "downscale_ratio_spacial": 8}  # 384×512
+        _, _, out, width, height = self.node.calculate_size(
+            "off", "Fit", 1.0, "FHD 1080P", "16:9 Widescreen", latent=latent)
+        self.assertEqual(tuple(out["samples"].shape), (1, 4, height // 8, width // 8))
+        self.assertLessEqual(height, 1080)
+
+    def test_fit_without_any_source_falls_back_to_the_target_size(self):
+        _, _, _, width, height = self.node.calculate_size(
+            "off", "Fit", 1.0, "FHD 1080P", "16:9 Widescreen")
+        self.assertEqual((width, height), (1920, 1080))
 
 
 @unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")

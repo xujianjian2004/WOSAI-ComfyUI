@@ -222,7 +222,7 @@ function buildUI(node) {
         }
     };
 
-    _cancelWidgetWait = waitForWidgets(node, ["Resolution", "Aspect_Ratio", "Manual_Mode", "scale_method", "scale_multiplier"], () => {
+    _cancelWidgetWait = waitForWidgets(node, ["Resolution", "Aspect_Ratio", "Manual_Mode", "scale_method", "scale_multiplier", "fit_edge"], () => {
         const resW = node.widgets.find(w => w.name === "Resolution");
         const aspW = node.widgets.find(w => w.name === "Aspect_Ratio");
         const manW = node.widgets.find(w => w.name === "Manual_Mode");
@@ -230,6 +230,7 @@ function buildUI(node) {
         const cusH = node.widgets.find(w => w.name === "Custom_Height");
         const scmW = node.widgets.find(w => w.name === "scale_method");
         const sclW = node.widgets.find(w => w.name === "scale_multiplier");
+        const fedW = node.widgets.find(w => w.name === "fit_edge");
         const almW = node.widgets.find(w => w.name === "align_multiple");
 
         if (manW) manW.label = t('menus.sizeSelect.manualMode');
@@ -239,8 +240,9 @@ function buildUI(node) {
         if (cusH) cusH.label = t('menus.sizeSelect.customHeight');
         if (scmW) scmW.label = t('menus.sizeSelect.scaleMethod');
         if (sclW) sclW.label = t('menus.sizeSelect.scaleMultiplier');
+        if (fedW) fedW.label = t('menus.sizeSelect.fitEdge');
         if (almW) almW.label = t('menus.sizeSelect.alignMultiple');
-        for (const _hw of [scmW, sclW]) {
+        for (const _hw of [scmW, sclW, fedW]) {
             if (!_hw) continue;
             _hw.hidden = true;
             _hw.computeSize = () => [0, 0];
@@ -284,7 +286,7 @@ function buildUI(node) {
         const _origSerialize = node.serialize?.bind(node);
         node.serialize = function () {
             const data = _origSerialize ? _origSerialize() : {};
-            const coreWidgets = [manW, scmW, sclW, resW, aspW, cusW, cusH, almW].filter(Boolean);
+            const coreWidgets = [manW, scmW, sclW, resW, aspW, cusW, cusH, almW, fedW].filter(Boolean);
             data.widgets_values = coreWidgets
                 .filter(w => w.options?.serialize !== false)
                 .map(w => w.value);
@@ -323,7 +325,7 @@ function buildUI(node) {
         contentDiv.className = "ss-content";
         wrap.appendChild(contentDiv);
 
-        // ── 4按钮控制行（预设｜自定义｜Scale｜Crop） ──
+        // ── 5按钮控制行（预设｜自定义｜裁剪｜适配｜缩放） ──
         const controlRow = document.createElement("div");
         controlRow.className = "ss-control-row";
 
@@ -335,24 +337,31 @@ function buildUI(node) {
         btnMan.className = `ss-control-btn${isManual ? " active" : ""}`;
         btnMan.textContent = t('menus.sizeSelect.manual');
 
-        const isFit = scmW?.value === "Scale";
-
-        const btnFit = document.createElement("button");
-        btnFit.className = "ss-control-btn" + (isFit ? " active" : "");
-        btnFit.textContent = t('menus.sizeSelect.scale');
-        btnFit.title = t('menus.sizeSelect.tipScale');
+        // 缩放方式三选一：Crop=裁到目标比例 / Fit=等比装入目标框 / Scale=按倍数缩放
+        const _ssMethod = () => (scmW?.value === "Scale" || scmW?.value === "Fit") ? scmW.value : "Crop";
 
         const btnCrop = document.createElement("button");
-        btnCrop.className = "ss-control-btn" + (isFit ? "" : " active");
+        btnCrop.className = "ss-control-btn" + (_ssMethod() === "Crop" ? " active" : "");
         btnCrop.textContent = t('menus.sizeSelect.crop');
         btnCrop.title = t('menus.sizeSelect.tipCrop');
 
+        const btnFit = document.createElement("button");
+        btnFit.className = "ss-control-btn" + (_ssMethod() === "Fit" ? " active" : "");
+        btnFit.textContent = t('menus.sizeSelect.fit');
+        btnFit.title = t('menus.sizeSelect.tipFit');
+
+        const btnScale = document.createElement("button");
+        btnScale.className = "ss-control-btn" + (_ssMethod() === "Scale" ? " active" : "");
+        btnScale.textContent = t('menus.sizeSelect.scale');
+        btnScale.title = t('menus.sizeSelect.tipScale');
+
         node._ss_btnAuto = btnAuto;
         node._ss_btnMan = btnMan;
-        node._ss_btnFit = btnFit;
         node._ss_btnCrop = btnCrop;
+        node._ss_btnFit = btnFit;
+        node._ss_btnScale = btnScale;
 
-        controlRow.append(btnAuto, btnMan, btnFit, btnCrop);
+        controlRow.append(btnAuto, btnMan, btnCrop, btnFit, btnScale);
         contentDiv.appendChild(controlRow);
 
         // 第二行：缩放倍数一体式轨道（复用 OmniSlider os-track 样式，无圆点）
@@ -374,6 +383,36 @@ function buildUI(node) {
         node._ss_sliderRow = sliderRow;
         // 稍后追加到 wrap，位置在尺寸预览上方
 
+        // ── Fit 模式的长边 / 短边适配（复用滑条同一行，不新增行高）──
+        //   与「缩放倍数」互斥出现：Scale 显示滑条，Fit 显示这两个按钮，Crop 两者都不激活。
+        const fitEdgeGroup = document.createElement("div");
+        fitEdgeGroup.className = "ss-fit-edge-group";
+        const _ssFitEdge = () => (fedW?.value === "Short") ? "Short" : "Long";
+        const mkEdgeBtn = (key, edge) => {
+            const b = document.createElement("button");
+            b.className = "ss-control-btn" + (_ssFitEdge() === edge ? " active" : "");
+            b.dataset.edge = edge;
+            b.textContent = t('menus.sizeSelect.' + key);
+            b.title = t('menus.sizeSelect.' + (edge === "Short" ? 'tipFitShort' : 'tipFitLong'));
+            b.onclick = () => {
+                if (fedW) { fedW.value = edge; fedW.callback?.(edge); }
+                _ssSyncFitEdgeBtns();
+                syncPreview();
+                app.graph?.setDirtyCanvas(true, true);
+            };
+            return b;
+        };
+        const btnEdgeLong  = mkEdgeBtn('fitLong', "Long");
+        const btnEdgeShort = mkEdgeBtn('fitShort', "Short");
+        function _ssSyncFitEdgeBtns() {
+            const cur = _ssFitEdge();
+            btnEdgeLong.classList.toggle("active", cur === "Long");
+            btnEdgeShort.classList.toggle("active", cur === "Short");
+            fitEdgeGroup.title = t('menus.sizeSelect.tipFitEdge');
+        }
+        fitEdgeGroup.append(btnEdgeLong, btnEdgeShort);
+        track.appendChild(fitEdgeGroup);
+
         // ── 一体式轨道显示更新 ──
         const _ssMn = 0.1, _ssMx = 4.0, _ssSt = 0.1;
 
@@ -388,36 +427,47 @@ function buildUI(node) {
         _ssUpdateTrack(initVal);
 
         // ── 缩放方式按钮事件 ──
-        // ── 缩放倍数滑条锁定/解锁（Crop 模式锁定，Scale 模式解锁） ──
+        // ── 缩放倍数滑条锁定/解锁（仅 Scale 模式可拖动） ──
+        //   同一行还承载 Fit 模式的「长边 / 短边」切换：三者互斥，行高不变。
         const _ssSetSliderLock = (val) => {
             if (!sliderRow) return;
-            const locked = val !== "Scale";
-            sliderRow.classList.toggle("ss-disabled", locked);
-            sliderRow.style.pointerEvents = locked ? "none" : "";
-            sliderRow.title = locked ? t('menus.sizeSelect.scaleOnly') : t('menus.sizeSelect.tipScaleMul');
+            const isScale = val === "Scale";
+            const isFit = val === "Fit";
+            sliderRow.classList.toggle("ss-disabled", !isScale);
+            // Crop 保持旧语义：整行不可点（滑条对它没有意义）；Fit 要留给适配边按钮
+            sliderRow.style.pointerEvents = (isScale || isFit) ? "" : "none";
+            sliderRow.title = isScale ? t('menus.sizeSelect.tipScaleMul')
+                : (isFit ? t('menus.sizeSelect.tipFitEdge') : t('menus.sizeSelect.scaleOnly'));
+            track.style.cursor = isScale ? "ew-resize" : "default";
+            fill.style.display = isScale ? "" : "none";
+            labelArea.style.display = isScale ? "" : "none";
+            fitEdgeGroup.style.display = isFit ? "flex" : "none";
         };
 
         const _ssSyncMethodBtns = (val) => {
-            if (val === "Scale") {
-                btnFit.classList.add("active");
-                btnCrop.classList.remove("active");
-            } else {
-                btnFit.classList.remove("active");
-                btnCrop.classList.add("active");
-            }
-            _ssSetSliderLock(val);
+            const m = _ssMethod();
+            btnCrop.classList.toggle("active", m === "Crop");
+            btnFit.classList.toggle("active", m === "Fit");
+            btnScale.classList.toggle("active", m === "Scale");
+            _ssSetSliderLock(m);
+            if (m === "Fit") _ssSyncFitEdgeBtns();
             const cur = parseFloat(sclW?.value) || 1.0;
-            const prefix = val === "Scale" ? t('menus.sizeSelect.originalImage') : t('menus.sizeSelect.scalingFactor');
+            const prefix = m === "Scale" ? t('menus.sizeSelect.originalImage') : t('menus.sizeSelect.scalingFactor');
             if (labelArea) labelArea.textContent = prefix + "  ×" + cur.toFixed(1);
-        };
-        btnFit.onclick = () => {
-            _ssSyncMethodBtns("Scale");
-            if (scmW) { scmW.value = "Scale"; scmW.callback?.("Scale"); }
-            app.graph?.setDirtyCanvas(true, true);
         };
         btnCrop.onclick = () => {
             _ssSyncMethodBtns("Crop");
             if (scmW) { scmW.value = "Crop"; scmW.callback?.("Crop"); }
+            app.graph?.setDirtyCanvas(true, true);
+        };
+        btnFit.onclick = () => {
+            _ssSyncMethodBtns("Fit");
+            if (scmW) { scmW.value = "Fit"; scmW.callback?.("Fit"); }
+            app.graph?.setDirtyCanvas(true, true);
+        };
+        btnScale.onclick = () => {
+            _ssSyncMethodBtns("Scale");
+            if (scmW) { scmW.value = "Scale"; scmW.callback?.("Scale"); }
             app.graph?.setDirtyCanvas(true, true);
         };
 
@@ -471,6 +521,7 @@ function buildUI(node) {
         };
         track.addEventListener("pointerdown", e => {
             if (e.button !== 0) return;
+            if (_ssMethod() === "Fit") return;   // Fit 模式这一行是适配边按钮，不是滑条
             e.preventDefault();
             _ssPressed = true;
             _ssPressX = e.clientX;
@@ -504,6 +555,7 @@ function buildUI(node) {
 
         // ── 滚轮调节 ──
         track.addEventListener("wheel", e => {
+            if (_ssMethod() === "Fit") return;   // Fit 模式滚轮不该改缩放倍数
             e.preventDefault();
             const cur = parseFloat(sclW?.value) || 1.0;
             const delta = e.deltaY > 0 ? -_ssSt : _ssSt;
@@ -673,7 +725,7 @@ function buildUI(node) {
         copyright.textContent = WOSAI_COPYRIGHT;
 
         wrap.appendChild(sliderRow);
-        _ssSetSliderLock(scmW?.value);
+        _ssSyncMethodBtns(scmW?.value);
         wrap.appendChild(preview);
         wrap.appendChild(copyright);
 
@@ -698,27 +750,54 @@ function buildUI(node) {
 
         function syncPreview(opts = {}) {
             const step = gridStep(almW?.value);
-            let w, h;
-            if (scmW?.value === "Scale") {
-                // 对齐 size_select.py：Scale 模式不限制上限，但必须落在 latent 网格上。
-                const mul = parseFloat(sclW?.value) || 1.0;
-                const src = (node._ss_srcW && node._ss_srcH);
-                w = src ? scaleAlign(node._ss_srcW * mul, step) : 0;
-                h = src ? scaleAlign(node._ss_srcH * mul, step) : 0;
-                previewVal.textContent = src ? `${w} × ${h}` : "-";
-            } else if (!isManual) {
+            const method = _ssMethod();
+            // 目标框：预设档位或自定义宽高（Scale 模式下尺寸完全由原图 × 倍数决定，不看目标框）
+            let tw = 0, th = 0;
+            if (!isManual) {
                 const d = RESOLUTION_DATA[currentRes]?.[currentAsp];
-                w = d ? alignTo(d[0], step) : 0;
-                h = d ? alignTo(d[1], step) : 0;
-                previewVal.textContent = d ? `${w} × ${h}` : "N/A";
+                if (d) { tw = alignTo(d[0], step); th = alignTo(d[1], step); }
             } else {
-                w = alignTo(_dimVal(cusW, baseWidth), step);
-                h = alignTo(_dimVal(cusH, baseHeight), step);
-                previewVal.textContent = `${w} × ${h}`;
+                tw = alignTo(_dimVal(cusW, baseWidth), step);
+                th = alignTo(_dimVal(cusH, baseHeight), step);
             }
+            const src = (node._ss_srcW > 0 && node._ss_srcH > 0) ? [node._ss_srcW, node._ss_srcH] : null;
+            let w = 0, h = 0;
+            let text;
+            if (method === "Scale") {
+                if (src) {
+                    // 对齐 size_select.py：Scale 模式不限制上限，但必须落在 latent 网格上。
+                    const mul = parseFloat(sclW?.value) || 1.0;
+                    w = scaleAlign(src[0] * mul, step);
+                    h = scaleAlign(src[1] * mul, step);
+                    text = `${w} × ${h}`;
+                } else {
+                    text = "-";
+                }
+            } else if (method === "Fit" && src) {
+                // 等比适配：不变形、不裁剪。与后端 _fit_scale 同口径，否则预览会骗人。
+                const s = _ssFitScale(src[0], src[1], tw, th, _ssFitEdge());
+                w = scaleAlign(src[0] * s, step);
+                h = scaleAlign(src[1] * s, step);
+                text = `${w} × ${h}`;
+            } else {
+                // Crop；或 Fit 但没有上游可适配（后端同样退化为直接用目标尺寸）
+                w = tw; h = th;
+                text = (tw > 0 && th > 0) ? `${tw} × ${th}` : "N/A";
+            }
+            previewVal.textContent = text;
             renderAreaMeta(w, h, step);
             syncUseSourceBtn();
             if (opts.flash !== false) flashPreview();
+        }
+
+        /** 与 nodes/size_select.py::_fit_scale 同口径的等比适配系数。
+         *  Long = contain（整图装进目标框，任何一边都不超出）
+         *  Short = 短边贴齐目标框，长边按比例超出（cover 但不裁剪） */
+        function _ssFitScale(sw, sh, tw, th, edge) {
+            if (!(sw > 0) || !(sh > 0) || !(tw > 0) || !(th > 0)) return 1;
+            return edge === "Short"
+                ? Math.min(tw, th) / Math.min(sw, sh)
+                : Math.min(tw / sw, th / sh);
         }
 
         /** 没接上游时「取原图尺寸」无源可取，置灰而不是点了没反应。 */
@@ -1007,7 +1086,7 @@ function buildUI(node) {
         });
         _resizeObserver.observe(wrap);
 
-        node._ss_widgets = { manW, resW, aspW, cusW, cusH, scmW, sclW, almW };
+        node._ss_widgets = { manW, resW, aspW, cusW, cusH, scmW, sclW, almW, fedW };
         node._ss_refreshLang = () => {
             if (manW) manW.label = t('menus.sizeSelect.manualMode');
             if (resW) resW.label = t('menus.sizeSelect.resolution');
@@ -1016,22 +1095,39 @@ function buildUI(node) {
             if (cusH) cusH.label = t('menus.sizeSelect.customHeight');
             if (scmW) scmW.label = t('menus.sizeSelect.scaleMethod');
             if (sclW) sclW.label = t('menus.sizeSelect.scaleMultiplier');
+            if (fedW) fedW.label = t('menus.sizeSelect.fitEdge');
         if (almW) almW.label = t('menus.sizeSelect.alignMultiple');
             if (node._ss_btnAuto) node._ss_btnAuto.textContent = t('menus.sizeSelect.preset');
             if (node._ss_btnMan) node._ss_btnMan.textContent = t('menus.sizeSelect.manual');
-            if (node._ss_btnFit) {
-                node._ss_btnFit.textContent = t('menus.sizeSelect.scale');
-                node._ss_btnFit.title = t('menus.sizeSelect.tipScale');
-            }
             if (node._ss_btnCrop) {
                 node._ss_btnCrop.textContent = t('menus.sizeSelect.crop');
                 node._ss_btnCrop.title = t('menus.sizeSelect.tipCrop');
+            }
+            if (node._ss_btnFit) {
+                node._ss_btnFit.textContent = t('menus.sizeSelect.fit');
+                node._ss_btnFit.title = t('menus.sizeSelect.tipFit');
+            }
+            if (node._ss_btnScale) {
+                node._ss_btnScale.textContent = t('menus.sizeSelect.scale');
+                node._ss_btnScale.title = t('menus.sizeSelect.tipScale');
+            }
+            if (btnEdgeLong) {
+                btnEdgeLong.textContent = t('menus.sizeSelect.fitLong');
+                btnEdgeLong.title = t('menus.sizeSelect.tipFitLong');
+            }
+            if (btnEdgeShort) {
+                btnEdgeShort.textContent = t('menus.sizeSelect.fitShort');
+                btnEdgeShort.title = t('menus.sizeSelect.tipFitShort');
             }
             if (node._ss_labelArea) {
                 const _lPrefix = scmW?.value === "Scale" ? t('menus.sizeSelect.originalImage') : t('menus.sizeSelect.scalingFactor');
                 node._ss_labelArea.textContent = _lPrefix + "  ×" + (parseFloat(sclW?.value) || 1.0).toFixed(1);
             }
-            if (node._ss_sliderRow) node._ss_sliderRow.title = (scmW?.value !== "Scale") ? t('menus.sizeSelect.scaleOnly') : t('menus.sizeSelect.tipScaleMul');
+            if (node._ss_sliderRow) {
+                const _lm = _ssMethod();
+                node._ss_sliderRow.title = _lm === "Scale" ? t('menus.sizeSelect.tipScaleMul')
+                    : (_lm === "Fit" ? t('menus.sizeSelect.tipFitEdge') : t('menus.sizeSelect.scaleOnly'));
+            }
             if (node._ss_resBtns) Object.entries(node._ss_resBtns).forEach(([lv, b]) => { b.innerHTML = t('menus.sizeSelect.' + (_RES_LABEL_MAP[lv] || lv)); });
             if (node._ss_swapBtn) node._ss_swapBtn.textContent = t('menus.sizeSelect.swap');
             if (node._ss_useSrcBtn) {
@@ -1070,7 +1166,7 @@ app.registerExtension({
             const link = document.createElement("link");
             link.id = "wosai-os-size-css";
             link.rel = "stylesheet";
-            link.href = new URL("./styles/os-size.css?v=2", import.meta.url).href;
+            link.href = new URL("./styles/os-size.css?v=3", import.meta.url).href;
             document.head.appendChild(link);
             _injectedCss = link;
         }

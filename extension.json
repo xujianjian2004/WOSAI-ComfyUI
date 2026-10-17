@@ -32,7 +32,7 @@
     "web/route-switch.js?v=3",
     "web/media-tools.js?v=23",
     "web/get-widget.js?v=8",
-    "web/size-select.js?v=7",
+    "web/size-select.js?v=8",
     "web/preset-prompt.js?v=14",
     "web/reset-defaults.js?v=3",
     "web/device-info.js?v=21"
@@ -47,7 +47,7 @@
     "web/styles/layout-toolkit.css?v=22",
     "web/styles/title-note.css?v=6",
     "web/styles/ignore-groups.css?v=3",
-    "web/styles/os-size.css?v=2",
+    "web/styles/os-size.css?v=3",
     "web/styles/save-node.css",
     "web/styles/selector.css?v=5",
     "web/styles/media-tools.css?v=20",

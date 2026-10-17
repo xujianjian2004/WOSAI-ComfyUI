@@ -85,7 +85,7 @@ test("front-end echoes the real pixel area and the latent grid", () => {
 
 test("the align multiple survives save and load", () => {
     // serialize 漏掉新 widget 会让保存再打开后对齐粒度丢回默认
-    assert.match(sizeSelectJs, /const coreWidgets = \[manW, scmW, sclW, resW, aspW, cusW, cusH, almW\]/);
+    assert.match(sizeSelectJs, /const coreWidgets = \[manW, scmW, sclW, resW, aspW, cusW, cusH, almW, fedW\]/);
 });
 
 test("the preview stays on one line and degrades by truncating, never overflowing", () => {
