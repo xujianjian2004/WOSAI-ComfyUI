@@ -2,7 +2,8 @@
  * 媒体对比节点的纯函数工具层。
  *
  * 这里只放「无 DOM、无副作用」的判定与换算，便于 node --test 直接覆盖：
- * 分割百分比归一、A/B 显示位互换、视图模式归一、舞台宽高比换算。
+ * 分割百分比归一、A/B 显示位互换、视图模式归一、舞台宽高比换算，
+ * 以及「从前端执行缓存里取上游素材」所需的键名推导与形状归一。
  */
 
 /** 对比视图的可选模式：滑动对比、左右并排、上下并排。 */
@@ -62,4 +63,49 @@ export function mediaSourceRatio(media) {
     const height = Number(media?.height) || 0;
     if (width <= 0 || height <= 0) return 0;
     return width / height;
+}
+
+/**
+ * 载荷里是否已有任一侧素材。
+ *
+ * 两侧皆空 = 节点处于紧凑初始态：控件不占高度，只剩标题与两行输入端口
+ * （对照 rgthree 图像对比节点的形态），不再垫一块空白舞台。
+ */
+export function hasCompareMedia(payload) {
+    return Boolean(payload?.a || payload?.b);
+}
+
+/**
+ * ComfyUI 前端把「每个节点最近一次产出」缓存在 `app.nodeOutputs` 上
+ * （LoadImage 换图、预览节点执行完都会写入）。缓存键是节点定位符，近几个版本
+ * 换过三种形态：裸 `nodeId` → `<subgraphId>:<nodeId>` → `~root:<nodeId>`。
+ * 这里按「最具体 → 最宽松」列出候选键，由调用方逐个试探，避免把扩展绑死在
+ * 某一个前端版本上。
+ */
+export function nodeOutputLocatorKeys(nodeId, rootGraphId) {
+    const id = String(nodeId ?? "");
+    if (!id) return [];
+    const keys = [];
+    if (rootGraphId) keys.push(`${rootGraphId}:${id}`);
+    keys.push(`~root:${id}`, id);
+    return [...new Set(keys)];
+}
+
+/**
+ * 从 `app.nodeOutputs` 的一条记录里取出第一张图像的 `/view` 引用。
+ *
+ * 前端缓存里的形状与后端载荷不同（没有 `kind` / 宽高），这里只归一成
+ * 「后端载荷的一个子集」，让下游的 `imageUrl()` 与尺寸探针共用一套读法。
+ * 无图、元素为 null（批次占位）或没有 filename 一律返回 `null`。
+ */
+export function mediaFromNodeOutput(entry) {
+    const images = Array.isArray(entry?.images) ? entry.images : [];
+    const first = images.find((item) => item?.filename);
+    if (!first) return null;
+    return {
+        kind: typeof first.kind === "string" ? first.kind : "image",
+        filename: String(first.filename),
+        subfolder: String(first.subfolder || ""),
+        type: String(first.type || "temp"),
+    };
 }

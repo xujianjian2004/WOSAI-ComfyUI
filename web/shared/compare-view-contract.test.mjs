@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { stageAspectRatio } from "./media-preview.js";
+import { hasCompareMedia, stageAspectRatio } from "./media-preview.js";
 
 const read = (relative) => readFileSync(new URL(relative, import.meta.url), "utf8");
 
@@ -266,12 +266,25 @@ const HEIGHT_SRC = pickSource(/const getWidgetHeight = \(\) => \{[\s\S]*?\n {4}\
 const SYNC_SRC = pickSource(/const syncBaseWidth = \(\) => \{[\s\S]*?\n {4}\};/g, "state.baseWidth");
 const FIT_SRC = pickSource(/const (fitNodeToStage|syncNodeSize)\s*=\s*\([\s\S]*?\n {4}\};/g, "node.setSize");
 
-function loadCompareSizing(viewMode = "slide") {
+// 从载荷推算舞台宽高比：单边有图时按该图比例（不退回 16:9 兜底），
+// 双边取平均，两侧皆空回落 16/9。仅服务于尺寸契约测试，与真实渲染的取比逻辑无关。
+function comparePayloadAspect(payload) {
+    const a = payload?.a, b = payload?.b;
+    const ratioOf = (m) => (m && m.width > 0 && m.height > 0 ? m.width / m.height : 0);
+    const ra = ratioOf(a), rb = ratioOf(b);
+    if (ra > 0 && rb <= 0) return ra;
+    if (rb > 0 && ra <= 0) return rb;
+    if (ra > 0 && rb > 0) return (ra + rb) / 2;
+    return 16 / 9;
+}
+
+function loadCompareSizing(viewMode = "slide", payload = { a: { width: 1024, height: 576 }, b: null }) {
     assert.ok(HEIGHT_SRC, "未找到 getWidgetHeight");
     assert.ok(SYNC_SRC, "未找到 syncBaseWidth");
     assert.ok(FIT_SRC, "未找到 fitNodeToStage");
     const factory = new Function(
         "getWOSAIVarNum", "stage", "state", "stageAspectRatio", "root", "requestAnimationFrame",
+        "payload", "hasCompareMedia",
         `${HEIGHT_SRC}\n${SYNC_SRC}\n${FIT_SRC}\n`
         // node.computeSize 要用到 widget 高度，故在同源作用域里造这个 stub
         + "const node = {\n"
@@ -289,7 +302,7 @@ function loadCompareSizing(viewMode = "slide") {
         "--ws-media-node-min-width": 420,
         "--ws-compare-node-min-height": 280,
     };
-    const state = { aspectRatio: 16 / 9, viewMode, baseWidth: 0, appliedWidth: 0 };
+    const state = { aspectRatio: comparePayloadAspect(payload), viewMode, baseWidth: 0, appliedWidth: 0 };
     return factory(
         (name, fallback) => vars[name] ?? fallback,
         { clientWidth: 400 },
@@ -297,6 +310,8 @@ function loadCompareSizing(viewMode = "slide") {
         stageAspectRatio,
         { isConnected: true },
         (fn) => fn(), // 同步执行，测试里不引入真实帧延迟
+        payload,
+        hasCompareMedia,
     );
 }
 
@@ -391,4 +406,113 @@ test("切换视图不夹初始最小高度（左右并排的舞台本就矮，�
         `左右并排应收到内容高度而非初始最小高度：${sizing.node.size[1]}`);
     // 但首次载入仍要夹，避免节点初始坍缩
     assert.match(JS, /fitNodeToStage\(\{ clampMinHeight: true \}\)/);
+});
+
+// ── 紧凑初始态（对照 rgthree 图像对比节点的形态）────────────────────────
+// 旧实现无论有没有图都垫着一块 16:9 的空白舞台，节点初始高度恒被夹到 280px；
+// 现在两侧都没有素材时控件高度为 0，节点只剩标题 + 两行输入端口，一旦有素材
+// 就整块展开（尺寸仍由舞台宽高比换算接管）。
+
+test("两侧都没有素材时控件高度为 0（紧凑初始态）", () => {
+    for (const empty of [{ a: null, b: null }, {}]) {
+        const sizing = loadCompareSizing("slide", empty);
+        assert.equal(sizing.getWidgetHeight(), 0, "紧凑态必须不占高度");
+    }
+});
+
+test("任一侧有素材即整块展开", () => {
+    const onlyA = loadCompareSizing("slide", { a: { width: 1024, height: 576 }, b: null });
+    const onlyB = loadCompareSizing("slide", { a: null, b: { width: 800, height: 800 } });
+    assert.ok(onlyA.getWidgetHeight() > 0, "只有 A 也要出图");
+    assert.ok(onlyB.getWidgetHeight() > 0, "只有 B 也要出图");
+    // 单边有图时舞台仍按该图比例换算，不退回 16:9 兜底
+    const square = loadCompareSizing("slide", { a: null, b: { width: 800, height: 800 } });
+    assert.equal(square.getWidgetHeight(), 400 / 1 + 6 * 2);
+});
+
+test("紧凑判定读的是载荷本身，与闲置态 / 视图态无关", () => {
+    // 紧凑「收起」的判定只看载荷本身，不受闲置态 / 视图态影响：
+    // 高度换算本身仍要读 viewMode（左右/上下并排的宽高比不同），这是合理的，
+    // 但「是否收起控件」这一决策不能夹带 is-idle 或 viewMode。
+    const compactLine = HEIGHT_SRC.match(/if \(!hasCompareMedia\(payload\)\) return 0;/)[0];
+    assert.ok(compactLine, "紧凑收起判定必须存在");
+    assert.doesNotMatch(compactLine, /is-idle|viewMode/);
+});
+
+test("紧凑态整块舞台收起，不再漏出舞台切片", () => {
+    // 舞台自带背景与一像素轮廓，内部还挂着分割线（主文本色）。只把「高度算作 0」
+    // 而元素照旧渲染，紧凑态会在端口下方漏出一条「黑条 + 中间一根白竖线」的切片
+    // （用户实测报的缺陷）——高度对、观感不对。stage 是 root 的唯一子节点，收起它
+    // 之后紧凑态不再画任何东西。
+    assert.match(
+        CSS,
+        /\.wosai-image-compare:not\(\.has-first\):not\(\.has-second\) \.wosai-image-compare-stage \{\s*display: none;/,
+    );
+});
+
+test("紧凑态不夹初始最小高度，有图后才夹回", () => {
+    assert.match(JS, /const nodeMinHeight = \(\) => \(hasCompareMedia\(payload\)/);
+    // 创建期的两条尺寸路径都必须走这个 getter，直写 280 会让紧凑态又被撑高
+    const uses = JS.match(/\bnodeMinHeight\b/g) ?? [];
+    assert.ok(uses.length >= 3, `nodeMinHeight 应被声明并复用到两条路径：实际 ${uses.length} 次`);
+    assert.doesNotMatch(
+        JS,
+        /compactNodeToContent\(\s*\n\s*node,\s*\n\s*getWOSAIVarNum\("--ws-media-node-min-width", 420\),\s*\n\s*getWOSAIVarNum\("--ws-compare-node-min-height", 280\),/,
+    );
+});
+
+// ── 上游直读：连线即出图，无需重跑工作流 ───────────────────────────────
+// ComfyUI 前端已经把「每个节点最近一次产出」缓存在 app.nodeOutputs 上，
+// 因此「上游有图」时不必等执行：接线 / 打开工作流 / 上游单独执行三条路径
+// 都要能拿到素材并立刻预览。
+
+test("自动加载挂在「连线变动」与「图配置完成」两个钩子上", () => {
+    assert.match(JS, /nodeType\.prototype\.onConnectionsChange = connectionsChanged;/);
+    assert.match(JS, /nodeType\.prototype\.onAfterGraphConfigured = afterGraphConfigured;/);
+    // onConfigure 时链接还没建立（LiteGraph 先建节点再连线），不能只挂在那里
+    const configured = JS.match(/const configured = function \(\) \{[\s\S]*?\n {4}\};/)[0];
+    assert.doesNotMatch(configured, /RefreshUpstream/);
+    // 两个钩子都要转调同一个入口，避免两处各自实现一套解析
+    const hooks = JS.match(/__wosaiCompareRefreshUpstream\?\.\(\)/g) ?? [];
+    assert.equal(hooks.length, 2, "两个钩子都应转调 __wosaiCompareRefreshUpstream");
+});
+
+test("上游解析在节点销毁时摘得干净", () => {
+    assert.match(JS, /api\.removeEventListener\("executed", onUpstreamExecuted\);/);
+    assert.match(JS, /delete node\.__wosaiCompareRefreshUpstream;/);
+    assert.match(JS, /api\.addEventListener\("executed", onUpstreamExecuted\);/);
+});
+
+test("上游素材取自前端执行缓存的多种定位符键，URL 只算一次", () => {
+    assert.match(
+        JS,
+        /for \(const key of nodeOutputLocatorKeys\(upstream\.id, app\.graph\?\.rootGraph\?\.id\)\)/,
+    );
+    // 探针与随后的渲染必须复用同一个 URL：imageUrl 每次都会加时间戳，
+    // 分别计算会让同一份文件被请求两次
+    assert.match(JS, /const url = imageUrl\(media\);/);
+    assert.match(JS, /if \(data\.url\) return opaqueImageUrl\(data\.url\);/);
+});
+
+test("连线被连续改动时只落地最后一次解析结果", () => {
+    assert.match(JS, /let upstreamToken = 0;/);
+    assert.match(JS, /const token = \+\+upstreamToken;/);
+    assert.match(JS, /if \(token !== upstreamToken \|\| !root\.isConnected\) return;/);
+});
+
+// ── 预览按 RGB 取图，与执行侧张量同源（2026-10-16）─────────────────────
+// 源文件带 alpha 时（Clipspace 涂抹产物的涂抹区 alpha=0，底下 RGB 却仍是原图内容），
+// `/view` 默认按 rgba 返回，透明区就透出舞台底色——看着像「节点把原图换成了遮罩」。
+// 执行侧 LoadImage 会 convert("RGB") 丢掉 alpha，预览必须跟着丢：否则「看到的」与
+// 「正在比对的」不是同一张图（用户报的正是这个现象）。
+test("预览图像统一按 RGB 取，透明区不再透出舞台底色", () => {
+    assert.match(JS, /function opaqueImageUrl\(/);
+    assert.match(JS, /parsed\.searchParams\.set\("channel", "rgb"\)/);
+    // 两条取图路径都要过一遍：载荷/缓存拼出来的 URL，与上游预览元素已有的 URL
+    assert.match(JS, /if \(data\.url\) return opaqueImageUrl\(data\.url\);/);
+    assert.match(JS, /return opaqueImageUrl\(api\.apiURL\(/);
+    // 非 /view 出图（blob: / data:）不得改写
+    assert.match(JS, /\/\^\(\?:blob:\|data:\)\//);
+    // 已算好的 URL 必须原样复用：探针与渲染不能各拼一个字符串
+    assert.match(JS, /const url = imageUrl\(media\);/);
 });

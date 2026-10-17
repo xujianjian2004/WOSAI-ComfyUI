@@ -449,8 +449,7 @@
     "empty": "Execute the node to load a preview"
   },
   "imageCompare": {
-    "empty": "Connect two images and execute",
-    "incomplete": "Execute with both images connected",
+    "incomplete": "Connect an image to the other side",
     "position": "Comparison position",
     "swap": "Swap A/B",
     "views": "Comparison view",

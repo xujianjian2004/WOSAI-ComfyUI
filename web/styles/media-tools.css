@@ -463,10 +463,12 @@
   cursor: not-allowed;
 }
 
-/* 无图时不显示底部工具栏，避免压在空状态提示上 */
-.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-bottom {
-  opacity: 0;
-  pointer-events: none;
+/* 两侧都无素材时整块舞台收起：节点只剩标题与两行输入端口（对照 rgthree 的紧凑态）。
+   舞台自带背景与一像素轮廓，内部还挂着分割线（主文本色），只把「高度算作 0」而元素
+   照旧渲染，紧凑态就会在端口下方漏出一条「黑条 + 中间一根白竖线」的切片——看着像
+   多出来又点不动的控件。stage 是 root 的唯一子节点，收起后紧凑态不再画任何东西。 */
+.wosai-image-compare:not(.has-first):not(.has-second) .wosai-image-compare-stage {
+  display: none;
 }
 
 /* ── 闲置自动淡出：指针离开或在图内静止后隐去控件，让图片回到纯净状态 ──

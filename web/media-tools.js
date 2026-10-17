@@ -18,7 +18,10 @@ import {
     COMPARE_VIEW_DEFAULT,
     COMPARE_VIEW_MODES,
     compareDisplayPair,
+    hasCompareMedia,
+    mediaFromNodeOutput,
     mediaSourceRatio,
+    nodeOutputLocatorKeys,
     normalizeSplitPercent,
     normalizeViewMode,
     stageAspectRatio,
@@ -32,7 +35,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=19", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=20", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -63,15 +66,40 @@ function viewText(mode) {
     }
 }
 
+/**
+ * 预览一律按 RGB 取图，与执行侧 `LoadImage` 的 `convert("RGB")` 对齐。
+ *
+ * 源文件带 alpha 时 `/view` 默认按 rgba 返回，透明区会透出舞台底色。Clipspace 的
+ * 涂抹产物正是这种文件：涂抹区被挖成 alpha=0，底下的 RGB 却仍是原图内容——于是
+ * 预览看着像「节点把原图换成了遮罩」，而节点真正拿到的张量（已丢 alpha）其实是
+ * 完整原图。补上 `channel=rgb` 让服务端只丢 alpha、保留 RGB，预览即与张量同源。
+ * 不认这个取值的旧服务端会原样返回文件，行为不劣化。
+ */
+function opaqueImageUrl(url) {
+    if (!url || /^(?:blob:|data:)/.test(url)) return url;
+    try {
+        const parsed = new URL(url, window.location.href);
+        if (!/(?:^|\/)view$/.test(parsed.pathname)) return url;
+        parsed.searchParams.set("channel", "rgb");
+        return parsed.toString();
+    } catch (_) {
+        return url;
+    }
+}
+
 function imageUrl(data) {
-    if (!data?.filename) return "";
+    if (!data) return "";
+    // 直读上游时 URL 已经算好：探针与渲染必须复用同一个字符串，否则浏览器会为了
+    // 同一份文件发两次请求（imageUrl 每次都加时间戳，拼接出来的 URL 不相等）
+    if (data.url) return opaqueImageUrl(data.url);
+    if (!data.filename) return "";
     const query = new URLSearchParams({
         filename: data.filename,
         type: data.type || "temp",
         subfolder: data.subfolder || "",
         rand: String(Date.now()),
     });
-    return api.apiURL(`/view?${query.toString()}`);
+    return opaqueImageUrl(api.apiURL(`/view?${query.toString()}`));
 }
 
 function findWidget(node, name) {
@@ -454,9 +482,11 @@ function createImageCompare(node) {
         '<circle class="wosai-image-compare-handle-dot" cx="12" cy="12" r="1.5"/>',
         "</svg>",
     ].join("");
+    // 只在「单边有图」时出现：两侧皆空时整个舞台收起来了，没有位置可提示，
+    // 也无需提示——紧凑形态本身就读作「还没接图」，与 ② 的初始形态一致
     const empty = document.createElement("div");
     empty.className = "wosai-media-empty";
-    empty.textContent = t("nodes.imageCompare.empty", "Connect two images and execute");
+    empty.textContent = t("nodes.imageCompare.incomplete", "Connect an image to the other side");
     secondWrap.append(second);
     // 底部工具栏：视图切换 + 交换按钮合并为一行，交换按钮在最右侧。
     // 仍是浮层（绝对定位），不进入 getWidgetHeight() 的高度计算。
@@ -725,17 +755,121 @@ function createImageCompare(node) {
         swap.disabled = !(payload.a && payload.b);
         swap.classList.toggle("is-active", swapped);
         swap.setAttribute("aria-pressed", String(swapped));
-        const complete = Boolean(payload.a && payload.b);
-        empty.hidden = complete;
-        empty.textContent = payload.a || payload.b
-            ? t("nodes.imageCompare.incomplete", "Execute with both images connected")
-            : t("nodes.imageCompare.empty", "Connect two images and execute");
+        // 两侧都在 ⇒ 无提示；两侧都缺 ⇒ 舞台整体收起（紧凑态），提示也无处可放
+        empty.hidden = !hasCompareMedia(payload) || Boolean(payload.a && payload.b);
         // 载荷尺寸可以先于图片解码给出宽高比，避免首帧先按 16:9 兜底再跳一次
         const sourceRatio = mediaSourceRatio(display.a) || mediaSourceRatio(display.b);
         if (sourceRatio > 0) commitLayout(sourceRatio);
         // 换图是「刚发生的动作」：控件先露出来，让新图的尺寸与当前视图状态可见
         revealControls(IDLE_REVEAL_HOLD);
     };
+
+    // ── 上游直读：不执行也能出图 ────────────────────────────────────
+    // ComfyUI 前端把「每个节点最近一次产出」缓存在 app.nodeOutputs 上，LoadImage
+    // 换图、预览节点跑完都会写入。连线接入图像 A / B 时直接读这份缓存，用户就不必
+    // 为了看一眼对比再跑一遍工作流；缓存里没有（上游是纯计算节点、或本次会话还没
+    // 跑过）时才回落到「执行后由后端载荷提供」的既有路径。
+    const INPUT_SLOTS = ["image_a", "image_b"];
+
+    const inputSlotIndex = (name) => node.inputs?.findIndex(
+        (slot) => (slot?._wosaiOrigName || slot?.name) === name,
+    ) ?? -1;
+
+    const upstreamNodeOf = (name) => {
+        const index = inputSlotIndex(name);
+        if (index < 0) return null;
+        try {
+            const resolved = node.getInputNode?.(index);
+            if (resolved) return resolved;
+        } catch (_) {
+            // 链接刚被删除、或指向已不存在的节点：继续走下面的手工解析
+        }
+        // getInputNode 在部分前端版本上不认「input.link 存的是链接对象」这种新形态，
+        // 这里补一条：对象索引与 Map 两种链接容器都试
+        const linkRef = node.inputs?.[index]?.link;
+        if (linkRef == null) return null;
+        const links = node.graph?.links;
+        const link = typeof linkRef === "object"
+            ? linkRef
+            : (links?.get?.(linkRef) ?? links?.[linkRef]);
+        const originId = link?.origin_id ?? link?.originId;
+        if (originId == null) return null;
+        return node.graph?.getNodeById?.(originId) ?? null;
+    };
+
+    const upstreamMedia = (upstream) => {
+        const outputs = app.nodeOutputs;
+        if (outputs) {
+            for (const key of nodeOutputLocatorKeys(upstream.id, app.graph?.rootGraph?.id)) {
+                const media = mediaFromNodeOutput(outputs[key]);
+                if (media) return media;
+            }
+        }
+        // 缓存键改名、或上游只画了预览而没写缓存时的兜底：节点自己的预览元素。
+        // 两种渲染模式都会把最近一次产出挂到 imgs 上，src 就是可直接引用的 URL。
+        const preview = upstream.imgs?.[0];
+        const url = typeof preview === "string" ? preview : preview?.src;
+        if (url) return { kind: "image", url };
+        return mediaFromNodeOutput(upstream);
+    };
+
+    // 探针只为拿像素尺寸：节点高度要靠「舞台宽高比」换算，而前端缓存里只有文件名。
+    // URL 与随后的渲染完全一致（载荷自带 url），浏览器因此只请求一次。
+    const probeSize = (url) => new Promise((resolve) => {
+        const probe = new Image();
+        probe.onload = () => resolve({ width: probe.naturalWidth, height: probe.naturalHeight });
+        probe.onerror = () => resolve(null);
+        probe.src = url;
+    });
+
+    const resolveSide = async (name) => {
+        const upstream = upstreamNodeOf(name);
+        if (!upstream) return null;
+        const media = upstreamMedia(upstream);
+        if (!media) return null;
+        const url = imageUrl(media);
+        const size = await probeSize(url);
+        return size ? { ...media, url, ...size } : { ...media, url };
+    };
+
+    // 每次解析都带一张号牌：连线可能被连续改动，只有最后一次的结果可以落地
+    let upstreamToken = 0;
+
+    const refreshFromUpstream = async () => {
+        const token = ++upstreamToken;
+        const resolved = await Promise.all(INPUT_SLOTS.map(resolveSide));
+        // 解析期间节点可能已被删除，或者工作流又跑了一轮（后端载荷更权威）
+        if (token !== upstreamToken || !root.isConnected) return;
+        const next = { a: resolved[0] ?? payload.a, b: resolved[1] ?? payload.b };
+        if (!hasCompareMedia(next)) return;
+        // 只认「换了一张图」这一个变化：同一张图重复解析（拖线抖动、重复触发的
+        // 执行事件）不该反复重排尺寸
+        const unchanged = (next.a?.url ?? "") === (payload.a?.url ?? "")
+            && (next.b?.url ?? "") === (payload.b?.url ?? "");
+        if (unchanged) return;
+        payload = next;
+        // 与执行路径同源：图换了就把节点尺寸归一（含紧凑态第一次展开）
+        state.normalizeSizeOnLoad = true;
+        renderImages();
+    };
+
+    /** 执行事件里的节点标识可能是定位符（`~root:4`），统一取最后一段再比对。 */
+    const plainNodeId = (value) => {
+        const text = String(value ?? "");
+        const cut = text.lastIndexOf(":");
+        return cut === -1 ? text : text.slice(cut + 1);
+    };
+    // 只跑了上游那一支（局部执行）时本节点不会被执行，后端载荷也就不会更新；
+    // 订阅执行事件就能让预览跟着上游一起刷新，这才叫「实时预览」。
+    const onUpstreamExecuted = (message) => {
+        const executed = plainNodeId(message?.display_node ?? message?.node);
+        if (!executed || executed === String(node.id)) return;
+        const hit = INPUT_SLOTS.some(
+            (name) => String(upstreamNodeOf(name)?.id ?? "") === executed,
+        );
+        if (hit) refreshFromUpstream();
+    };
+    api.addEventListener("executed", onUpstreamExecuted);
     slider.addEventListener("input", updateSplit, { signal });
     // 交换按钮与视图按钮都浮在图像区上，需拦住 pointerdown，
     // 否则会被 stage 当成分割线拖拽的起点
@@ -805,6 +939,10 @@ function createImageCompare(node) {
     updateSplit();
 
     const getWidgetHeight = () => {
+        // 紧凑初始态：两侧都没有素材时控件不占高度，节点只剩标题与两行输入端口
+        // （对照 rgthree 图像对比节点的初始形态），不再垫一块永远填不满的空白舞台。
+        // 一旦有任一侧素材就整块展开，尺寸由下面的宽高比换算接管。
+        if (!hasCompareMedia(payload)) return 0;
         const gap = getWOSAIVarNum("--ws-gap-sm", 6);
         // 控件高度 = 上下内边距 + 图像区高度；图像区高度严格等于 宽度 / 舞台宽高比，
         // 所以宽度优先取舞台实测值（首帧未挂载时按节点宽度扣除左右内边距估算）
@@ -861,25 +999,33 @@ function createImageCompare(node) {
         swap.title = swapText;
         swap.setAttribute("aria-label", swapText);
         refreshViewText();
-        if (!empty.hidden) {
-            empty.textContent = root.classList.contains("has-first") || root.classList.contains("has-second")
-                ? t("nodes.imageCompare.incomplete", "Execute with both images connected")
-                : t("nodes.imageCompare.empty", "Connect two images and execute");
-        }
+        empty.textContent = t(
+            "nodes.imageCompare.incomplete",
+            "Connect an image to the other side",
+        );
+    };
+    node.__wosaiCompareRefreshUpstream = () => {
+        void refreshFromUpstream();
     };
     node.__wosaiCompareRefreshText();
     applyLayout();
     applyStageRatio();
     renderImages();
+    // 紧凑态不能沿用 --ws-compare-node-min-height：那是「有图时」的下限，无图时夹到
+    // 280 会在收起的舞台下方撑出一大块空白。有图后由 fitNodeToStage({clampMinHeight})
+    // 夹回，两条路径都不会漏。
+    const nodeMinHeight = () => (hasCompareMedia(payload)
+        ? getWOSAIVarNum("--ws-compare-node-min-height", 280)
+        : 0);
     ensureNodeMinSize(
         node,
         getWOSAIVarNum("--ws-media-node-min-width", 420),
-        getWOSAIVarNum("--ws-compare-node-min-height", 280),
+        nodeMinHeight,
     );
     compactNodeToContent(
         node,
         getWOSAIVarNum("--ws-media-node-min-width", 420),
-        getWOSAIVarNum("--ws-compare-node-min-height", 280),
+        nodeMinHeight,
     );
     cleanups.set(node, () => {
         controller.abort();
@@ -887,11 +1033,14 @@ function createImageCompare(node) {
         // 订阅闭包持有 stage / root，不清会阻止整棵子树被回收
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = 0;
+        // 执行事件监听同理：闭包持有 root，漏摘会让被删掉的节点一直留着
+        api.removeEventListener("executed", onUpstreamExecuted);
         root.remove();
         delete node.__wosaiCompareRoot;
         delete node.__wosaiCompareSetImages;
         delete node.__wosaiCompareSyncState;
         delete node.__wosaiCompareRefreshText;
+        delete node.__wosaiCompareRefreshUpstream;
     });
 }
 
@@ -901,6 +1050,8 @@ function patchNodeType(nodeType, nodeData) {
     const originalConfigure = nodeType.prototype.onConfigure;
     const originalExecuted = nodeType.prototype.onExecuted;
     const originalRemoved = nodeType.prototype.onRemoved;
+    const originalConnectionsChange = nodeType.prototype.onConnectionsChange;
+    const originalAfterGraphConfigured = nodeType.prototype.onAfterGraphConfigured;
     const attach = function () {
         queueMicrotask(() => {
             if (nodeData.name === POINTS_TYPE) createPointsEditor(this);
@@ -924,6 +1075,20 @@ function patchNodeType(nodeType, nodeData) {
         }
         return result;
     };
+    // onConfigure 早于链接建立（LiteGraph 先建节点再连线），此时反查上游必然落空，
+    // 所以「打开工作流后自动出图」挂在 onAfterGraphConfigured 上：它在整张图
+    // （含全部 link）配置完成后才逐个节点回调。粘贴节点走的也是同一个钩子。
+    const afterGraphConfigured = function () {
+        const result = originalAfterGraphConfigured?.apply(this, arguments);
+        if (nodeData.name === COMPARE_TYPE) this.__wosaiCompareRefreshUpstream?.();
+        return result;
+    };
+    // 连线变动是「自动加载」的主入口：上游本来就有图时，接上线即出图，无需执行
+    const connectionsChanged = function () {
+        const result = originalConnectionsChange?.apply(this, arguments);
+        if (nodeData.name === COMPARE_TYPE) this.__wosaiCompareRefreshUpstream?.();
+        return result;
+    };
     const executed = function (message) {
         if (nodeData.name === POINTS_TYPE) {
             const hadNativePreview = clearNativeImagePreview(this);
@@ -944,11 +1109,14 @@ function patchNodeType(nodeType, nodeData) {
     };
     nodeType.prototype.onNodeCreated = created;
     nodeType.prototype.onConfigure = configured;
+    nodeType.prototype.onAfterGraphConfigured = afterGraphConfigured;
+    nodeType.prototype.onConnectionsChange = connectionsChanged;
     nodeType.prototype.onExecuted = executed;
     nodeType.prototype.onRemoved = removed;
     nodeType.prototype[PATCH_KEY] = {
         originalCreated, originalConfigure, originalExecuted, originalRemoved,
-        created, configured, executed, removed,
+        originalConnectionsChange, originalAfterGraphConfigured,
+        created, configured, connectionsChanged, afterGraphConfigured, executed, removed,
     };
     patchedNodeTypes.add(nodeType);
 }

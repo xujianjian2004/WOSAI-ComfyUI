@@ -5,7 +5,10 @@ import {
     COMPARE_STAGE_RATIO_BOUNDS,
     COMPARE_VIEW_MODES,
     compareDisplayPair,
+    hasCompareMedia,
+    mediaFromNodeOutput,
     mediaSourceRatio,
+    nodeOutputLocatorKeys,
     normalizeSplitPercent,
     normalizeViewMode,
     stageAspectRatio,
@@ -112,6 +115,49 @@ test("mediaSourceRatio reads payload dimensions and rejects unusable ones", () =
     assert.equal(mediaSourceRatio({ width: "800", height: "600" }), 800 / 600);
     for (const media of [undefined, null, {}, { width: 800 }, { width: 0, height: 600 }]) {
         assert.equal(mediaSourceRatio(media), 0);
+    }
+});
+
+test("hasCompareMedia reports the compact state only when both sides are empty", () => {
+    assert.equal(hasCompareMedia({ a: { filename: "a.png" }, b: null }), true);
+    assert.equal(hasCompareMedia({ a: null, b: { filename: "b.png" } }), true);
+    assert.equal(hasCompareMedia({ a: { filename: "a.png" }, b: { filename: "b.png" } }), true);
+    // 初始 / 清空态：两侧都没有 ⇒ 紧凑
+    assert.equal(hasCompareMedia({ a: null, b: null }), false);
+    assert.equal(hasCompareMedia({}), false);
+    assert.equal(hasCompareMedia(undefined), false);
+    assert.equal(hasCompareMedia(null), false);
+});
+
+test("nodeOutputLocatorKeys lists locator forms newest first", () => {
+    // rootGraphId 已知时先试 <graphId>:<id>，再试当前版本的 ~root:<id>，最后裸 id
+    assert.deepEqual(nodeOutputLocatorKeys(4, "root"), ["root:4", "~root:4", "4"]);
+    // 拿不到 rootGraph.id（旧版前端 / 子图）时不能产出 "undefined:4" 这类废键
+    assert.deepEqual(nodeOutputLocatorKeys(4), ["~root:4", "4"]);
+    assert.deepEqual(nodeOutputLocatorKeys("4", null), ["~root:4", "4"]);
+    // 数字与字符串 id 归一成同一个键，避免「画布上是 4、事件里是 "4"」重复试探
+    assert.deepEqual(nodeOutputLocatorKeys("4", "root"), nodeOutputLocatorKeys(4, "root"));
+    for (const empty of [undefined, null, ""]) {
+        assert.deepEqual(nodeOutputLocatorKeys(empty, "root"), []);
+    }
+});
+
+test("mediaFromNodeOutput normalizes the frontend cache shape", () => {
+    assert.deepEqual(
+        mediaFromNodeOutput({
+            images: [{ filename: "a.png", subfolder: "sub", type: "output" }],
+        }),
+        { kind: "image", filename: "a.png", subfolder: "sub", type: "output" },
+    );
+    // 批次里的 null 占位（前端用它表示「这一帧没有图」）必须跳过，而不是当空引用
+    assert.deepEqual(
+        mediaFromNodeOutput({ images: [null, { filename: "b.png" }] }),
+        { kind: "image", filename: "b.png", subfolder: "", type: "temp" },
+    );
+    // 视频节点同样会写 images，kind 由载荷给出
+    assert.equal(mediaFromNodeOutput({ images: [{ filename: "v.mp4", kind: "video" }] }).kind, "video");
+    for (const entry of [undefined, null, {}, { images: [] }, { images: [null] }, { images: [{}] }]) {
+        assert.equal(mediaFromNodeOutput(entry), null);
     }
 });
 
