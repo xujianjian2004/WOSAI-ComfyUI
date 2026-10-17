@@ -229,13 +229,72 @@ class SizeSelectManualModeLimitTests(unittest.TestCase):
     def test_validation_accepts_large_custom_sizes(self):
         self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 8192, 8192), True)
 
-    def test_validation_still_rejects_below_minimum_and_off_grid_values(self):
+    def test_validation_still_rejects_below_minimum_but_no_longer_off_grid(self):
+        # 最小值仍然要卡；但**网格倍数不该由校验来管**——对齐由 _align_grid 自动完成，
+        # 硬编码 `% 8` 与 align_multiple 脱钩：实测 align_multiple=3 时 1023 被拒（本该合法）、
+        # 1024 被放行（随后又被对齐成 1023），双向都错。
         self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 128, 2048), str)
-        self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 4097, 2048), str)
+        self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 4097, 2048), True)
+        self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1023, 1023, 3), True)
 
     def test_validation_rejects_a_bogus_align_multiple(self):
         self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1024, 1024, 8), True)
         self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1024, 1024, 0), str)
+        # 上限与 UI 声明的 max 同口径（此前用的是 MAX_DIMENSION=16384，与 UI 的 128 不符）
+        self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 1024, 1024, 129), str)
+
+
+@unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")
+class SizeSelectLatentConsistencyTests(unittest.TestCase):
+    """本节点自己产 latent ⇒ 输出的 width/height 必须等于 latent 形状 × 压缩率。
+
+    历史上无 latent / VAE 输入时 processing_ratio 按 1 计（只按 align_multiple 对齐），
+    而空 latent 用 `// 8` 截断 ⇒ align_multiple 取 1/3/5 时两者对不上（差最多 7px）。
+    """
+
+    def setUp(self):
+        self.node = WOSAI_SizeSelect()
+
+    def test_empty_latent_matches_the_reported_size_for_every_align_multiple(self):
+        for multiple in (1, 3, 5, 8, 16, 64, 128):
+            with self.subTest(align_multiple=multiple):
+                _, _, out, width, height = self.node.calculate_size(
+                    "on", "Crop", 1.0, None, None, 1023, 1023, multiple)
+                ratio = out["downscale_ratio_spacial"]
+                samples = out["samples"]
+                self.assertEqual(samples.shape[-1] * ratio, width)
+                self.assertEqual(samples.shape[-2] * ratio, height)
+
+    def test_align_multiple_that_is_not_a_multiple_of_8_still_lands_on_the_latent_grid(self):
+        # lcm(3, 8) = 24 ⇒ 1023 落到 1032，仍然能被压缩率 8 整除
+        _, _, out, width, height = self.node.calculate_size(
+            "on", "Crop", 1.0, None, None, 1023, 1023, 3)
+        self.assertEqual(width % 24, 0)
+        self.assertEqual(height % 24, 0)
+        self.assertEqual(out["samples"].shape[-1] * 8, width)
+
+
+@unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")
+class SizeSelectMaskOnlyTests(unittest.TestCase):
+    """只接 mask（无 image / latent）时遮罩不能被静默丢弃。"""
+
+    def setUp(self):
+        self.node = WOSAI_SizeSelect()
+
+    def test_a_lone_mask_is_resized_and_returned(self):
+        mask = torch.ones((1, 512, 512))
+        image, out_mask, _, width, height = self.node.calculate_size(
+            "on", "Crop", 1.0, None, None, 1024, 768, mask=mask)
+        self.assertIsNone(image)
+        self.assertIsNotNone(out_mask, "只接 mask 时遮罩不应被丢弃")
+        self.assertEqual(tuple(out_mask.shape), (1, height, width))
+
+    def test_a_2d_mask_keeps_its_rank(self):
+        mask = torch.ones((300, 400))
+        _, out_mask, _, width, height = self.node.calculate_size(
+            "on", "Crop", 1.0, None, None, 1024, 768, mask=mask)
+        self.assertEqual(out_mask.ndim, 2)
+        self.assertEqual(tuple(out_mask.shape), (height, width))
 
 
 @unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")

@@ -72,7 +72,26 @@ test("python INT specs declare an explicit max above the legacy 2048 cap", () =>
     }
 });
 
-test("python validation still enforces the minimum and the 8px grid", () => {
+test("python validation enforces the minimum but not a hard-coded grid multiple", () => {
+    // ⚠ 曾经的 `custom_width % 8 != 0` 与 align_multiple 脱钩：align_multiple=3 时
+    //   1023 被拒（本该合法）、1024 被放行（随后又被对齐成 1023），双向都错。
+    //   对齐由 _align_grid 自动完成，校验不该重复管这一层。
     assert.match(sizeSelectPy, /if custom_width < MIN_DIMENSION or custom_height < MIN_DIMENSION:/);
-    assert.match(sizeSelectPy, /if custom_width % 8 != 0 or custom_height % 8 != 0:/);
+    assert.ok(!/% 8 != 0/.test(sizeSelectPy), "校验不得再硬编码 8px 倍数（与 align_multiple 脱钩）");
+});
+
+test("the align multiple upper bound is one constant shared by both schemas and the validator", () => {
+    // 三处硬编码会各自漂移：此前 VALIDATE 用的是 MAX_DIMENSION=16384，而 UI 声明的是 128。
+    const declared = sizeSelectPy.match(/^MAX_ALIGN_MULTIPLE = (\d+)$/m);
+    assert.ok(declared, "MAX_ALIGN_MULTIPLE constant not found");
+    assert.equal(Number(declared[1]), 128);
+    assert.match(sizeSelectPy, /"align_multiple": \("INT", \{[^}]*"max": MAX_ALIGN_MULTIPLE/);
+    assert.match(sizeSelectPy, /_io\.Int\.Input\("align_multiple"[\s\S]*?max=MAX_ALIGN_MULTIPLE/);
+    assert.match(sizeSelectPy, /if multiple < 1 or multiple > MAX_ALIGN_MULTIPLE:/);
+});
+
+test("the align multiple is advanced on both the V1 and V3 schemas", () => {
+    // 只有 V3 标 advanced 时，Classic 前端会把它摆在主区域，双前端不一致
+    assert.match(sizeSelectPy, /"align_multiple": \("INT", \{[^}]*"advanced": True/);
+    assert.match(sizeSelectPy, /_io\.Int\.Input\("align_multiple"[\s\S]*?advanced=True/);
 });

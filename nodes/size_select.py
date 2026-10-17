@@ -33,6 +33,9 @@ MAX_DIMENSION = 16384
 # 像素对齐粒度的默认值：8 = SD / SDXL / Flux 一系的 latent 空间压缩率。
 # 可由节点上的 align_multiple（advanced）覆盖，用于下采样率不同的模型。
 DEFAULT_ALIGN_MULTIPLE = 8
+# 对齐粒度的可调上限：与 V1 / V3 两处声明及 VALIDATE_INPUTS 共用同一个常量，
+#   避免三处硬编码后各自漂移（此前 VALIDATE 用的是 MAX_DIMENSION=16384，与 UI 的 128 不符）。
+MAX_ALIGN_MULTIPLE = 128
 DEFAULT_RES = _RESOLUTION_CONFIG["default_resolution"]
 DEFAULT_RATIO = _RESOLUTION_CONFIG["default_ratio"]
 
@@ -102,7 +105,7 @@ class WOSAI_SizeSelect:
                 "Aspect_Ratio":  (ASPECT_RATIOS, {"default": DEFAULT_RATIO, "tooltip": "Select aspect ratio | 选择画面宽高比"}),
                 "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom width (manual mode only, max {MAX_DIMENSION}) | 自定义宽度（仅手动模式，上限 {MAX_DIMENSION}）"}),
                 "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"}),
-                "align_multiple": ("INT", {"default": DEFAULT_ALIGN_MULTIPLE, "min": 1, "max": 128, "step": 1, "tooltip": "Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"}),
+                "align_multiple": ("INT", {"default": DEFAULT_ALIGN_MULTIPLE, "min": 1, "max": MAX_ALIGN_MULTIPLE, "step": 1, "advanced": True, "tooltip": "Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"}),
                 "image":         ("IMAGE",),
                 "mask":          ("MASK",),
                 "latent":        ("LATENT",),
@@ -171,19 +174,21 @@ class WOSAI_SizeSelect:
         has_latent = latent is not None
         has_vae = vae is not None
         latent_ratio = _latent_spatial_ratio(latent, vae)
-        processing_ratio = latent_ratio if has_latent or has_vae else 1
-        # 三条路径（预设 / 自定义 / Scale）统一走同一个网格：lcm(对齐粒度, latent 压缩率)。
-        # 无 latent / VAE 输入时压缩率按 1 计，即只按 align_multiple 对齐
-        # （空 latent 与下游真实 VAE 的压缩率差异见 tooltip 说明）。
-        target_w = _align_grid(target_w, align_multiple, processing_ratio)
-        target_h = _align_grid(target_h, align_multiple, processing_ratio)
+        # ⚠ 三条路径（预设 / 自定义 / Scale）统一走同一个网格：lcm(对齐粒度, latent 压缩率)，
+        #   **不区分有没有接 latent / VAE**。本节点自己产 latent ⇒ 像素必须能被压缩率整除，
+        #   否则 latent 形状只能靠 `//` 截断、与输出的 width/height 对不上。
+        #   实测（无 latent/VAE 输入）：align_multiple=3、输入 1023 → 输出 1023×1023，
+        #   而空 latent 是 127×127（隐含 1016×1016），差 7px。
+        #   无 latent / VAE 时压缩率按 8 计；接了 VAE 会自动取真实值（如 16× 模型）。
+        target_w = _align_grid(target_w, align_multiple, latent_ratio)
+        target_h = _align_grid(target_h, align_multiple, latent_ratio)
 
         # ── 计算实际处理尺寸（等比缩放 vs 中心裁剪）──
         if scale_method == "Scale":
             if has_image:
                 _, h1, w1, _ = image.shape
-                actual_w = _align_grid(w1 * scale_multiplier, align_multiple, processing_ratio)
-                actual_h = _align_grid(h1 * scale_multiplier, align_multiple, processing_ratio)
+                actual_w = _align_grid(w1 * scale_multiplier, align_multiple, latent_ratio)
+                actual_h = _align_grid(h1 * scale_multiplier, align_multiple, latent_ratio)
             elif has_latent:
                 _, _, lh, lw = latent["samples"].shape
                 actual_w = _align_grid(lw * latent_ratio * scale_multiplier, align_multiple, latent_ratio)
@@ -262,6 +267,21 @@ class WOSAI_SizeSelect:
                 actual_w, actual_h, scaled.shape,
             )
             return (None, None, out_latent, actual_w, actual_h)
+
+        elif mask is not None:
+            # ── 只接了 mask（既无 image 也无 latent）：按目标尺寸缩放遮罩后输出 ──
+            #   此前这条路径会掉进下面的 else，用户接的遮罩被静默丢弃。
+            #   复用 _resize_spatial_mask（2D / 3D / 4D 通吃，保留原 rank 与 dtype）。
+            out_mask = self._resize_spatial_mask(
+                mask, actual_w, actual_h, scale_method != "Scale")
+            out_latent = {"samples": torch.zeros(
+                (1, 4, actual_h // latent_ratio, actual_w // latent_ratio)),
+                "downscale_ratio_spacial": latent_ratio}
+            logger.debug(
+                "SizeSelect mask-only pixel=(%s,%s) mask_shape=%s",
+                actual_w, actual_h, getattr(out_mask, "shape", None),
+            )
+            return (None, out_mask, out_latent, actual_w, actual_h)
 
         else:
             # ── 无输入：仅返回尺寸 + 空 latent ──
@@ -343,8 +363,8 @@ class WOSAI_SizeSelect:
                 multiple = int(align_multiple)
             except (TypeError, ValueError):
                 return "对齐粒度必须是不小于 1 的整数"
-            if multiple < 1 or multiple > MAX_DIMENSION:
-                return f"对齐粒度必须在 1-{MAX_DIMENSION} 之间"
+            if multiple < 1 or multiple > MAX_ALIGN_MULTIPLE:
+                return f"对齐粒度必须在 1-{MAX_ALIGN_MULTIPLE} 之间"
         if Manual_Mode == "on":
             try:
                 custom_width = int(Custom_Width)
@@ -353,8 +373,9 @@ class WOSAI_SizeSelect:
                 return "自定义宽高必须是整数"
             if custom_width < MIN_DIMENSION or custom_height < MIN_DIMENSION:
                 return f"自定义宽高不能小于 {MIN_DIMENSION}"
-            if custom_width % 8 != 0 or custom_height % 8 != 0:
-                return "自定义宽高必须是 8 的倍数"
+            # ⚠ 这里**不校验网格倍数**：对齐由 _align_grid 自动完成，硬编码 `% 8` 会与
+            #   align_multiple 脱钩——实测 align_multiple=3 时 1023 被拒（本该合法）、
+            #   1024 被放行（随后又被对齐成 1023），双向都错。只卡真正越界的值。
         else:
             if Resolution and Resolution not in RESOLUTION_DATA:
                 return f"无效的分辨率: {Resolution}"
@@ -425,7 +446,7 @@ try:
                                   optional=True,
                                   tooltip=f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"),
                     _io.Int.Input("align_multiple", default=DEFAULT_ALIGN_MULTIPLE,
-                                  min=1, max=128, step=1, optional=True, advanced=True,
+                                  min=1, max=MAX_ALIGN_MULTIPLE, step=1, optional=True, advanced=True,
                                   tooltip="Snap width/height to this grid (default 8 = latent compression) | 宽高对齐粒度（默认 8，即 latent 压缩率）"),
                     _io.Image.Input("image", optional=True,
                                     tooltip="Input image (optional, will be scaled to target size) | 输入图像（可选，将缩放至目标尺寸）"),
