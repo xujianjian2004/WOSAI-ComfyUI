@@ -14,7 +14,7 @@ except ModuleNotFoundError:
 from nodes.logic_switch import WOSAI_LogicSwitch
 from nodes.preset_prompt import DEFAULT_PRESETS, WOSAI_PresetPromptSelector, _normalize_presets
 if torch is not None:
-    from nodes.size_select import WOSAI_SizeSelect
+    from nodes.size_select import MIN_DIMENSION, WOSAI_SizeSelect
 
 
 class LogicSwitchTests(unittest.TestCase):
@@ -207,3 +207,28 @@ class SizeSelectTensorResizeTests(unittest.TestCase):
         self.assertEqual((width, height), (192, 128))
         self.assertEqual(tuple(output["samples"].shape), (1, 16, 8, 12))
         self.assertEqual(output["downscale_ratio_spacial"], 16)
+
+
+@unittest.skipIf(torch is None, "PyTorch is provided by the ComfyUI runtime, not this test interpreter")
+class SizeSelectManualModeLimitTests(unittest.TestCase):
+    """自定义（手动）模式不设上限：只保留最小值约束与 8px 网格对齐。"""
+
+    def setUp(self):
+        self.node = WOSAI_SizeSelect()
+
+    def test_manual_mode_accepts_dimensions_above_the_removed_cap(self):
+        self.assertEqual(self.node._determine_target_size("on", None, None, 4096, 8192), (4096, 8192))
+
+    def test_manual_mode_still_applies_the_minimum_and_the_8px_grid(self):
+        # 8 → 抬到最小值；4100 → 向下对齐到 4096
+        self.assertEqual(
+            self.node._determine_target_size("on", None, None, 8, 4100),
+            (MIN_DIMENSION, 4096),
+        )
+
+    def test_validation_accepts_large_custom_sizes(self):
+        self.assertIs(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 8192, 8192), True)
+
+    def test_validation_still_rejects_below_minimum_and_off_grid_values(self):
+        self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 128, 2048), str)
+        self.assertIsInstance(WOSAI_SizeSelect.VALIDATE_INPUTS("on", None, None, 4097, 2048), str)

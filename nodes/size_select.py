@@ -20,8 +20,10 @@ RESOLUTION_DATA = {
     for resolution, ratios in _RESOLUTION_CONFIG["resolutions"].items()
 }
 ASPECT_RATIOS = list(_RESOLUTION_CONFIG["aspect_ratios"])
-MAX_DIMENSION = int(_RESOLUTION_CONFIG["max_dimension"])
 MIN_DIMENSION = int(_RESOLUTION_CONFIG["min_dimension"])
+# 自定义模式**不设上限**（与 Scale 模式一致）：只保留最小值约束与 8px 网格对齐。
+# 该键仅作为「新建节点时自定义高度」的默认值，不是上限——历史键名 max_dimension 即因此改名。
+DEFAULT_CUSTOM_HEIGHT = int(_RESOLUTION_CONFIG["default_custom_height"])
 DEFAULT_RES = _RESOLUTION_CONFIG["default_resolution"]
 DEFAULT_RATIO = _RESOLUTION_CONFIG["default_ratio"]
 
@@ -75,8 +77,8 @@ class WOSAI_SizeSelect:
             "optional": {
                 "Resolution":    (list(RESOLUTION_DATA.keys()), {"default": DEFAULT_RES, "tooltip": "Select preset resolution | 选择预设分辨率"}),
                 "Aspect_Ratio":  (ASPECT_RATIOS, {"default": DEFAULT_RATIO, "tooltip": "Select aspect ratio | 选择画面宽高比"}),
-                "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": "Custom width (manual mode only) | 自定义宽度（仅手动模式）"}),
-                "Custom_Height": ("INT", {"default": MAX_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": "Custom height (manual mode only) | 自定义高度（仅手动模式）"}),
+                "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "step": 8, "tooltip": "Custom width, no upper limit (manual mode only) | 自定义宽度，无上限（仅手动模式）"}),
+                "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "step": 8, "tooltip": "Custom height, no upper limit (manual mode only) | 自定义高度，无上限（仅手动模式）"}),
                 "image":         ("IMAGE",),
                 "mask":          ("MASK",),
                 "latent":        ("LATENT",),
@@ -93,8 +95,9 @@ class WOSAI_SizeSelect:
                                 Custom_Width, Custom_Height):
         """确定目标像素尺寸（与现有逻辑一致）"""
         if Manual_Mode == "on":
-            w = max(MIN_DIMENSION, min(MAX_DIMENSION, Custom_Width))
-            h = max(MIN_DIMENSION, min(MAX_DIMENSION, Custom_Height))
+            # 无上限：只保留最小值约束，8px 网格对齐由 _r8 完成。
+            w = max(MIN_DIMENSION, int(Custom_Width or MIN_DIMENSION))
+            h = max(MIN_DIMENSION, int(Custom_Height or MIN_DIMENSION))
         else:
             if not Resolution:
                 Resolution = DEFAULT_RES
@@ -308,11 +311,14 @@ class WOSAI_SizeSelect:
         **kwargs,
     ):
         if Manual_Mode == "on":
-            if not (MIN_DIMENSION <= Custom_Width <= MAX_DIMENSION):
-                return f"自定义宽度必须在 {MIN_DIMENSION}-{MAX_DIMENSION} 之间"
-            if not (MIN_DIMENSION <= Custom_Height <= MAX_DIMENSION):
-                return f"自定义高度必须在 {MIN_DIMENSION}-{MAX_DIMENSION} 之间"
-            if Custom_Width % 8 != 0 or Custom_Height % 8 != 0:
+            try:
+                custom_width = int(Custom_Width)
+                custom_height = int(Custom_Height)
+            except (TypeError, ValueError):
+                return "自定义宽高必须是整数"
+            if custom_width < MIN_DIMENSION or custom_height < MIN_DIMENSION:
+                return f"自定义宽高不能小于 {MIN_DIMENSION}"
+            if custom_width % 8 != 0 or custom_height % 8 != 0:
                 return "自定义宽高必须是 8 的倍数"
         else:
             if Resolution and Resolution not in RESOLUTION_DATA:
@@ -374,13 +380,13 @@ try:
                                     default=DEFAULT_RATIO, optional=True,
                                     tooltip="Select aspect ratio | 选择宽高比"),
                     _io.Int.Input("Custom_Width", default=MIN_DIMENSION,
-                                  min=MIN_DIMENSION, max=MAX_DIMENSION, step=8,
+                                  min=MIN_DIMENSION, step=8,
                                   optional=True,
-                                  tooltip="Custom width (manual mode only) | 自定义宽度（仅手动模式）"),
-                    _io.Int.Input("Custom_Height", default=MAX_DIMENSION,
-                                  min=MIN_DIMENSION, max=MAX_DIMENSION, step=8,
+                                  tooltip="Custom width, no upper limit (manual mode only) | 自定义宽度，无上限（仅手动模式）"),
+                    _io.Int.Input("Custom_Height", default=DEFAULT_CUSTOM_HEIGHT,
+                                  min=MIN_DIMENSION, step=8,
                                   optional=True,
-                                  tooltip="Custom height (manual mode only) | 自定义高度（仅手动模式）"),
+                                  tooltip="Custom height, no upper limit (manual mode only) | 自定义高度，无上限（仅手动模式）"),
                     _io.Image.Input("image", optional=True,
                                     tooltip="Input image (optional, will be scaled to target size) | 输入图像（可选，将缩放至目标尺寸）"),
                     _io.Mask.Input("mask", optional=True,

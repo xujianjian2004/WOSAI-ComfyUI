@@ -22,7 +22,10 @@ for (const color of colors.colors) {
 
 const sizes = await readJson("web/data/resolutions.json");
 assert.ok(Number.isInteger(sizes.min_dimension) && sizes.min_dimension > 0);
-assert.ok(Number.isInteger(sizes.max_dimension) && sizes.max_dimension >= sizes.min_dimension);
+assert.ok(
+    Number.isInteger(sizes.default_custom_height) && sizes.default_custom_height >= sizes.min_dimension,
+    "default_custom_height must be an integer >= min_dimension (manual mode has no upper bound)",
+);
 assert.ok(Array.isArray(sizes.aspect_ratios) && sizes.aspect_ratios.length > 0);
 assert.ok(sizes.resolutions?.[sizes.default_resolution], "default resolution must exist");
 const aspectKeys = new Set(sizes.aspect_ratios.map((label) => label.split(" ")[0]));

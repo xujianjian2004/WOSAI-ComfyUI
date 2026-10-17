@@ -1,6 +1,6 @@
 {
   "min_dimension": 256,
-  "max_dimension": 2048,
+  "default_custom_height": 2048,
   "default_resolution": "FHD 1080P",
   "default_ratio": "9:16 Mobile",
   "aspect_ratios": [

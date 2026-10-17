@@ -14,7 +14,8 @@ const PATCH_KEY = "__wosaiSizeSelectPatch";
 let _offLangChange = null;
 let _injectedCss = null;
 
-const MAX_DIMENSION = RESOLUTION_CONFIG.max_dimension;
+// 自定义模式**不设上限**（与 Scale 模式一致）：该键只作为「自定义高度」的初始值，不是上限。
+const DEFAULT_CUSTOM_HEIGHT = RESOLUTION_CONFIG.default_custom_height;
 const MIN_DIMENSION = RESOLUTION_CONFIG.min_dimension;
 const DEFAULT_RES = RESOLUTION_CONFIG.default_resolution;
 const DEFAULT_RATIO = RESOLUTION_CONFIG.default_ratio;
@@ -143,8 +144,9 @@ function _shortAsp(label) {
     return i > 0 ? label.slice(0, i) : label;
 }
 
-function roundTo8(v, maxV = MAX_DIMENSION) {
-    const n = Math.max(MIN_DIMENSION, Math.min(maxV, Number(v) || MIN_DIMENSION));
+// 自定义模式不设上限：只保留最小值约束 + latent 的 8px 网格对齐。
+function roundTo8(v) {
+    const n = Math.max(MIN_DIMENSION, Number(v) || MIN_DIMENSION);
     return Math.floor(n / 8) * 8;
 }
 
@@ -234,8 +236,8 @@ function buildUI(node) {
             }
         }
 
-        if (cusW) cusW.value = Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, cusW.value));
-        if (cusH) cusH.value = Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, cusH.value));
+        if (cusW) cusW.value = roundTo8(cusW.value);
+        if (cusH) cusH.value = roundTo8(cusH.value);
 
         let currentRes = (resW?.value && RESOLUTION_DATA[resW.value]) ? resW.value : DEFAULT_RES;
         if (resW && resW.value !== currentRes) resW.value = currentRes;
@@ -246,7 +248,7 @@ function buildUI(node) {
 
         let isManual         = manW?.value === "on";
         let baseWidth        = cusW?.value || MIN_DIMENSION;
-        let baseHeight       = cusH?.value || MAX_DIMENSION;
+        let baseHeight       = cusH?.value || DEFAULT_CUSTOM_HEIGHT;
         let _updatingDisplay = false;
         let _applyingMode    = false;
         let _targetHeight    = getFixedHeight(isManual);
@@ -649,8 +651,8 @@ function buildUI(node) {
                 const d = RESOLUTION_DATA[currentRes]?.[currentAsp];
                 previewVal.textContent = d ? `${d[0]} × ${d[1]}` : "N/A";
             } else {
-                const w = roundTo8(_dimVal(cusW, baseWidth),  MAX_DIMENSION);
-                const h = roundTo8(_dimVal(cusH, baseHeight), MAX_DIMENSION);
+                const w = roundTo8(_dimVal(cusW, baseWidth));
+                const h = roundTo8(_dimVal(cusH, baseHeight));
                 previewVal.textContent = `${w} × ${h}`;
             }
             if (opts.flash !== false) flashPreview();
@@ -769,7 +771,7 @@ function buildUI(node) {
                 const input  = e.target.querySelector("input") || e.target;
                 const rawVal = parseInt(input.value) || 0;
                 if (rawVal <= 0) { if (skipZero) return; syncPreview(); return; }
-                const r = roundTo8(rawVal, MAX_DIMENSION);
+                const r = roundTo8(rawVal);
                 input.value  = r;
                 widget.value = r;
                 setBase(r);
