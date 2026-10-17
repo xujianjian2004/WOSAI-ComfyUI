@@ -21,9 +21,15 @@ RESOLUTION_DATA = {
 }
 ASPECT_RATIOS = list(_RESOLUTION_CONFIG["aspect_ratios"])
 MIN_DIMENSION = int(_RESOLUTION_CONFIG["min_dimension"])
-# 自定义模式**不设上限**（与 Scale 模式一致）：只保留最小值约束与 8px 网格对齐。
 # 该键仅作为「新建节点时自定义高度」的默认值，不是上限——历史键名 max_dimension 即因此改名。
 DEFAULT_CUSTOM_HEIGHT = int(_RESOLUTION_CONFIG["default_custom_height"])
+# ⚠ 上限必须**显式**声明，不能靠「省略 max」表达无限。
+#   ComfyUI 前端 `useIntWidget()` 里写死了 `max: spec.max ?? 2048`——省略 max 不是
+#   「无上限」，而是被前端兜底成 2048。这正是「后端已去掉上限、实测仍卡在 2048」
+#   的根因：只删 max 等于把上限设成 2048。
+#   这里取 ComfyUI 官方口径 `MAX_RESOLUTION`（EmptyLatentImage 等节点同款），
+#   仅用于喂给 UI；后端计算与校验**不夹这个值**（见 _determine_target_size）。
+MAX_DIMENSION = 16384
 DEFAULT_RES = _RESOLUTION_CONFIG["default_resolution"]
 DEFAULT_RATIO = _RESOLUTION_CONFIG["default_ratio"]
 
@@ -77,8 +83,8 @@ class WOSAI_SizeSelect:
             "optional": {
                 "Resolution":    (list(RESOLUTION_DATA.keys()), {"default": DEFAULT_RES, "tooltip": "Select preset resolution | 选择预设分辨率"}),
                 "Aspect_Ratio":  (ASPECT_RATIOS, {"default": DEFAULT_RATIO, "tooltip": "Select aspect ratio | 选择画面宽高比"}),
-                "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "step": 8, "tooltip": "Custom width, no upper limit (manual mode only) | 自定义宽度，无上限（仅手动模式）"}),
-                "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "step": 8, "tooltip": "Custom height, no upper limit (manual mode only) | 自定义高度，无上限（仅手动模式）"}),
+                "Custom_Width":  ("INT", {"default": MIN_DIMENSION, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom width (manual mode only, max {MAX_DIMENSION}) | 自定义宽度（仅手动模式，上限 {MAX_DIMENSION}）"}),
+                "Custom_Height": ("INT", {"default": DEFAULT_CUSTOM_HEIGHT, "min": MIN_DIMENSION, "max": MAX_DIMENSION, "step": 8, "tooltip": f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"}),
                 "image":         ("IMAGE",),
                 "mask":          ("MASK",),
                 "latent":        ("LATENT",),
@@ -380,13 +386,13 @@ try:
                                     default=DEFAULT_RATIO, optional=True,
                                     tooltip="Select aspect ratio | 选择宽高比"),
                     _io.Int.Input("Custom_Width", default=MIN_DIMENSION,
-                                  min=MIN_DIMENSION, step=8,
+                                  min=MIN_DIMENSION, max=MAX_DIMENSION, step=8,
                                   optional=True,
-                                  tooltip="Custom width, no upper limit (manual mode only) | 自定义宽度，无上限（仅手动模式）"),
+                                  tooltip=f"Custom width (manual mode only, max {MAX_DIMENSION}) | 自定义宽度（仅手动模式，上限 {MAX_DIMENSION}）"),
                     _io.Int.Input("Custom_Height", default=DEFAULT_CUSTOM_HEIGHT,
-                                  min=MIN_DIMENSION, step=8,
+                                  min=MIN_DIMENSION, max=MAX_DIMENSION, step=8,
                                   optional=True,
-                                  tooltip="Custom height, no upper limit (manual mode only) | 自定义高度，无上限（仅手动模式）"),
+                                  tooltip=f"Custom height (manual mode only, max {MAX_DIMENSION}) | 自定义高度（仅手动模式，上限 {MAX_DIMENSION}）"),
                     _io.Image.Input("image", optional=True,
                                     tooltip="Input image (optional, will be scaled to target size) | 输入图像（可选，将缩放至目标尺寸）"),
                     _io.Mask.Input("mask", optional=True,

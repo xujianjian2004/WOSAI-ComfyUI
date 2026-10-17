@@ -40,12 +40,13 @@
 
 ### Changed
 
-- **尺寸选择节点（SizeSelect）取消自定义模式的最大尺寸限制。** 此前自定义（手动）模式把宽高夹到 `resolutions.json` 的 `max_dimension`（2048）：后端 `_determine_target_size` 做 `min(MAX_DIMENSION, …)`、`VALIDATE_INPUTS` 直接报错拒绝、两个 INT 端口声明 `max=MAX_DIMENSION`、前端 `roundTo8(v, MAX_DIMENSION)` 还会把输入框里刚敲进去的数值改写回 2048——四条限制并存，用户无法输入更大的尺寸。与之矛盾的是 `Scale` 模式本就不设上限（注释即写明「Scale 模式不限制上限」），同一节点两种模式口径不一致。现统一为**自定义模式不设上限**，与 `Scale` 模式对齐，仅保留 8px 网格对齐与最小值（256）约束。配套改动：
+- **尺寸选择节点（SizeSelect）取消自定义模式的最大尺寸限制。** 此前自定义（手动）模式把宽高夹到 `resolutions.json` 的 `max_dimension`（2048）：后端 `_determine_target_size` 做 `min(MAX_DIMENSION, …)`、`VALIDATE_INPUTS` 直接报错拒绝、两个 INT 端口声明 `max=MAX_DIMENSION`、前端 `roundTo8(v, MAX_DIMENSION)` 还会把输入框里刚敲进去的数值改写回 2048——四条限制并存，用户无法输入更大的尺寸。与之矛盾的是 `Scale` 模式本就不设上限（注释即写明「Scale 模式不限制上限」），同一节点两种模式口径不一致。现统一为**自定义模式不再受 2048 限制**，与 `Scale` 模式对齐，仅保留 8px 网格对齐与最小值（256）约束；UI 侧的输入上限显式声明为 16384（ComfyUI 通用分辨率口径），后端计算与校验仍不夹任何上限。配套改动：
   - `web/data/resolutions.json`：`max_dimension` 改名为 `default_custom_height`（该值此后只作为「新建节点时自定义高度」的初始值，不再是上限），`scripts/check-shared-data.mjs` 的断言同步改名。
-  - `nodes/size_select.py`：V1 `INPUT_TYPES` 与 V3 `_io.Int.Input` 均去掉 `max`（只留 `min` / `step:8`）；`_determine_target_size` 手动分支只做 `max(MIN_DIMENSION, …)`；`VALIDATE_INPUTS` 不再因「超过上限」报错，改为只校验「必须是整数 / ≥256 / 8 的倍数」，并顺手修掉旧实现在 `Custom_Width` 为 `None` 时抛 `TypeError` 的隐患。
+  - `nodes/size_select.py`：V1 `INPUT_TYPES` 与 V3 `_io.Int.Input` **显式声明 `max=MAX_DIMENSION`（16384）**；`_determine_target_size` 手动分支只做 `max(MIN_DIMENSION, …)`；`VALIDATE_INPUTS` 不再因「超过上限」报错，改为只校验「必须是整数 / ≥256 / 8 的倍数」，并顺手修掉旧实现在 `Custom_Width` 为 `None` 时抛 `TypeError` 的隐患。
   - `web/size-select.js`：`roundTo8` 不再接受上限参数（只按最小值约束 + 8px 对齐）；初始播种 `Custom_Width` / `Custom_Height` 时不再夹上限。缓存破坏：`size-select.js` `?v=3 → 4`。
-  - 新增 `web/shared/size-select-manual-limit-contract.test.mjs`（6 项）锁定：JSON 不再有 `max_dimension`、`roundTo8` 无上限参数也无 `Math.min` 夹取、三处调用点不再传上限、Python 手动分支无上限夹取、两侧 INT 端口不声明 `max`、校验仍保留最小值与 8px 约束（已做阴性验证：把 `roundTo8` 改回带上限的版本后第 2 项按预期变红）。Python 侧新增 4 项单测（4096×8192 原样通过、低于最小值抬到 256 且 4100 对齐到 4096、8192×8192 校验通过、128 / 4097 仍被拒）。
+  - 新增 `web/shared/size-select-manual-limit-contract.test.mjs`（6 项）锁定：JSON 不再有 `max_dimension`、`roundTo8` 无上限参数也无 `Math.min` 夹取、三处调用点不再传上限、Python 手动分支无上限夹取、两侧 INT 端口**显式声明大于 2048 的 `max`**、校验仍保留最小值与 8px 约束（已做阴性验证：把 `roundTo8` 改回带上限的版本后第 2 项变红；把 `MAX_DIMENSION` 调成 1024 后第 5 项变红）。Python 侧新增 4 项单测（4096×8192 原样通过、低于最小值抬到 256 且 4100 对齐到 4096、8192×8192 校验通过、128 / 4097 仍被拒）。
   - ⚠️ 提示：**超大尺寸会显著增加显存 / 内存占用**（无输入时会直接按目标尺寸分配空 latent），请按显存容量设置；`README.md` 同步说明。
+- **修正「去掉后端 `max` 后实测仍卡在 2048」。** 上一条把两个 INT 端口的 `max` 一并删掉，实测自定义宽高最大值仍是 2048。根因不在本仓库：ComfyUI 前端 `useIntWidget()` 里写死了 `{ min: spec.min ?? 0, max: spec.max ?? 2048, … }`——**省略 `max` 不等于「无上限」，而是被前端兜底成 2048**。也就是说「不声明 max」恰好等价于「上限 2048」，删得越干净、卡得越死。现改为显式声明 `MAX_DIMENSION = 16384`（与 ComfyUI 官方 `MAX_RESOLUTION` 同口径，`EmptyLatentImage` 等节点一致），既喂给 UI 一个真实上限，又保留后端对更大值的宽容（API 调用不受此值限制）。注释已写在常量旁，避免后来者再「顺手删掉」。`README.md` 的手动宽高说明同步更新。
 
 - **忽略编组节点的默认排序改为「按字母」。** 位置排序会随画布布局变化而跳动——拖动一个编组，列表顺序就跟着变，编组一多便无法预期；字母序是稳定可预期的顺序。改动只影响默认值：新建节点与「一键恢复默认参数」均落在按字母，面板分段控件同步显示；**已在工作流里显式保存过 `wosai_ig_sort_order` 的旧存档不受影响**（显式取值优先于默认值），仍可手动切回按位置。新增 `web/shared/ignore-groups-defaults-contract.test.mjs`（5 项）锁定默认值、非法值回落方向、`resetAll` 的状态与控件同步，以及两个排序选项都仍然提供。缓存破坏：`ignore-groups.js` `?v=4 → 5`。
 
