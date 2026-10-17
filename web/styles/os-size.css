@@ -225,6 +225,21 @@
   box-shadow: var(--ws-os-input-focus-ring);
   color: var(--ws-text-on-accent);
 }
+/* 手动模式按钮行：取上游原图尺寸 / 互换宽高 两枚等宽 */
+.ss-man-row {
+  display: flex;
+  gap: var(--ws-ss-control-gap);
+}
+.ss-man-row .ss-swap-btn {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+/* 未接上游时「取原图尺寸」无源可取：置灰且不响应 hover，避免点了没反应 */
+.ss-swap-btn:disabled {
+  opacity: .45;
+  pointer-events: none;
+}
 .ss-swap-btn:active { filter: brightness(.85); transition: none; }
 
 /* ── Preview bar（一体式药丸，同缩放倍数轨道）── */

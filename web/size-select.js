@@ -577,6 +577,30 @@ function buildUI(node) {
         const manPanel = document.createElement("div");
         manPanel.className = isManual ? "" : "ss-hidden";
 
+        // 两枚等宽按钮：取上游原图尺寸 / 互换宽高。
+        //   前者复用 Scale 模式已经解析好的 _ss_srcW/_ss_srcH（见 _ssTrackSourceImage），
+        //   不额外发请求也不依赖后端执行结果。
+        const manRow = document.createElement("div");
+        manRow.className = "ss-man-row";
+
+        const useSrcBtn = document.createElement("button");
+        useSrcBtn.className = "ss-swap-btn";
+        useSrcBtn.textContent = t('menus.sizeSelect.useSourceSize');
+        useSrcBtn.title = t('menus.sizeSelect.tipUseSourceSize');
+        node._ss_useSrcBtn = useSrcBtn;
+        useSrcBtn.onclick = () => {
+            const srcW = node._ss_srcW, srcH = node._ss_srcH;
+            if (!(srcW > 0) || !(srcH > 0)) return;
+            const step = gridStep(almW?.value);
+            baseWidth  = alignTo(srcW, step);
+            baseHeight = alignTo(srcH, step);
+            updateWidgetValue(cusW, baseWidth);
+            updateWidgetValue(cusH, baseHeight);
+            syncPreview();
+            app.graph?.change();
+            app.graph?.setDirtyCanvas(true, true);
+        };
+
         const swapBtn = document.createElement("button");
         swapBtn.className = "ss-swap-btn";
         swapBtn.textContent = t('menus.sizeSelect.swap');
@@ -588,7 +612,8 @@ function buildUI(node) {
             syncPreview();
             app.graph?.setDirtyCanvas(true, true);
         };
-        manPanel.appendChild(swapBtn);
+        manRow.append(useSrcBtn, swapBtn);
+        manPanel.appendChild(manRow);
         contentDiv.appendChild(manPanel);
 
         const preview = document.createElement("div");
@@ -692,7 +717,18 @@ function buildUI(node) {
                 previewVal.textContent = `${w} × ${h}`;
             }
             renderAreaMeta(w, h, step);
+            syncUseSourceBtn();
             if (opts.flash !== false) flashPreview();
+        }
+
+        /** 没接上游时「取原图尺寸」无源可取，置灰而不是点了没反应。 */
+        function syncUseSourceBtn() {
+            if (!useSrcBtn) return;
+            const has = node._ss_srcW > 0 && node._ss_srcH > 0;
+            useSrcBtn.disabled = !has;
+            useSrcBtn.title = has
+                ? t('menus.sizeSelect.tipUseSourceSize')
+                : t('menus.sizeSelect.tipNoSourceSize');
         }
 
         /** 回显真实像素总量与 latent 网格；面积超预算时按级别变色提示。 */
@@ -998,6 +1034,10 @@ function buildUI(node) {
             if (node._ss_sliderRow) node._ss_sliderRow.title = (scmW?.value !== "Scale") ? t('menus.sizeSelect.scaleOnly') : t('menus.sizeSelect.tipScaleMul');
             if (node._ss_resBtns) Object.entries(node._ss_resBtns).forEach(([lv, b]) => { b.innerHTML = t('menus.sizeSelect.' + (_RES_LABEL_MAP[lv] || lv)); });
             if (node._ss_swapBtn) node._ss_swapBtn.textContent = t('menus.sizeSelect.swap');
+            if (node._ss_useSrcBtn) {
+                node._ss_useSrcBtn.textContent = t('menus.sizeSelect.useSourceSize');
+                syncUseSourceBtn();
+            }
             const _dimAsp = scmW?.value === "Scale";
             const _aspEl2 = aspW?.element?.parentElement;
             if (_aspEl2) {
@@ -1030,7 +1070,7 @@ app.registerExtension({
             const link = document.createElement("link");
             link.id = "wosai-os-size-css";
             link.rel = "stylesheet";
-            link.href = new URL("./styles/os-size.css?v=1", import.meta.url).href;
+            link.href = new URL("./styles/os-size.css?v=2", import.meta.url).href;
             document.head.appendChild(link);
             _injectedCss = link;
         }
