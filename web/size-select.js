@@ -102,9 +102,19 @@ const _RES_LABEL_MAP = {
 
 // 预览行不再带「尺寸预览」标签：节点最小宽度 220px，四个字要吃掉约 44px，
 //   留着它必然把后面的尺寸 / 面积挤出节点框，而「宽 × 高」本身已自解释。
-function getFixedHeight(manual) {
-    // 5 输出端口(INT×2 + LATENT + IMAGE + MASK) + 缩放区两行(按钮+滑条)
-    return manual ? 375 : 455;
+//
+// 高度分档（实测，ComfyUI 经典模式 1:1 缩放下）：
+//   ComfyUI 把 DOM widget 拉伸占满「节点高 − 标题 − 端口行 − 两个组合控件 − 上下留白」
+//   之后的全部剩余空间，该固定占用恒为 174px；wrap 又是 height:100% 的弹性列，
+//   所以节点定高一旦高于内容自然高度，底部就多出一条空白（用户反馈「始终多余一行」）。
+//   内容自然高度：预设 239（第二行收起）/ 271（显示）；自定义 163 / 195。
+//   第二行（缩放滑条 / 适配边）只有 Scale 与 Fit 用得上，Crop 下整行收起
+//   ⇒ 该状态高度随之降一档，各档 = 174 + 自然高 + 4px 余量。
+function _ssSecondRowShown(method) {
+    return method === "Scale" || method === "Fit";
+}
+function getFixedHeight(manual, secondRow) {
+    return manual ? (secondRow ? 373 : 341) : (secondRow ? 449 : 417);
 }
 
 // 紧致 viewBox：SVG 恰好包住线框（无内边空隙），icon 与文字间距即真实 gap，
@@ -218,7 +228,9 @@ function buildUI(node) {
         _origOnConfigure?.apply(this, arguments);
         if (Array.isArray(info?.widgets_values) && info.widgets_values.length > 0 && node.size) {
             const isMan = info.widgets_values[0] === "on";
-            node.size[1] = getFixedHeight(isMan);
+            // widgets_values[1] 是 scale_method（serialize 顺序见下）；读不到就按收起第二行算，
+            // 随后 waitForWidgets 建好 UI 时会用真实值再校一次。
+            node.size[1] = getFixedHeight(isMan, _ssSecondRowShown(info.widgets_values[1]));
         }
     };
 
@@ -278,7 +290,7 @@ function buildUI(node) {
         let baseHeight       = cusH?.value || DEFAULT_CUSTOM_HEIGHT;
         let _updatingDisplay = false;
         let _applyingMode    = false;
-        let _targetHeight    = getFixedHeight(isManual);
+        let _targetHeight    = getFixedHeight(isManual, _ssSecondRowShown(scmW?.value));
 
         const _origOrder = new Map();
         node.widgets.forEach((w, i) => _origOrder.set(w, i));
@@ -431,7 +443,8 @@ function buildUI(node) {
         //   Scale → 显示滑条；Fit → 显示长边/短边按钮；Crop → 两者都用不上，整行收起。
         //   一直挂着一个透明度 .4 的空药丸只会白占一块地方（用户反馈视觉效果不佳），
         //   而且 Fit 模式下行是活的（按钮可点），却同样被 .4 压灰，看着像禁用。
-        //   节点高度是 getFixedHeight() 的固定值，收起一行不会撑出空洞。
+        //   节点高度是 getFixedHeight() 的分档定值：这一行收起时高度随之降一档
+        //   （否则底部就多出一条空白），且因为高度本就远大于内容，降档不会撑出空洞。
         const _ssSetSliderLock = (val) => {
             if (!sliderRow) return;
             const isScale = val === "Scale";
@@ -453,6 +466,8 @@ function buildUI(node) {
             btnFit.classList.toggle("active", m === "Fit");
             btnScale.classList.toggle("active", m === "Scale");
             _ssSetSliderLock(m);
+            // 第二行的出现/收起直接改变内容自然高度 ⇒ 节点高度跟着换档，底部不留空行
+            updateNodeHeight();
             if (m === "Fit") _ssSyncFitEdgeBtns();
             const cur = parseFloat(sclW?.value) || 1.0;
             const prefix = m === "Scale" ? t('menus.sizeSelect.originalImage') : t('menus.sizeSelect.scalingFactor');
@@ -891,7 +906,7 @@ function buildUI(node) {
         }
 
         function updateNodeHeight() {
-            const h = getFixedHeight(isManual);
+            const h = getFixedHeight(isManual, _ssSecondRowShown(scmW?.value));
             _targetHeight = h;
             const curW = node.size?.[0] || 220;
             node.size = [curW, h];
@@ -1022,10 +1037,10 @@ function buildUI(node) {
         node.computeSize = function (out) {
             const s = _origComputeSize
                 ? _origComputeSize(out)
-                : [node.size?.[0] || 220, getFixedHeight(isManual)];
+                : [node.size?.[0] || 220, getFixedHeight(isManual, _ssSecondRowShown(scmW?.value))];
             const w = Math.max(node.minSize?.[0] || 220, s[0]);
             wrap.style.width = w + "px";
-            return [w, getFixedHeight(isManual)];
+            return [w, getFixedHeight(isManual, _ssSecondRowShown(scmW?.value))];
         };
 
         node.addDOMWidget("ss_ui", "ss_panel", wrap, { getMinHeight: function () { return 0; } });

@@ -40,15 +40,27 @@
 
 ### Changed
 
+- **尺寸选择节点消除底部多余的一行空白。** 上一轮为「适配 / 缩放」加了第二行（长边短边 / 倍数滑条）并让它只在用得上它的模式出现，但**节点高度仍按最高状态定值**（预设 455 / 自定义 375）：Crop 模式下第二行整行收起、内容自然高度少了 32px，这 32px 就沉到节点底部变成一条空白——用户反馈「节点底部始终多余一行空白，需要进行优化」。根因是 **ComfyUI 会把 DOM widget 拉伸占满「节点高 − 标题 − 端口行 − 两个组合控件 − 上下留白」之后的全部剩余空间（该固定占用实测恒为 174px）**，而 `.ss-wrap` 是 `height:100%` 的弹性列 ⇒ 定高一旦高于内容自然高度，差值全部变成底部空白。现 `getFixedHeight()` 按「第二行是否出现」分四档（= 174 + 内容自然高 + 4px 余量）：
+
+  | 模式 | 第二行收起（Crop） | 第二行显示（适配 / 缩放） | 内容自然高（收起 / 显示） |
+  | --- | --- | --- | --- |
+  | 预设 | 417 | 449 | 239 / 271 |
+  | 自定义 | 341 | 373 | 163 / 195 |
+
+  - 切缩放方式时立刻重算节点高度（`_ssSyncMethodBtns()` 内调 `updateNodeHeight()`）；读档时按存盘的 `scale_method` 选档（`onConfigure` 读 `widgets_values[1]`，即 serialize 顺序里的第二个值）。
+  - 数值全部实测得来：内容自然高度用「临时把 wrap 改成 `height:auto` 后读 `offsetHeight`」取得，且与节点宽度无关（220–400px 下五枚控制按钮均 `white-space:nowrap` + 省略号，不换行）；节点变矮后 ComfyUI 会把 DOM widget 同步重算到新的剩余空间（实测 415 → 241px），故降档不会裁内容。
+  - 契约测试 `size-select-fit-contract.test.mjs` 新增 1 项（共 13 项）：四档数值必须等于「174 + 自然高 + 4」、两档之差必须正好是第二行的 32px（24px 行高 + 8px 上间距）、切方式必须触发高度重算、读档必须按 `scale_method` 选档。已做阴性验证：把四档改回单值、去掉切换时的高度重算，分别让该项变红。
+  - **已在运行中的 ComfyUI 实例上端到端验收**：四态实测节点高 417 / 449 / 341 / 373，DOM widget 高 243 / 275 / 167 / 199，与内容自然高的差恒为 4px（即预留余量），全程无 page error；自定义模式下版权行紧贴预览条下方（间距 4px），不再悬在节点中段。缓存破坏：`size-select.js` `?v=9 → 10`。
+
 - **尺寸选择节点新增第三种缩放方式「适配」（Fit）：不变形、不裁剪地把整图等比装进目标框。** 此前的 `scale_method` 只有二选一——`Crop`（先按目标比例中心裁剪、再拉伸到目标尺寸，**会裁掉内容**）与 `Scale`（按倍数缩放，**不看目标尺寸**）；想要「保持原比例又落在目标画幅内」只能先手算尺寸再走自定义，属于能力缺口。现补齐第三种：
   - `nodes/size_select.py`：`scale_method` 组合改为 `["Crop", "Fit", "Scale"]`，新增 advanced 输入 `fit_edge`（`["Long", "Short"]`，默认 `Long`）。`_fit_scale(src, target, fit_edge)` 给出等比系数——`Long` = contain（`min(tw/sw, th/sh)`，整图装入、任何一边都不超出），`Short` = 短边贴齐（`min(tw,th)/min(sw,sh)`，短边填满目标、长边按比例超出，即 cover 但不裁剪）。`_resize_image_and_mask` 只在 `Crop` 下裁剪（Fit 与 Scale 一样是纯等比缩放，倍率由目标框算出而已）。
   - **没有 image / latent 就没有基准**：此时 Fit 退化为直接使用目标尺寸（与 Crop 同结果），不会抛异常也不会产出 0 尺寸。
   - Fit 出来的宽高同样过 `_align_grid()`——本节点自己产 latent，像素必须能被压缩率整除，否则 latent 形状只能靠整除截断、与输出的 width/height 对不上。
-  - `web/size-select.js`：控制行由 4 枚按钮扩为 5 枚（预设｜自定义｜裁剪｜适配｜缩放），`_ssSyncMethodBtns()` 三枚互斥高亮；**「长边 / 短边」复用缩放滑条那一行**（互斥出现：Scale 显示滑条、Fit 显示两枚按钮、**Crop 整行收起**），节点高度因此不变——高度是 `getFixedHeight()` 的固定值，Fit 模式不该比 Crop 高一截。Fit 下该行不再响应拖拽与滚轮（否则会误改缩放倍数）。
+  - `web/size-select.js`：控制行由 4 枚按钮扩为 5 枚（预设｜自定义｜裁剪｜适配｜缩放），`_ssSyncMethodBtns()` 三枚互斥高亮；**「长边 / 短边」复用缩放滑条那一行**（互斥出现：Scale 显示滑条、Fit 显示两枚按钮、**Crop 整行收起**）——不为适配边新增一行，节点高度按该行是否出现分档（见上文「消除底部多余的一行空白」）。Fit 下该行不再响应拖拽与滚轮（否则会误改缩放倍数）。
   - **第二行只在用得上它的模式出现。** 首版把 Crop 模式做成「整行锁定」：滑条内容虽被隐藏，行本身仍以 `opacity:.4` 挂着一个**空药丸**白占一块地方；更糟的是 Fit 模式下行是活的（按钮可点），却同样被压成 .4 的禁用相。现改为 `ss-hidden` 整行折叠（`margin` 一并归零，不留缝）， Crop 下直接消失；随之 `.ss-disabled` 样式与 JS 切换都已不可达，**连规则一起删掉**，不留死样式。
   - 预览与后端**同源复算**：新增 `_ssFitScale()`（与 `_fit_scale` 同口径），Fit 分支按 `scaleAlign(src × 系数, step)` 出尺寸——这正是本节点此前反复踩坑的地方（舍入口径、网格口径都曾前后端分叉），预览一旦各算各的就会骗人。
   - `fit_edge` 已进 `IS_CHANGED` / V3 `fingerprint_inputs` / `serialize`（V1 签名与前端 `coreWidgets` 顺序一一对应，错位会让所有 widget 的值串味），保存再打开不会丢回默认。
-  - 新增 `web/shared/size-select-fit-contract.test.mjs`（12 项）锁定：三选一口径（V1/V3 双 schema）、`fit_edge` 双 schema 且 advanced 且默认 Long、缓存指纹含 `fit_edge`、contain/cover 两个公式与除零保护、Fit 分支仍走 `_align_grid`、Fit 不裁剪、前端公式与后端同源、三按钮互斥、适配边复用同一行、**第二行只在用得上它的模式出现且 `ss-disabled` 不得复活**、序列化顺序、i18n 双语言齐备且每个键都被消费（已做阴性验证：删掉 Fit 选项、改错 cover 公式、把适配边组改成常驻显示、把整行折叠改回 `ss-disabled` 压灰，分别让 4 项变红）。Python 侧新增 `SizeSelectFitModeTests`（4 项）。缓存破坏：`size-select.js` `?v=8 → 9`；`os-size.css` 双源 `?v=3 → 4`。
+  - 新增 `web/shared/size-select-fit-contract.test.mjs`（13 项）锁定：三选一口径（V1/V3 双 schema）、`fit_edge` 双 schema 且 advanced 且默认 Long、缓存指纹含 `fit_edge`、contain/cover 两个公式与除零保护、Fit 分支仍走 `_align_grid`、Fit 不裁剪、前端公式与后端同源、三按钮互斥、适配边复用同一行、**第二行只在用得上它的模式出现且 `ss-disabled` 不得复活**、序列化顺序、i18n 双语言齐备且每个键都被消费（已做阴性验证：删掉 Fit 选项、改错 cover 公式、把适配边组改成常驻显示、把整行折叠改回 `ss-disabled` 压灰，分别让 4 项变红）。Python 侧新增 `SizeSelectFitModeTests`（4 项）。缓存破坏：`size-select.js` `?v=8 → 9`；`os-size.css` 双源 `?v=3 → 4`。
   - 以上改动**已在运行中的 ComfyUI 实例上做端到端验收**（真实 Chrome + 真实 `os-size.css`）：创建 `WOSAI_SizeSelect` 节点，依次点击裁剪 / 适配 / 缩放 / 裁剪，实测计算样式——Crop 下第二行 `display:none`、行高 0、`margin-top:0`（连缝都不留）；Fit 下该行 `display:flex`、行高 21.6px、`opacity:1`（不再被压灰），组内「长边」带 `active`；Scale 下滑条与「原图 ×1.0」标签恢复显示。三种状态的截图已逐张核对。
 - **尺寸选择节点手动模式新增「取原图尺寸」一键按钮。** 节点此前已经为 Scale 预览解析过上游 image / latent 的尺寸（`_ssTrackSourceImage` 填 `_ss_srcW/_ss_srcH`），但手动模式只能把尺寸**一个数字一个数字敲进去**——要对齐上游图，得先看图、再心算、再输入，还要自己按对齐粒度取整。现手动面板并排两枚等宽按钮：「取原图尺寸」把解析到的源尺寸填入自定义宽高（按当前对齐粒度取整，复用预览同一个 helper，保证回显与后端产出不可能不一致），旁边是原有的「互换宽高」。**未接上游时按钮置灰**（置灰且不响应 hover）——点了没反应的按钮比没有按钮更糟；禁用态由 `syncPreview()` 刷新，而它本来就会在连线上/下线时跑。新增 `web/shared/size-select-source-size-contract.test.mjs`（5 项，阴性验证：去掉 `useSrcBtn.disabled = !has` 后第 3 项变红）。缓存破坏：`size-select.js` `?v=6 → 7`；`os-size.css` 双源 `?v=1 → 2`。
 - **修正尺寸选择节点三处正确性缺陷（空 latent 形状与回显尺寸不一致 / 写死的 8 倍数校验 / 只接 mask 时遮罩被静默丢弃）。**

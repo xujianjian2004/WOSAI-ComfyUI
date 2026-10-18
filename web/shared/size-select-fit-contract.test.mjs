@@ -102,8 +102,8 @@ test("the method row exposes three mutually exclusive buttons", () => {
 });
 
 test("the fit edge switch reuses the slider row instead of adding a row", () => {
-    // 复用同一行：节点高度是固定值（getFixedHeight），Fit 模式不该比 Crop 高一截
-    assert.ok(!/getFixedHeight\(manual,\s*/.test(sizeSelectJs), "高度签名不应为 Fit 增加参数");
+    // 复用同一行：高度是 getFixedHeight() 的分档定值（Fit/Scale 比 Crop 高一档，
+    // 因为那一行 32px），但绝不新增一行——为适配边单开一行就得改高度签名与 onConfigure。
     assert.match(sizeSelectJs, /fitEdgeGroup\.style\.display = isFit \? "flex" : "none";/);
     // 滑条与适配边按钮互斥：Fit 下既不能拖滑条也不能被滚轮改倍数
     assert.match(sizeSelectJs, /if \(_ssMethod\(\) === "Fit"\) return;\s+\/\/ Fit 模式这一行是适配边按钮，不是滑条/);
@@ -113,6 +113,36 @@ test("the fit edge switch reuses the slider row instead of adding a row", () => 
     assert.ok(rule, ".ss-fit-edge-group rule not found");
     assert.match(rule[0], /display: none/);
     assert.match(rule[0], /gap: var\(--ws-ss-control-gap\)/);
+});
+
+test("the node height drops a tier when the second row folds away", () => {
+    // 用户反馈「节点底部始终多余一行空白」：ComfyUI 把 DOM widget 拉伸占满节点扣除
+    // 标题/端口/组合控件后的全部剩余空间（实测该固定占用恒为 174px），wrap 又是
+    // height:100% 的弹性列 ⇒ 定高一旦高于内容自然高度，底部就空出一条。
+    // 内容自然高度实测：预设 239（第二行收起）/ 271（显示）；自定义 163 / 195，
+    // 第二行本身高 24px + 8px 上间距 = 32px。故高度必须分四档，档差恰为 32。
+    const fn = sizeSelectJs.match(/function _ssSecondRowShown\(method\) \{[\s\S]*?\n\}/);
+    assert.ok(fn, "_ssSecondRowShown not found");
+    assert.match(fn[0], /return method === "Scale" \|\| method === "Fit";/);
+
+    const tiers = sizeSelectJs.match(
+        /return manual \? \(secondRow \? (\d+) : (\d+)\) : \(secondRow \? (\d+) : (\d+)\);/
+    );
+    assert.ok(tiers, "getFixedHeight 必须按 (manual, secondRow) 分四档");
+    const [manShown, manHidden, preShown, preHidden] = tiers.slice(1).map(Number);
+    // 各档 = 174（固定占用）+ 内容自然高 + 4px 余量
+    assert.equal(preHidden, 174 + 239 + 4, "预设·收起档应贴内容自然高");
+    assert.equal(preShown, 174 + 271 + 4, "预设·显示档应贴内容自然高");
+    assert.equal(manHidden, 174 + 163 + 4, "自定义·收起档应贴内容自然高");
+    assert.equal(manShown, 174 + 195 + 4, "自定义·显示档应贴内容自然高");
+    // 两档之差必须正好是第二行的高度，否则要么留空白要么裁内容
+    assert.equal(preShown - preHidden, 32, "第二行 24px + 8px 上间距");
+    assert.equal(manShown - manHidden, 32, "第二行 24px + 8px 上间距");
+
+    // 切缩放方式会改变第二行的有无 ⇒ 必须立刻重算节点高度，不能等下一次模式切换
+    assert.match(sizeSelectJs, /_ssSetSliderLock\(m\);\s*\n\s*\/\/ 第二行的出现\/收起直接改变内容自然高度 ⇒ 节点高度跟着换档，底部不留空行\s*\n\s*updateNodeHeight\(\);/);
+    // 读档时也要按存盘里的 scale_method 选档（serialize 顺序里它是第 2 个值）
+    assert.match(sizeSelectJs, /node\.size\[1\] = getFixedHeight\(isMan, _ssSecondRowShown\(info\.widgets_values\[1\]\)\);/);
 });
 
 test("the second row only shows up in the modes that use it", () => {
