@@ -390,6 +390,8 @@ def setup_routes() -> None:
 
     @routes.get("/wosai/device_info")
     async def wosai_device_info(request: Any) -> web.Response:
+        if not is_same_origin_request(request):
+            return web.json_response({"error": "cross-origin request rejected"}, status=403)
         refresh = request.rel_url.query.get("refresh", "")
         force = refresh == "all"
         dynamic_force = refresh in {"all", "dynamic"}
