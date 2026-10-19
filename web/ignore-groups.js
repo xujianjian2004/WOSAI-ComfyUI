@@ -1757,7 +1757,8 @@ const _IG_DOM_PREFIX = "wosai-ig-node";
      命中判定 isPointInside 直接用 boundingRect；折叠按钮热区 isPointInCollapse
      取「pos 上方 NODE_TITLE_HEIGHT 见方」。
    · 低缩放比 LOD：画布缩放低于「最小可读字号 / (字号 × √dpr)」时 ComfyUI 进入
-     low_quality 模式，drawTitleText 直接 return 不画标题文字（见 _igForceFullQuality）。
+     low_quality 模式，drawTitleText 直接 return 不画标题文字（本类型在
+     drawTitleText 内豁免，见 _igKeepTitleText）。
    对本类型节点按 wosai_ig_scale 在这两个窗口内临时覆盖这几个量，原生标题即随
    缩放比等比放大：不重复渲染一份 DOM 标题、不占内容高度、命中区/热区同步增大，
    拖动/多选/参考线一律走 LiteGraph 原生路径。finally 还原 + 重入守卫
@@ -1769,6 +1770,7 @@ let _igTitleScaleDispose = null;     // drawNode：绘制窗口
 let _igTitleBoxScaleDispose = null;  // drawTitleBox：小方块尺寸
 let _igTitleHitDispose = null;       // updateArea：命中区（boundingRect / renderArea）
 let _igCollapseHitDispose = null;    // isPointInCollapse：折叠按钮热区
+let _igTitleTextLodDispose = null;   // drawTitleText：低缩放比 LOD 豁免
 let _igTitleConstDepth = 0;          // 常量覆盖重入深度
 
 /* 在 fn() 执行期内把指定标题几何常量按 s 放大，退出时原值还原。
@@ -1800,29 +1802,20 @@ function _igNodeScale(n) {
     return normalizeIgnoreGroupsScale(n.properties && n.properties.wosai_ig_scale);
 }
 
-/* 低缩放比 LOD 豁免（治本）：ComfyUI 的 LOD 在画布缩放低于
+/* 标题文字 LOD 豁免（治本，覆盖全部缩放档）：ComfyUI 的 LOD 在画布缩放低于
    「最小可读字号 / (NODE_TEXT_SIZE × √dpr)」时进入 low_quality 模式——
-   drawTitleText 直接 return（标题文字消失）、标题带退化为直角简版、
-   节点圆角与徽章也被简化。该阈值只按基础字号 14px 推算，不知道本节点
-   标题已按 wosai_ig_scale 放大：5× 节点在 40% 画布缩放下标题实际屏幕
-   字号仍是基准的 2 倍（5×0.4），清晰可读却被判定「不可读」而隐藏。
-   判据改为按本节点实际屏幕字号计算：缩放比 × 画布缩放 ≥ LOD 阈值时，
-   绘制本节点期间强制全质量（finally 还原，不影响其他节点与全局 LOD）。 */
-function _igForceFullQuality(canvas, s) {
-    if (!canvas) return null;
-    const minFont = canvas.min_font_size_for_lod;
-    /* LOD 已禁用（设为 0）时全局本就是全质量，无需干预 */
-    if (typeof minFont !== "number" || minFont <= 0) return null;
-    const LG = window.LiteGraph;
-    const baseFont = (LG && LG.NODE_TEXT_SIZE) || 14;
-    const dprAdj = Math.sqrt(canvas.dpr || 1);
-    const threshold = minFont / (baseFont * dprAdj);
-    const scale = canvas.ds ? canvas.ds.scale : 1;
-    if (typeof scale !== "number" || s * scale < threshold) return null;
-    if (!canvas._isLowQuality) return null;
-    const prev = canvas._isLowQuality;
-    canvas._isLowQuality = false;
-    return () => { canvas._isLowQuality = prev; };
+   drawTitleText 直接 return（标题文字消失）、标题带退化为直角简版。
+   该阈值只按基础字号 14px 推算：缩放比 5× 时标题实际屏幕字号是基准的数倍
+   （如 5×0.4=2 倍）仍被判定「不可读」；缩放比 1× 时更是与所有节点一起消失。
+   普通节点还有控件体可辨认，本类型是编组容器（无输入输出槽、DOM 体），
+   标题是它唯一的画布标识，消失即「无名方块」——平台自身的编组原语
+   LGraphGroup.draw 画标题就没有任何 low_quality 判断（任意缩放保留标签），
+   本节点同理。豁免只放行标题文字一项：把透传的 low_quality 改 false，
+   标题带直角简版/无投影等低质量简化仍与其他节点保持一致。 */
+function _igKeepTitleText(ctx, opts, next) {
+    if (!opts || !opts.low_quality) return next.call(this, ctx, opts);
+    if (!this || this.type !== _IG_TYPE) return next.call(this, ctx, opts);
+    return next.call(this, ctx, { ...opts, low_quality: false });
 }
 
 function _igInstallTitleScale() {
@@ -1836,12 +1829,7 @@ function _igInstallTitleScale() {
         (next) => function (n, ...rest) {
             const s = _igNodeScale(n);
             if (s <= 1) return next.call(this, n, ...rest);
-            const restoreLod = _igForceFullQuality(this, s);
-            try {
-                return _igWithTitleConstants(s, _IG_TITLE_KEYS_ALL, () => next.call(this, n, ...rest));
-            } finally {
-                if (restoreLod) restoreLod();
-            }
+            return _igWithTitleConstants(s, _IG_TITLE_KEYS_ALL, () => next.call(this, n, ...rest));
         },
     );
     const nodeProto = window.LiteGraph && window.LiteGraph.LGraphNode && window.LiteGraph.LGraphNode.prototype;
@@ -1885,6 +1873,18 @@ function _igInstallTitleScale() {
                 const s = _igNodeScale(this);
                 if (s <= 1) return next.call(this, x, y);
                 return _igWithTitleConstants(s, _IG_TITLE_KEYS_H, () => next.call(this, x, y));
+            },
+        );
+    }
+    /* 标题文字 LOD 豁免：低画布缩放下 drawTitleText 早退，本类型标题是唯一
+       标识不能消失（判据见 _igKeepTitleText）。与缩放比无关，1× 同样豁免。 */
+    if (typeof nodeProto.drawTitleText === "function") {
+        _igTitleTextLodDispose = patchMethod(
+            nodeProto,
+            "drawTitleText",
+            "WOSAI.IgnoreGroups.keepTitleTextAtLowQuality",
+            (next) => function (ctx, opts) {
+                return _igKeepTitleText.call(this, ctx, opts, next);
             },
         );
     }
@@ -2122,7 +2122,8 @@ app.registerExtension({
     remove() {
         if (_igSetupTimer) { clearTimeout(_igSetupTimer); _igSetupTimer = null; }
 
-        /* 标题缩放补丁：四层各自独立，逆序脱卸 */
+        /* 标题缩放补丁：五层各自独立，逆序脱卸 */
+        if (_igTitleTextLodDispose) { _igTitleTextLodDispose(); _igTitleTextLodDispose = null; }
         if (_igCollapseHitDispose) { _igCollapseHitDispose(); _igCollapseHitDispose = null; }
         if (_igTitleHitDispose) { _igTitleHitDispose(); _igTitleHitDispose = null; }
         if (_igTitleBoxScaleDispose) { _igTitleBoxScaleDispose(); _igTitleBoxScaleDispose = null; }

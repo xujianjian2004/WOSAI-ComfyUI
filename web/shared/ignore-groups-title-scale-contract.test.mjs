@@ -42,7 +42,7 @@ function extractFunctionBody(code, name) {
 const INSTALL_BODY = extractFunctionBody(SOURCE, "_igInstallTitleScale");
 const NODE_SCALE_BODY = extractFunctionBody(SOURCE, "_igNodeScale");
 const WITH_CONST_BODY = extractFunctionBody(SOURCE, "_igWithTitleConstants");
-const FORCE_LOD_BODY = extractFunctionBody(SOURCE, "_igForceFullQuality");
+const KEEP_TEXT_BODY = extractFunctionBody(SOURCE, "_igKeepTitleText");
 const CALC_HEIGHT_BODY = extractFunctionBody(SOURCE, "calcHeight");
 const APPLY_SCALE_BODY = extractFunctionBody(SOURCE, "_applyScale");
 const POPUP_SCALE_BODY = extractFunctionBody(SOURCE, "applyPopupScale");
@@ -90,17 +90,24 @@ test("isPointInCollapse 补丁：折叠按钮热区随标题带放大", () => {
     assert.match(SOURCE, /_IG_TITLE_KEYS_H\s*=\s*\["NODE_TITLE_HEIGHT"\]/, "折叠热区键表只含 NODE_TITLE_HEIGHT");
 });
 
-test("LOD 豁免：低画布缩放下本节点标题文字不消失", () => {
-    assert.ok(FORCE_LOD_BODY, "必须能抽取出 _igForceFullQuality 函数体");
-    assert.match(INSTALL_BODY, /_igForceFullQuality\(this,\s*s\)/, "drawNode 补丁必须申请 LOD 豁免");
-    assert.match(INSTALL_BODY, /if\s*\(restoreLod\)\s*restoreLod\(\)/, "绘制结束必须还原 LOD 状态，不得污染全局");
-    assert.match(FORCE_LOD_BODY, /min_font_size_for_lod/, "LOD 阈值取自画布 min_font_size_for_lod");
-    assert.match(FORCE_LOD_BODY, /Math\.sqrt\(canvas\.dpr/, "阈值含 √dpr 修正（与 ComfyUI 口径一致）");
-    assert.match(FORCE_LOD_BODY, /s\s*\*\s*scale\s*<\s*threshold/,
-        "判据必须是「本节点实际屏幕字号」= 缩放比 × 画布缩放，而非全局画布缩放");
-    assert.match(FORCE_LOD_BODY, /canvas\._isLowQuality\s*=\s*false/, "满足判据时强制全质量");
-    assert.match(FORCE_LOD_BODY, /canvas\._isLowQuality\s*=\s*prev/, "finally 还原 _isLowQuality");
-    assert.match(FORCE_LOD_BODY, /minFont\s*<=\s*0/, "LOD 被禁用（min_font=0）时不得干预");
+test("LOD 豁免：低画布缩放下本节点标题文字不消失（全部缩放档，含 1×）", () => {
+    assert.ok(KEEP_TEXT_BODY, "必须能抽取出 _igKeepTitleText 函数体");
+    assert.match(INSTALL_BODY, /"drawTitleText"/, "必须拦截 drawTitleText（low_quality 早退点）");
+    assert.match(INSTALL_BODY, /"WOSAI\.IgnoreGroups\.keepTitleTextAtLowQuality"/, "补丁 id 必须稳定唯一");
+    assert.match(INSTALL_BODY, /_igKeepTitleText\.call\(this,\s*ctx,\s*opts,\s*next\)/,
+        "补丁必须把 ctx/opts/next 转交豁免判定（this 为节点本体）");
+    assert.match(KEEP_TEXT_BODY, /!opts\s*\|\|\s*!opts\.low_quality\)\s*return\s*next\.call/,
+        "非 low_quality 绘制必须原样透传，不得无谓改写 options");
+    assert.match(KEEP_TEXT_BODY, /this\.type\s*!==\s*_IG_TYPE\)\s*return\s*next\.call/,
+        "非本类型节点必须原样透传，不得影响其他节点遵循全局 LOD");
+    assert.match(KEEP_TEXT_BODY, /\{\s*\.\.\.opts,\s*low_quality:\s*false\s*\}/,
+        "豁免手段 = 把透传的 low_quality 改 false（只放行标题文字一项）");
+    assert.ok(!/s\s*\*\s*scale/.test(KEEP_TEXT_BODY),
+        "豁免不得再按「缩放比×画布缩放」设限——1× 节点曾被该判据漏掉（实测 40% 标题消失）");
+    assert.ok(!/_igNodeScale/.test(KEEP_TEXT_BODY),
+        "豁免与缩放档无关：1× 与 5× 同样不能因低画布缩放丢标题");
+    assert.ok(!SOURCE.includes("_isLowQuality"),
+        "不得再翻转画布私有字段 _isLowQuality（旧实现连带启用投影/圆角/徽章，且 1× 漏判）");
 });
 
 test("drawTitleBox 补丁：标题小方块仅对本类型节点等比放大", () => {
@@ -125,6 +132,8 @@ test("安装时机：轮询等待 app.canvas，setup 触发，remove 全部销�
         "setup() 必须触发安装轮询");
     assert.match(SOURCE, /setTimeout\(\(\)\s*=>\s*_igTryInstallTitleScale\(attempts\s*-\s*1\),\s*250\)/,
         "app.canvas 未就绪时必须轮询重试（前端加载时序不确定）");
+    assert.match(SOURCE, /_igTitleTextLodDispose\(\);\s*_igTitleTextLodDispose\s*=\s*null/,
+        "remove() 必须销毁 drawTitleText LOD 豁免补丁");
     assert.match(SOURCE, /_igTitleBoxScaleDispose\(\);\s*_igTitleBoxScaleDispose\s*=\s*null/,
         "remove() 必须销毁 drawTitleBox 补丁（旧代码从未 dispose，属泄漏）");
     assert.match(SOURCE, /_igTitleScaleDispose\(\);\s*_igTitleScaleDispose\s*=\s*null/,
