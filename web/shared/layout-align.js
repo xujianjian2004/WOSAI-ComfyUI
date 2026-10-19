@@ -287,9 +287,9 @@ function _buildQuickAlign() {
     addControl(equalControls, "eq_h", () => applyResize("eq_h", "max"), false);
     addControl(equalControls, "eq_both", () => applyResize("eq_both", "max"), false);
     addControl(utilityControls, "reset_size", () => applyResetSize(), false);
-    // 顺序：分布（两列）在上、等宽/等高/等尺寸在下 —— 分布是「先拉间距再对齐」的
-    // 主路径，等宽类属于尺寸微调，放同一组的下方更贴合使用顺序
-    quick.append(grid, distributeControls, equalControls, utilityControls);
+    // 顺序：分布（两列）最上 → 田字格 → 等宽/等高/等尺寸 → 重置/更多。
+    // 分布是「先拉间距再对齐」的主路径，放到方向键之前；等宽类属尺寸微调，留在其后。
+    quick.append(distributeControls, grid, equalControls, utilityControls);
     return { quick, utilityControls };
 }
 

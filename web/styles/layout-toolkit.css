@@ -47,6 +47,8 @@
   grid-template-columns: repeat(3, 1fr);
   grid-template-rows: 1fr 1.4fr 1fr;
   height: var(--ws-lt-quick-grid-height);
+  /* 田字格现在排在分布行之后：两行之间需要与其它行同等的间距 */
+  margin-top: var(--ws-gap-sm);
   gap: var(--ws-border-width-thin);
   overflow: hidden;
   border: var(--ws-border-width-thin) solid var(--ws-border);
@@ -122,6 +124,8 @@
   gap: var(--ws-gap-sm);
   margin-top: var(--ws-gap-sm);
 }
+/* 面板头部自带下边距：第一行不再叠加上边距，否则首屏留白多出一截 */
+.wosai-al-quick-controls:first-child { margin-top: 0; }
 .wosai-al-quick-controls--pair {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--ws-gap-xs);

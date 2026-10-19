@@ -52,15 +52,23 @@ test("按钮改为竖排，图标与标签上下排列", () => {
     assert.match(css, /\.wosai-al-center-action svg \{[^}]*var\(--ws-lt-quick-icon-size\)/);
 });
 
-test("快捷层顺序：分布（等距+对齐）在上，等宽/等高/等尺寸在下", () => {
-    // 分布是「先拉间距再对齐」的主路径，等宽类属于尺寸微调，排在其后
+test("快捷层顺序：分布（等距+对齐）最上，田字格其次，等宽类在其后", () => {
+    // 分布是「先拉间距再对齐」的主路径，排到方向键之前；等宽类属于尺寸微调，留在其后
     const order = js.match(/quick\.append\(([^)]*)\)/)?.[1] ?? "";
     assert.ok(order, "未找到快捷层的挂载顺序");
     const idx = (name) => order.indexOf(name);
     assert.ok(idx("distributeControls") >= 0 && idx("equalControls") >= 0);
     assert.ok(
-        idx("distributeControls") < idx("equalControls"),
-        "分布行必须排在等宽行之前（DOM 顺序即视觉顺序）",
+        idx("distributeControls") < idx("grid"),
+        "分布行必须排在田字格之前（DOM 顺序即视觉顺序）",
     );
-    assert.ok(idx("grid") < idx("distributeControls"), "田字格仍在最上");
+    assert.ok(idx("grid") < idx("equalControls"), "等宽行仍应在田字格之后");
+    assert.ok(idx("equalControls") < idx("utilityControls"), "重置/更多仍在最后一组");
+});
+
+test("田字格不再打头，间距由自身 margin 补齐", () => {
+    // 首行去掉上边距（面板头部已有下边距），田字格排第二时自带间距
+    assert.match(css, /\.wosai-al-quick-controls:first-child \{ margin-top: 0; \}/);
+    const tian = css.match(/\.wosai-al-tian \{[^}]*\}/)?.[0] ?? "";
+    assert.match(tian, /margin-top: var\(--ws-gap-sm\);/, "田字格需要与上方分布行拉开间距");
 });
