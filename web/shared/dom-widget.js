@@ -2,7 +2,7 @@ import { createHiddenObserver, ghostWidget } from "./nodes2-hide.js";
 import { forwardWheelToCanvas } from "./wheel-forward.js";
 
 const BASE_STYLES = [
-    ["wosai-vars-link", new URL("../styles/wosai-variables.css?v=29", import.meta.url).href],
+    ["wosai-vars-link", new URL("../styles/wosai-variables.css?v=30", import.meta.url).href],
     ["wosai-theme-css", new URL("../styles/wosai-theme.css?v=4", import.meta.url).href],
 ];
 

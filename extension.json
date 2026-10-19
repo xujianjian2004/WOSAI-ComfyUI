@@ -29,7 +29,7 @@
     "web/selector.js?v=14",
     "web/common-color.js?v=17",
     "web/route-switch.js?v=3",
-    "web/media-tools.js?v=25",
+    "web/media-tools.js?v=26",
     "web/get-widget.js?v=8",
     "web/size-select.js?v=10",
     "web/preset-prompt.js?v=14",
@@ -37,7 +37,7 @@
     "web/device-info.js?v=21"
   ],
   "css": [
-    "web/styles/wosai-variables.css?v=29",
+    "web/styles/wosai-variables.css?v=30",
     "web/styles/wosai-theme.css?v=4",
     "web/styles/os-slider.css",
     "web/styles/os-slider-panel.css",
@@ -49,7 +49,7 @@
     "web/styles/os-size.css?v=4",
     "web/styles/save-node.css",
     "web/styles/selector.css?v=5",
-    "web/styles/media-tools.css?v=21",
+    "web/styles/media-tools.css?v=22",
     "web/styles/preset-prompt.css?v=52",
     "web/styles/device-info.css?v=13"
   ],

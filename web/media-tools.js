@@ -36,7 +36,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=21", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=22", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -472,17 +472,6 @@ function createImageCompare(node) {
     const grab = document.createElement("div");
     grab.className = "wosai-image-compare-grab";
     grab.setAttribute("aria-hidden", "true");
-    // 左右箭头手柄（↔）：默认隐藏，悬停分割线或拖动时淡入
-    const handle = document.createElement("div");
-    handle.className = "wosai-image-compare-handle";
-    handle.setAttribute("aria-hidden", "true");
-    handle.innerHTML = [
-        '<svg viewBox="0 0 24 24" focusable="false">',
-        '<path d="m18 8 4 4-4 4"/>',
-        '<path d="m6 8-4 4 4 4"/>',
-        '<path d="M2 12h20"/>',
-        "</svg>",
-    ].join("");
     // 只在「单边有图」时出现：两侧皆空时整个舞台收起来了，没有位置可提示，
     // 也无需提示——紧凑形态本身就读作「还没接图」，与 ② 的初始形态一致
     const empty = document.createElement("div");
@@ -511,9 +500,9 @@ function createImageCompare(node) {
     }
     // 图像区按顺序挂：图层 → 面板分隔缝 → 分割线交互层 → 底部工具栏
     // → 隐藏的原生滑块
-    stage.append(first, secondWrap, divider, line, grab, handle);
+    stage.append(first, secondWrap, divider, line, grab);
     // 原生滑块不再单独占一行（视觉隐藏，1px）：只承担键盘操作与无障碍语义，
-    // 分割位置完全由图像区内的拖拽 / 左右箭头手柄控制
+    // 分割位置完全由图像区内的拖拽控制
     const slider = document.createElement("input");
     slider.type = "range";
     slider.className = "wosai-image-compare-range";
@@ -738,7 +727,7 @@ function createImageCompare(node) {
             ? `inset(0 0 0 ${value}%)`
             : "none";
         line.style.left = `${value}%`;
-        // 写在 root 上：分割线、拖拽热区、箭头手柄读同一个百分比，保证严格共线
+        // 写在 root 上：分割线与拖拽热区读同一个百分比，保证严格共线
         root.style.setProperty("--wosai-compare-split", `${value}%`);
     };
     const renderImages = () => {

@@ -12,8 +12,8 @@
   font: 500 var(--ws-text-sm)/1.2 var(--ws-font-family);
 }
 
-/* 左右各留半个手柄宽：分割线与箭头手柄的圆心可以走到图像区的 0% / 100%，
-   此时手柄圆盘会溢出行边界，这里必须留出足够余量，否则会被 root 的
+/* 左右各留半个热区宽：分割线的圆心可以走到图像区的 0% / 100%，
+   此时分割线会溢出行边界，这里必须留出足够余量，否则会被 root 的
    overflow:hidden 裁掉一块。取 max 是为了兼容 gap 令牌变小的情况。 */
 .wosai-image-compare {
   padding-inline: max(var(--ws-gap-sm), calc(var(--ws-compare-handle-size) / 2));
@@ -133,7 +133,7 @@
      否则 DOM 控件高度估算的误差会把它拉伸，图像上下出现留白 */
   flex: 0 0 auto;
   box-sizing: border-box;
-  /* 这里不能用 overflow:hidden：分割线 / 热区 / 箭头手柄的圆心要走满 0%–100%，
+  /* 这里不能用 overflow:hidden：分割线 / 热区的圆心要走满 0%–100%，
      圆盘必然溢出舞台边界，被裁就成了残缺的 D 形。圆角裁切改由下方图像图层自己承担。 */
   overflow: visible;
   width: 100%;
@@ -186,7 +186,7 @@
   width: var(--ws-border-width);
   background: var(--ws-text);
   box-shadow: var(--ws-shadow-sm);
-  /* 居中于 --wosai-compare-split，使线心与拇指/手柄圆心严格同 x */
+  /* 居中于 --wosai-compare-split，使线心与拇指圆心严格同 x */
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -207,54 +207,9 @@
   cursor: ew-resize;
 }
 
-/* 左右箭头手柄：悬停热区或拖动时淡入，提示此处可拖动分割线 */
-.wosai-image-compare-handle {
-  position: absolute;
-  top: 50%;
-  z-index: 2;
-  left: var(--wosai-compare-split, 50%);
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  width: var(--ws-compare-handle-size);
-  height: var(--ws-compare-handle-size);
-  border: var(--ws-border-width-thin) solid var(--ws-border);
-  border-radius: var(--ws-radius-pill);
-  background: var(--ws-surface-2);
-  color: var(--ws-text-secondary);
-  box-shadow: var(--ws-shadow-sm);
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.72);
-  pointer-events: none;
-  transition:
-    opacity var(--ws-transition),
-    transform var(--ws-transition),
-    border-color var(--ws-transition),
-    color var(--ws-transition);
-}
-
-.wosai-image-compare-grab:hover + .wosai-image-compare-handle,
-.wosai-image-compare:has(.wosai-image-compare-range:focus-visible) .wosai-image-compare-handle,
-.wosai-image-compare-stage.is-dragging .wosai-image-compare-handle {
-  border-color: var(--ws-text);
-  color: var(--ws-text);
-  opacity: 1;
-  transform: translate(-50%, -50%) scale(1);
-}
-
 /* 指针捕获会转移到 stage，拖动期间由 stage 维持拖拽光标 */
 .wosai-image-compare-stage.is-dragging {
   cursor: ew-resize;
-}
-
-.wosai-image-compare-handle svg {
-  width: var(--ws-compare-handle-icon-size);
-  height: var(--ws-compare-handle-icon-size);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* 交换 / 切换视图时把图像整体压暗，掩盖图层换位的瞬时跳变 */
@@ -326,14 +281,12 @@
   transform: translateY(-50%);
 }
 
-/* 双拼视图没有「分割位置」这个概念，隐藏分割线、热区与箭头手柄，
+/* 双拼视图没有「分割位置」这个概念，隐藏分割线与拖拽热区，
    避免出现一条拖不动、也说不清含义的线 */
 .wosai-image-compare-stage.is-view-side .wosai-image-compare-line,
 .wosai-image-compare-stage.is-view-side .wosai-image-compare-grab,
-.wosai-image-compare-stage.is-view-side .wosai-image-compare-handle,
 .wosai-image-compare-stage.is-view-stack .wosai-image-compare-line,
-.wosai-image-compare-stage.is-view-stack .wosai-image-compare-grab,
-.wosai-image-compare-stage.is-view-stack .wosai-image-compare-handle {
+.wosai-image-compare-stage.is-view-stack .wosai-image-compare-grab {
   display: none;
 }
 
@@ -500,8 +453,7 @@
 
 /* 图像对比已不再单独占一行滑块：原生 input 降级为 1px 隐藏控件，
    只承担键盘操作（方向键微调）与无障碍语义；鼠标/触摸改由图像区上的
-   拖拽与左右箭头手柄承担。pointer-events:none 避免它在左下角抢走拖拽起点，
-   键盘聚焦时则点亮箭头手柄作为可见焦点提示（见上方 :focus-visible 规则）。 */
+   拖拽承担。pointer-events:none 避免它在左下角抢走拖拽起点。 */
 .wosai-image-compare-range {
   position: absolute;
   left: 0;
@@ -522,7 +474,6 @@
 @media (prefers-reduced-motion: reduce) {
   .wosai-image-compare-stage > img,
   .wosai-image-compare-top,
-  .wosai-image-compare-handle,
   .wosai-image-compare-bottom,
   .wosai-image-compare-views,
   .wosai-image-compare-swap {

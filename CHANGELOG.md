@@ -48,7 +48,7 @@
 
 ### Changed
 
-- 图像对比节点分割线手柄图标由十字准心换为**左右箭头（↔）**，与「水平拖动分割线」的操作语义一致。同步删除仅服务准心圆点的 `.wosai-image-compare-handle-dot` 样式；缓存破坏：`media-tools.js ?v=24 → 25`、`media-tools.css ?v=20 → 21`（extension.json / get-widget.js / media-tools.js 三处双源成对递增）。
+- 图像对比节点**移除分割线手柄图标**（原十字准心，本轮曾短暂换为 ↔ 后按反馈整体去掉）：分割线悬停与拖拽行为不变（热区与 `ew-resize` 光标保留），仅去掉圆盘图形。同步删除仅服务手柄的 `.wosai-image-compare-handle` 全部样式与孤儿令牌 `--ws-compare-handle-icon-size`；缓存破坏：`media-tools.js ?v=25 → 26`、`media-tools.css ?v=21 → 22`（extension.json / get-widget.js / media-tools.js 三处双源成对递增）、`wosai-variables.css ?v=29 → 30`（extension.json ↔ dom-widget.js）。
 
 - **体积与预算**：本轮为忽略编组根治标题缩放（原生标题随缩放比等比放大 + 命中区/折叠热区同步 + LOD 豁免）与设置窗同步缩放，主 JavaScript **1415.9 → 1422.2 KiB**（工作区磁盘字节口径）。原预算 `1_450_000 B`（1416.0 KiB）在此前功能累计后仅剩 <0.2 KiB 余量，属预算用尽而非新增死码；按既有再校准惯例上调至 `1_472_000 B`（≈1437.5 KiB，余约 15.3 KiB），原因记录在 `scripts/check-frontend-performance.mjs`。样式 **236.7 → 236.8 KiB**（余约 19.2 KiB）。预算内。
 
