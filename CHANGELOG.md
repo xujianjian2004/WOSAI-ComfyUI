@@ -50,6 +50,8 @@
 
 - 图像对比节点**移除分割线手柄图标**（原十字准心，本轮曾短暂换为 ↔ 后按反馈整体去掉）：分割线悬停与拖拽行为不变（热区与 `ew-resize` 光标保留），仅去掉圆盘图形。同步删除仅服务手柄的 `.wosai-image-compare-handle` 全部样式与孤儿令牌 `--ws-compare-handle-icon-size`；缓存破坏：`media-tools.js ?v=25 → 26`、`media-tools.css ?v=21 → 22`（extension.json / get-widget.js / media-tools.js 三处双源成对递增）、`wosai-variables.css ?v=29 → 30`（extension.json ↔ dom-widget.js）。
 
+- 快捷对齐面板的四个方向键改为**常驻中文标签**：← → ↑ ↓ 下方永久显示「左对齐 / 右对齐 / 顶对齐 / 底对齐」，不再只在悬停时用 Tooltip 揭示（原来悬停会用 `::after` 把图标整块换成文字，指针一移开名字就没了，等于图标永远无标签）。标签改为真实 `<span>` 子元素（可被读屏朗读、高对比度下不丢），按钮转竖排、图标尺寸统一由 `--ws-lt-quick-icon-size` 控制；同步移除 `data-inline-tip` 及其悬停替换样式。缓存破坏：`layout-toolkit.js ?v=7 → 8`、`layout-toolkit.css ?v=22 → 23`。
+
 - **修复尺寸选择节点「取原图尺寸」在上游换图后不刷新**的问题（用户反馈：切换图片 1→图片 2 后点击取原图尺寸，预览仍显示图片 1 的旧尺寸）。根因是原图尺寸只在 `onConnectionsChange` 与首次挂载时解析并缓存到 `_ss_srcW/_ss_srcH`，而 LoadImage 换文件只替换 `node.imgs` 里的 `<img>` 元素、**连线不变**，故三个钩子一个都不触发，按钮读到的永远是上一张图；同时旧 `<img>` 的 `load` 回调可能晚于新图到达，把旧尺寸覆盖回新尺寸。现：① 点击时 `await _ssTrackSourceImage()` 重新解析（新图未解码则等 `load`，不再拿旧值硬填）；② 订阅上游 `executed` 事件，新图落盘 / latent 重建后自动重解析；③ `apply` 前校验当前挂着的仍是同一个 `<img>`，杜绝旧图回填。缓存破坏：`size-select.js ?v=10 → 11`。
 
 - 图像对比节点改为 **rgthree 式悬停对比**：指针在图像区左右移动即实时移动分割线，**无需按下鼠标**（对照此前「必须点击/拖住分割线」）。悬停在底部视图 / 交换控件上时浮标不跟手，避免误移分割线；触摸设备无悬停，按下拖拽路径照常工作。滑动视图额外给出 `ew-resize` 光标提示可水平滑动。缓存破坏：`media-tools.js ?v=26 → 27`、`media-tools.css ?v=22 → 23`（三处双源成对递增）。

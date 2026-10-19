@@ -229,13 +229,21 @@ function _buildQuickAlign() {
 
     const grid = document.createElement("div");
     grid.className = "wosai-al-tian";
+    // 图标下方常驻动作名：中文标签永久可见，不再只在悬停时用 Tooltip 揭示
+    // （四个方向键只有箭头，不标名字就只能靠猜）
+    const addCap = (button, className, label) => {
+        const cap = document.createElement("span");
+        cap.className = className;
+        cap.textContent = label;
+        button.appendChild(cap);
+    };
     const add = (className, label, action, icon) => {
         const button = document.createElement("button");
         button.type = "button";
         button.className = `wosai-al-tian-btn ${className}`;
         button.setAttribute("aria-label", label);
-        button.dataset.inlineTip = label;
         button.innerHTML = icon;
+        addCap(button, "wosai-al-tian-cap", label);
         button.onclick = (event) => { event.stopPropagation(); action(); };
         grid.appendChild(button);
     };
@@ -248,8 +256,8 @@ function _buildQuickAlign() {
         button.type = "button";
         button.className = "wosai-al-center-action";
         button.setAttribute("aria-label", label);
-        button.dataset.inlineTip = label;
         button.innerHTML = icon;
+        addCap(button, "wosai-al-center-cap", label);
         button.onclick = (event) => { event.stopPropagation(); action(); };
         center.appendChild(button);
     };
