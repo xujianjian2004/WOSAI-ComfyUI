@@ -103,11 +103,6 @@ export const FEATURE_REGISTRY = Object.freeze([
         persistence: [], compatibility: ["classic", "nodes2"], status: "active", hub: "optional",
     },
     {
-        id: "shake-disconnect", name: "ShakeDisconnect", category: FEATURE_CATEGORIES.productivity,
-        kind: "workflow-tool", entry: ["web/shake-disconnect.js"], surfaces: ["hub", "canvas"],
-        persistence: ["localStorage"], compatibility: ["classic", "nodes2"], status: "active", hub: "optional",
-    },
-    {
         id: "selection-toolbox", name: "SelectionToolbox", category: FEATURE_CATEGORIES.controlSurface,
         kind: "native-control-adapter", entry: ["web/hub-bar.js"], surfaces: ["selection-toolbox", "node"],
         persistence: [], compatibility: ["classic", "nodes2"], status: "active",

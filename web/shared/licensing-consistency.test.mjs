@@ -22,7 +22,6 @@ const read = (rel) => readFileSync(path.join(ROOT, rel), "utf8");
    新增/移除条目必须同步 THIRD-PARTY-NOTICES.md 与 LICENSE 的例外章节。 */
 const GPL_FILES = [
     "web/auto-connect.js",
-    "web/shake-disconnect.js",
     "web/performance-mode.js",
     "web/shared/graph-utils.js",
     "web/ignore-groups.js",

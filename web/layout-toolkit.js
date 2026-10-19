@@ -518,7 +518,7 @@ window.__wosaiNodeDelete = nodeDelete;
 window.__wosaiJumpToNode = jumpToNode;
 window.__wosaiAlignIcons = ALIGN_ICONS;   // 供 hub-bar.js 节点下拉复用同款图标（固定/绕过/禁用/折叠/克隆/删除）
 
-// 把 HUB 栏注册的「节点」分组按钮（自动连点 / 摇断 / 重建）合并到原节点工具栏。
+// 把 HUB 栏注册的「节点」分组按钮（自动连点 / 重建）合并到原节点工具栏。
 // 复用 window.__wosaiHubButtons 注册表（与 hub-bar.js 节点下拉同源），保证两处内容一致。
 function _buildNodeExtraTools(orient = "h") {
     const registry = window.__wosaiHubButtons || [];
@@ -540,7 +540,7 @@ function _buildNodeExtraTools(orient = "h") {
     return out;
 }
 
-// ── 节点工具栏：跳转 / 替换（原 HUB BAR 入口，现并入节点栏，与速联/摇断同组）──
+// ── 节点工具栏：跳转 / 替换（原 HUB BAR 入口，现并入节点栏，与速联同组）──
 const NODE_JUMP_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m12 16 4-4-4-4"/><path d="M8 12h8"/></svg>';
 const NODE_REPLACE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>';
 
@@ -594,7 +594,7 @@ function buildNodeItems(orient = "h") {
         mk(ALIGN_ICONS.clone, t('menus.layoutToolkit.clone'), t('menus.layoutToolkit.cloneTooltip'), nodeClone),
         mk(ALIGN_ICONS.del, t('menus.layoutToolkit.delete'), t('menus.layoutToolkit.deleteTooltip'), nodeDelete),
         mk(NODE_REPLACE_SVG, t('menus.layoutToolkit.replaceNode'), t('menus.hubBar.tips.replace'), onNodeReplace),
-        // 导航：先跳转，再执行速联/重建/摇断等节点级工具。
+        // 导航：先跳转，再执行速联/重建等节点级工具。
         mk(NODE_JUMP_SVG, t('menus.layoutToolkit.jumpToConnected'), t('menus.hubBar.tips.jump'), onNodeJump),
         ..._buildNodeExtraTools(orient),
     ];

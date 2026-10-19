@@ -177,7 +177,6 @@ WOSAI-ComfyUI/
 | 文件 | 来源项目（许可） |
 | --- | --- |
 | `web/auto-connect.js` | [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes)（GPL-3.0，kijai） |
-| `web/shake-disconnect.js` | 同上 |
 | `web/performance-mode.js` | 同上 |
 | `web/shared/graph-utils.js` | 同上 |
 | `web/ignore-groups.js` | [Goohaitools-comfyui](https://github.com/goohai/Goohaitools-comfyui)（GPL-3.0，goohai） |

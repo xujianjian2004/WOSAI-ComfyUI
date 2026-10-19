@@ -31,7 +31,6 @@ SOFTWARE.
 
 ```text
 web/auto-connect.js          衍生自 ComfyUI-KJNodes (kijai)          web/js/fillconnect.js
-web/shake-disconnect.js      衍生自 ComfyUI-KJNodes (kijai)          web/js/shake_to_disconnect.js
 web/performance-mode.js      衍生自 ComfyUI-KJNodes (kijai)          web/js/performance.js
 web/shared/graph-utils.js    衍生自 ComfyUI-KJNodes (kijai)          web/js/utility.js
 web/ignore-groups.js         衍生自 Goohaitools-comfyui (goohai)     web/js/nodes pass.js

@@ -148,9 +148,6 @@
     "manageContextMenuShort": "右键",
     "followZoom": "缩放",
     "autoConnect": "速联",
-    "shake": "摇断",
-    "shakeOn": "摇断：已开启",
-    "shakeOff": "摇断：已关闭",
     "tips": {
       "favorite": "打开已收藏节点",
       "color": "为选中节点配色",
@@ -166,8 +163,7 @@
       "quickLink": "链式连接选中节点",
       "replace": "替换选中节点",
       "followZoom": "工具栏随画布同步缩放",
-      "autoConnect": "选中多个节点后按类型兼容性+空间距离智能连线（速联）",
-      "shake": "拖动节点快速来回抖动即可断开其外部连线"
+      "autoConnect": "选中多个节点后按类型兼容性+空间距离智能连线（速联）"
     }
   },
   "hubConfig": {

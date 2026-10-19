@@ -148,9 +148,6 @@
     "manageContextMenuShort": "Menu",
     "followZoom": "Zoom",
     "autoConnect": "Quick Link",
-    "shake": "Shake",
-    "shakeOn": "Shake: ON",
-    "shakeOff": "Shake: OFF",
     "tips": {
       "favorite": "Open saved nodes",
       "color": "Color selected nodes",
@@ -166,8 +163,7 @@
       "quickLink": "Chain selected nodes",
       "replace": "Replace selected node",
       "followZoom": "Toolbar scales in sync with the canvas",
-      "autoConnect": "Smart-connect selected nodes by type compatibility + distance (Quick Link)",
-      "shake": "Shake a dragged node back and forth to disconnect its links"
+      "autoConnect": "Smart-connect selected nodes by type compatibility + distance (Quick Link)"
     }
   },
   "hubConfig": {

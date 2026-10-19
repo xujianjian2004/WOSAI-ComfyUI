@@ -22,7 +22,6 @@
 | 本项目文件 | 对应的原始文件 |
 | --- | --- |
 | `web/auto-connect.js` | `web/js/fillconnect.js` |
-| `web/shake-disconnect.js` | `web/js/shake_to_disconnect.js` |
 | `web/performance-mode.js` | `web/js/performance.js` |
 | `web/shared/graph-utils.js` | `web/js/utility.js` |
 

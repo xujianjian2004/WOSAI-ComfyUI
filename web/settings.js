@@ -6,7 +6,7 @@ import { iconBtn } from "./shared/svg-icons.js";
 import { _sec, buildControlPanel } from "./shared/panel-builder.js";
 import { dodgeBall, createLauncher, removeLauncher } from "./launcher.js";
 import { t, onLangChange } from "./shared/i18n.js";
-import { wosaiGetBool, wosaiGetInt, wosaiSetBool, wosaiSetInt } from "./shared/wosai-prefs.js";
+import { wosaiGetBool, wosaiSetBool } from "./shared/wosai-prefs.js";
 import { calcSnapToNodeSide } from "./shared/canvas-utils.js";
 import { WOSAI_COPYRIGHT, STORAGE_KEYS } from "./shared/constants.js";
 import { retryUntil } from "./shared/shared-utils.js";
@@ -137,26 +137,6 @@ async function registerNativeWosaiSettings() {
             type: "boolean",
             defaultValue: wosaiGetBool("wosai-autoConnect", true),
             onChange: (value) => wosaiSetBool("wosai-autoConnect", !!value),
-        },
-        {
-            id: "wosai-shakeEnabled",
-            name: t("menus.hubBar.shake"),
-            category: [root, linkTools, t("menus.hubBar.shake")],
-            type: "boolean",
-            defaultValue: wosaiGetBool("wosai-shakeEnabled", true),
-            onChange: (value) => wosaiSetBool("wosai-shakeEnabled", !!value),
-        },
-        {
-            id: "wosai-shakeReversals",
-            name: t("settings.shakeReversals", "Shake reversals"),
-            category: [root, linkTools, t("menus.hubBar.shake")],
-            type: "slider",
-            defaultValue: wosaiGetInt("wosai-shakeReversals", 3),
-            attrs: { min: 2, max: 6, step: 1 },
-            min: 2,
-            max: 6,
-            step: 1,
-            onChange: (value) => wosaiSetInt("wosai-shakeReversals", Math.max(2, Math.min(6, Number(value) || 3))),
         },
         ...[
             ["wosai-perf-singleCanvasPan", "menus.performance.pan", true],

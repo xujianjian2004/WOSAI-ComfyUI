@@ -256,7 +256,7 @@ const SHORT_LABEL_PATTERNS = [
   /^settings\.(autoTheme|showOrb)$/,
   /^menus\.colorBar\.showLauncherWosaiAssistant$/,
   /^menus\.launcher\.(enableAnimation|cycleExpression)$/,
-  /^menus\.hubBar\.(minimize|restore|manageContextMenu|manageContextMenuShort|shake|shakeOn|shakeOff)$/,
+  /^menus\.hubBar\.(minimize|restore|manageContextMenu|manageContextMenuShort)$/,
   /^menus\.hubConfig\.(title|selectAll|openSystem)$/,
   /^menus\.performance\.(title|pan|throttle|shadow|border|radius)$/,
   /^menus\.layoutToolkit\.(resizeAnchor|resizeMax|switchToBar|quickAdvanced|quickCollapse|sectionResize|sectionStretch|contextMenuJump|command[A-Z].*|groupAdvancedColor|distHorizontal|distVertical|quickDist[A-Z].*|dist[HV]Align[A-Z].*)$/,

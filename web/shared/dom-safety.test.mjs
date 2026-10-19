@@ -30,8 +30,6 @@ test("WOSAI native settings use one stable registration owner", () => {
         "WOSAI.ColorBar.HoldMode",
         "WOSAI.LayoutToolkit.Crosshair",
         "wosai-autoConnect",
-        "wosai-shakeEnabled",
-        "wosai-shakeReversals",
         "wosai-perf-singleCanvasPan",
         "wosai-perf-throttleRenderInfo",
         "wosai-perf-disableShadows",

@@ -281,7 +281,7 @@
 .wosai-al-btn:hover .wosai-al-lb { color: var(--ws-accent); }
 .wosai-al-lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; transition: color .15s; }
 
-/* ── 节点工具栏扩展按钮激活态（自动连点 / 摇断 / 重建）── */
+/* ── 节点工具栏扩展按钮激活态（自动连点 / 重建）── */
 .wosai-node-tool-active > div:first-child {
   background: var(--ws-accent) !important;
   color: var(--ws-text-on-accent) !important;

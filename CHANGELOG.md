@@ -6,21 +6,24 @@
 
 ### License
 
-- **修复一处长期存在的 GPL-3.0 合规缺陷。** 本项目此前整体标注为 MIT，但其中 5 个前端文件实为 GPL-3.0 许可项目的衍生作品，被以 MIT 条款分发，构成许可证违规。经逐行比对量化后，现按 **GPL-3.0-or-later** 单独授权并补齐署名（本项目其余部分仍为 MIT）：
+- **修复一处长期存在的 GPL-3.0 合规缺陷。** 本项目此前整体标注为 MIT，但其中 5 个前端文件（含本轮已移除的摇断，现余 4 个）实为 GPL-3.0 许可项目的衍生作品，被以 MIT 条款分发，构成许可证违规。经逐行比对量化后，现按 **GPL-3.0-or-later** 单独授权并补齐署名（本项目其余部分仍为 MIT）：
 
   | 文件 | 上游（许可） | 逐字相同率 | 上游独创命名命中 |
   | --- | --- | --- | --- |
   | `web/auto-connect.js` | ComfyUI-KJNodes `web/js/fillconnect.js`（GPL-3.0，kijai） | 69.6% | 39 |
-  | `web/shake-disconnect.js` | ComfyUI-KJNodes `web/js/shake_to_disconnect.js`（GPL-3.0，kijai） | 67.7% | 58 |
   | `web/performance-mode.js` | ComfyUI-KJNodes `web/js/performance.js`（GPL-3.0，kijai） | 51.7% | 35 |
   | `web/shared/graph-utils.js` | ComfyUI-KJNodes `web/js/utility.js`（GPL-3.0，kijai） | 66.7% | 6 |
   | `web/ignore-groups.js` | Goohaitools-comfyui `web/js/nodes pass.js`（GPL-3.0，goohai） | 22.7% | ~130 |
 
 - 新增 `LICENSE-GPL-3.0`（GPL v3 全文）与 `THIRD-PARTY-NOTICES.md`（完整署名、出处，含 MIT 来源与纯设计参考来源的区分）；`LICENSE` 增加「许可证例外说明」章节；README 增加许可证例外表。发布包现随附许可证全文与署名文件。
-- 上表 5 个文件均添加 `SPDX-License-Identifier: GPL-3.0-or-later` 文件头与上游项目／作者／原始文件路径注释。
+- 上表 4 个文件均添加 `SPDX-License-Identifier: GPL-3.0-or-later` 文件头与上游项目／作者／原始文件路径注释。
 - 新增 `web/shared/licensing-consistency.test.mjs`（4 项断言）：锁定许可证文件齐备、SPDX 标识一致、署名完整，并**禁止 MIT 文件静态引用 GPL 文件**（防 GPL 反向传染）。已通过阴性验证。
 - 顺带澄清两条**不构成敞口**的来源：`logic-switch`（移植自 MIT 许可的 ComfyUI-OverrideSwitch，兼容）与 `color-theme.js` / `color-core.js`（参考 ComfyUI_GJJ_Nodes 的数据结构，逐字相同率 0%，颜色与实现均为独立设计）。
 - 完整审计记录见 `dev/licensing/PORTING-AUDIT.md`（该目录不随发布包分发）。
+
+### Removed
+
+- **移除 WOSAI 摇断（ShakeDisconnect）功能。** 删除 `web/shake-disconnect.js` 及其全部接入点：从 `extension.json` 入口与 `dev/frontend/feature-registry.js` 注销；撤销 HUB 栏开关按钮、设置中心两项（启用开关 `wosai-shakeEnabled`、触发反转次数 `wosai-shakeReversals`）；清理中英文 `menus.json` / `settings.json` 的摇断文案与提示；移除 `layout-toolkit.js` / `layout-toolkit.css` 中的摇断注释；同步清理 `check-i18n` 死键豁免、`dom-safety.test.mjs` 断言项与 `licensing-consistency.test.mjs` 的 GPL 清单。GPL-3.0 衍生文件集合由 5 个降为 4 个（`auto-connect` / `performance-mode` / `shared/graph-utils` / `ignore-groups`），并同步更新 `LICENSE`、`THIRD-PARTY-NOTICES.md`、`PORTING-AUDIT.md` 的署名与计数（README 许可证例外表同步）。
 
 ### Added
 

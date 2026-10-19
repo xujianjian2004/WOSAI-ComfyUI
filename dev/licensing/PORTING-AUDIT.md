@@ -6,17 +6,16 @@
 
 ## 一、结论摘要
 
-本项目有 **5 个文件**构成 GPL-3.0 敞口，其中 **4 个来自 ComfyUI-KJNodes**，其复制程度**远高于**先前关注的 `ignore-groups.js`。
+本项目有 **4 个文件**构成 GPL-3.0 敞口，其中 **3 个来自 ComfyUI-KJNodes**，其复制程度**远高于**先前关注的 `ignore-groups.js`。
 
 | # | 本项目文件 | 上游 | 上游许可 | 逐字相同率 | 上游专有标识符命中 | 严重度 |
 |---|---|---|---|---|---|---|
 | 1 | `web/auto-connect.js` | `ComfyUI-KJNodes/web/js/fillconnect.js` | GPL-3.0 | **69.6%** (71/102) | 39 | ⛔ 严重 |
-| 2 | `web/shake-disconnect.js` | `ComfyUI-KJNodes/web/js/shake_to_disconnect.js` | GPL-3.0 | **67.7%** (88/130) | 58 | ⛔ 严重 |
-| 3 | `web/performance-mode.js` | `ComfyUI-KJNodes/web/js/performance.js` | GPL-3.0 | **51.7%** (45/87) | 35 | ⛔ 严重 |
-| 4 | `web/shared/graph-utils.js` | `ComfyUI-KJNodes/web/js/utility.js` | GPL-3.0 | 66.7% (4/6) | 6 | ⚠️ 小（文件已被裁剪至 6 行） |
-| 5 | `web/ignore-groups.js` | `Goohaitools-comfyui/web/js/nodes pass.js` | GPL-3.0 | 22.7% (248/1094) | ~130 | ⚠️ 中 |
+| 2 | `web/performance-mode.js` | `ComfyUI-KJNodes/web/js/performance.js` | GPL-3.0 | **51.7%** (45/87) | 35 | ⛔ 严重 |
+| 3 | `web/shared/graph-utils.js` | `ComfyUI-KJNodes/web/js/utility.js` | GPL-3.0 | 66.7% (4/6) | 6 | ⚠️ 小（文件已被裁剪至 6 行） |
+| 4 | `web/ignore-groups.js` | `Goohaitools-comfyui/web/js/nodes pass.js` | GPL-3.0 | 22.7% (248/1094) | ~130 | ⚠️ 中 |
 
-「上游专有标识符命中」指上游作者的独创命名（如 `installSingleCanvasPan`、`_panInstalledOn`、`executeShakeBreak`、`getNodeAnchor`、`traceAndBypass`、`cachedAll`、`cdPanel`、`computeStateSig`）原样出现在本项目代码中。此类命名是「实质性相似」的核心证据。
+「上游专有标识符命中」指上游作者的独创命名（如 `installSingleCanvasPan`、`_panInstalledOn`、`cachedAll`、`cdPanel`、`computeStateSig`）原样出现在本项目代码中。此类命名是「实质性相似」的核心证据。
 
 ## 二、已排除的来源（澄清）
 
@@ -42,17 +41,17 @@
 
 - GPL-3.0 的 copyleft 要求**衍生作品整体按 GPL 授权**。将 GPL-3.0 代码并入 MIT 项目并以 MIT 条款分发，构成许可证违规。
 - **仅补充署名不足以合规**——署名是 GPL 的必要条件而非充分条件。只要这些衍生文件仍以 MIT 条款分发，违规状态持续存在。
-- 上述 5 个文件与上游的逐字相同率（22.7% ~ 69.6%）与独创标识符命中，已远超「独立创作巧合」的范围，构成衍生作品。
+- 上述 4 个文件与上游的逐字相同率（22.7% ~ 69.6%）与独创标识符命中，已远超「独立创作巧合」的范围，构成衍生作品。
 
 ## 五、技术可行性：局部双许可
 
-经核查 import 引用边界，这 5 个文件构成**自闭合闭包**：
+经核查 import 引用边界，这 4 个文件构成**自闭合闭包**：
 
 - `web/shared/graph-utils.js` 仅被 `web/auto-connect.js` 引用（同源）
-- `web/auto-connect.js`、`web/performance-mode.js`、`web/shake-disconnect.js`、`web/ignore-groups.js` 仅由 `extension.json` 作为入口加载；`hub-bar.js` 中以字符串形式持有 `autoConnect: "./auto-connect.js"` 的模块路径（运行时动态 import）
+- `web/auto-connect.js`、`web/performance-mode.js`、`web/ignore-groups.js` 仅由 `extension.json` 作为入口加载；`hub-bar.js` 中以字符串形式持有 `autoConnect: "./auto-connect.js"` 的模块路径（运行时动态 import）
 - **没有任何 MIT 文件 `import` 这 5 个文件** → 不存在 GPL 反向传染
 
-因此「这 5 个文件标为 GPL-3.0、项目主体保持 MIT」在技术上是可行的。方向正确性：MIT 代码可被 GPL 文件引用（MIT → GPL 兼容），反之不可。
+因此「这 4 个文件标为 GPL-3.0、项目主体保持 MIT」在技术上是可行的。方向正确性：MIT 代码可被 GPL 文件引用（MIT → GPL 兼容），反之不可。
 
 ## 六、处置选项
 

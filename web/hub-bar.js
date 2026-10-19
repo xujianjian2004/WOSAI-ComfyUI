@@ -38,7 +38,6 @@ const CORE_MODULE_URLS = Object.freeze({
 const _coreModuleLoads = new Map();
 const EXTRA_ICONS = Object.freeze({
     autoConnect: "pi pi-share-alt",
-    shake: "pi pi-bolt",
     menuHide: "pi pi-bars",
 });
 const CAPTIONED_COMMANDS = new Set();
