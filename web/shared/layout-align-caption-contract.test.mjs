@@ -51,3 +51,16 @@ test("按钮改为竖排，图标与标签上下排列", () => {
     // 中央键此前没有图标尺寸规则，加标签后必须与其他键同源
     assert.match(css, /\.wosai-al-center-action svg \{[^}]*var\(--ws-lt-quick-icon-size\)/);
 });
+
+test("快捷层顺序：分布（等距+对齐）在上，等宽/等高/等尺寸在下", () => {
+    // 分布是「先拉间距再对齐」的主路径，等宽类属于尺寸微调，排在其后
+    const order = js.match(/quick\.append\(([^)]*)\)/)?.[1] ?? "";
+    assert.ok(order, "未找到快捷层的挂载顺序");
+    const idx = (name) => order.indexOf(name);
+    assert.ok(idx("distributeControls") >= 0 && idx("equalControls") >= 0);
+    assert.ok(
+        idx("distributeControls") < idx("equalControls"),
+        "分布行必须排在等宽行之前（DOM 顺序即视觉顺序）",
+    );
+    assert.ok(idx("grid") < idx("distributeControls"), "田字格仍在最上");
+});
