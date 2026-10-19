@@ -50,6 +50,8 @@
 
 - 图像对比节点**移除分割线手柄图标**（原十字准心，本轮曾短暂换为 ↔ 后按反馈整体去掉）：分割线悬停与拖拽行为不变（热区与 `ew-resize` 光标保留），仅去掉圆盘图形。同步删除仅服务手柄的 `.wosai-image-compare-handle` 全部样式与孤儿令牌 `--ws-compare-handle-icon-size`；缓存破坏：`media-tools.js ?v=25 → 26`、`media-tools.css ?v=21 → 22`（extension.json / get-widget.js / media-tools.js 三处双源成对递增）、`wosai-variables.css ?v=29 → 30`（extension.json ↔ dom-widget.js）。
 
+- **修复尺寸选择节点「取原图尺寸」在上游换图后不刷新**的问题（用户反馈：切换图片 1→图片 2 后点击取原图尺寸，预览仍显示图片 1 的旧尺寸）。根因是原图尺寸只在 `onConnectionsChange` 与首次挂载时解析并缓存到 `_ss_srcW/_ss_srcH`，而 LoadImage 换文件只替换 `node.imgs` 里的 `<img>` 元素、**连线不变**，故三个钩子一个都不触发，按钮读到的永远是上一张图；同时旧 `<img>` 的 `load` 回调可能晚于新图到达，把旧尺寸覆盖回新尺寸。现：① 点击时 `await _ssTrackSourceImage()` 重新解析（新图未解码则等 `load`，不再拿旧值硬填）；② 订阅上游 `executed` 事件，新图落盘 / latent 重建后自动重解析；③ `apply` 前校验当前挂着的仍是同一个 `<img>`，杜绝旧图回填。缓存破坏：`size-select.js ?v=10 → 11`。
+
 - 图像对比节点改为 **rgthree 式悬停对比**：指针在图像区左右移动即实时移动分割线，**无需按下鼠标**（对照此前「必须点击/拖住分割线」）。悬停在底部视图 / 交换控件上时浮标不跟手，避免误移分割线；触摸设备无悬停，按下拖拽路径照常工作。滑动视图额外给出 `ew-resize` 光标提示可水平滑动。缓存破坏：`media-tools.js ?v=26 → 27`、`media-tools.css ?v=22 → 23`（三处双源成对递增）。
 
 - **体积与预算**：本轮为忽略编组根治标题缩放（原生标题随缩放比等比放大 + 命中区/折叠热区同步 + LOD 豁免）与设置窗同步缩放，主 JavaScript **1415.9 → 1422.2 KiB**（工作区磁盘字节口径）。原预算 `1_450_000 B`（1416.0 KiB）在此前功能累计后仅剩 <0.2 KiB 余量，属预算用尽而非新增死码；按既有再校准惯例上调至 `1_472_000 B`（≈1437.5 KiB，余约 15.3 KiB），原因记录在 `scripts/check-frontend-performance.mjs`。样式 **236.7 → 236.8 KiB**（余约 19.2 KiB）。预算内。

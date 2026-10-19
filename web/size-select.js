@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 import { t, applyNodeDefTranslation, onLangChange } from "./shared/i18n.js";
 import { WOSAI_COPYRIGHT } from "./shared/constants.js";
 import { getWOSAIVar } from "./shared/shared-utils.js";
@@ -658,9 +659,14 @@ function buildUI(node) {
         useSrcBtn.textContent = t('menus.sizeSelect.useSourceSize');
         useSrcBtn.title = t('menus.sizeSelect.tipUseSourceSize');
         node._ss_useSrcBtn = useSrcBtn;
-        useSrcBtn.onclick = () => {
-            const srcW = node._ss_srcW, srcH = node._ss_srcH;
-            if (!(srcW > 0) || !(srcH > 0)) return;
+        useSrcBtn.onclick = async () => {
+            // 点击瞬间重新解析上游：LoadImage 换文件只换 node.imgs 里的
+            // <img> 元素、连线不动，下面的钩子都不保证已经跑过，
+            // 直接读缓存会把上一张图的尺寸又填回来。
+            // 新图还没解码完时 await 解析结果，而不是拿旧值硬填。
+            const wh = await _ssTrackSourceImage();
+            if (!wh) return;
+            const [srcW, srcH] = wh;
             const step = gridStep(almW?.value);
             baseWidth  = alignTo(srcW, step);
             baseHeight = alignTo(srcH, step);
@@ -717,24 +723,59 @@ function buildUI(node) {
             const img = _ssResolveUpstream("image")?.imgs?.[0];
             if (img) {
                 const apply = () => {
+                    // 换图后旧 <img> 的 load 可能晚于新图到达：只认当前挂着的那一个，
+                    // 否则图片 1 的尺寸会在图片 2 之后又覆盖回来
+                    if (_ssResolveUpstream("image")?.imgs?.[0] !== img) return false;
                     node._ss_srcW = img.naturalWidth;
                     node._ss_srcH = img.naturalHeight;
                     syncPreview();
+                    syncUseSourceBtn();
+                    return true;
                 };
-                if (img.complete && img.naturalWidth) apply();
-                else img.addEventListener("load", apply, { once: true, signal: _ac.signal });
-                return;
+                if (img.complete && img.naturalWidth) {
+                    apply();
+                    return Promise.resolve([node._ss_srcW, node._ss_srcH]);
+                }
+                // 换完文件立刻点按钮时，新图往往还在解码：等它 load 完再回填，
+                // 否则读到的仍是上一张图的尺寸
+                return new Promise((resolve) => {
+                    img.addEventListener("load", () => {
+                        resolve(apply() ? [node._ss_srcW, node._ss_srcH] : null);
+                    }, { once: true, signal: _ac.signal });
+                });
             }
             const wh = _ssReadStaticWH(_ssResolveUpstream("latent"));
-            if (wh) { [node._ss_srcW, node._ss_srcH] = wh; syncPreview(); return; }
+            if (wh) {
+                [node._ss_srcW, node._ss_srcH] = wh;
+                syncPreview();
+                syncUseSourceBtn();
+                return Promise.resolve(wh);
+            }
             node._ss_srcW = node._ss_srcH = null;
             syncPreview();
+            syncUseSourceBtn();
+            return Promise.resolve(null);
         }
         node._ss_trackSourceImage = _ssTrackSourceImage;
         const _origOnConnChange = node.onConnectionsChange;
         node.onConnectionsChange = function (type) {
             _origOnConnChange?.apply(this, arguments);
             if (type === (window.LiteGraph ? LiteGraph.INPUT : 1)) _ssTrackSourceImage();
+        };
+        // 上游执行完（新图落盘 / latent 重建）也要重解析：连线没变时
+        // onConnectionsChange 不触发，缓存会停在上一张图
+        const _onUpstreamExecuted = (message) => {
+            const hit = ["image", "latent"].some((portName) => {
+                const src = _ssResolveUpstream(portName);
+                return src && String(src.id) === String(message?.display_node ?? message?.node);
+            });
+            if (hit) _ssTrackSourceImage();
+        };
+        api.addEventListener("executed", _onUpstreamExecuted);
+        const _origOnRemovedExec = node.onRemoved;
+        node.onRemoved = () => {
+            api.removeEventListener("executed", _onUpstreamExecuted);
+            _origOnRemovedExec?.();
         };
         _ssTrackSourceImage(); // 首次挂载时补一次（覆盖从已保存工作流加载、连线早已存在的情况）
 

@@ -23,15 +23,31 @@ test("the manual panel has a use-source-size button next to swap", () => {
     assert.match(sizeSelectJs, /node\._ss_useSrcBtn = useSrcBtn/);
 });
 
-test("clicking it fills the custom dimensions from the resolved upstream size", () => {
-    const handler = sizeSelectJs.match(/useSrcBtn\.onclick = \(\) => \{[\s\S]*?\n {8}\};/);
+test("clicking it re-resolves the upstream, then fills the custom dimensions", () => {
+    const handler = sizeSelectJs.match(/useSrcBtn\.onclick = async \(\) => \{[\s\S]*?\n {8}\};/);
     assert.ok(handler, "useSrcBtn.onclick not found");
-    // 无源可点时直接返回（按钮此时是 disabled，但 onclick 仍可能被程序触发）
-    assert.match(handler[0], /if \(!\(srcW > 0\) \|\| !\(srcH > 0\)\) return;/);
+    // 上游换图不换连线，缓存的 _ss_srcW/_ss_srcH 会停在旧图 ⇒ 点击时必须重新解析，
+    // 且新图尚未解码时要 await 解析结果而不是拿旧值硬填
+    assert.match(handler[0], /const wh = await _ssTrackSourceImage\(\);/);
+    assert.match(handler[0], /if \(!wh\) return;/);
+    assert.match(handler[0], /const \[srcW, srcH\] = wh;/);
     assert.match(handler[0], /baseWidth\s+= alignTo\(srcW, step\)/);
     assert.match(handler[0], /baseHeight\s+= alignTo\(srcH, step\)/);
     assert.match(handler[0], /updateWidgetValue\(cusW, baseWidth\)/);
     assert.match(handler[0], /updateWidgetValue\(cusH, baseHeight\)/);
+});
+
+test("source size is re-resolved when the upstream changes image", () => {
+    const fn = sizeSelectJs.match(/function _ssTrackSourceImage\(\) \{[\s\S]*?\n {8}\}/);
+    assert.ok(fn, "_ssTrackSourceImage not found");
+    // 返回可 await 的 [w, h]：换完文件立刻点按钮时新图往往还在解码
+    assert.match(fn[0], /return Promise\.resolve\(\[node\._ss_srcW, node\._ss_srcH\]\);/);
+    assert.match(fn[0], /return new Promise\(\(resolve\) => \{/);
+    // 旧 <img> 的 load 晚于新图到达时不得回填，否则旧尺寸会盖掉新图
+    assert.match(fn[0], /if \(_ssResolveUpstream\("image"\)\?\.imgs\?\.\[0\] !== img\) return false;/);
+    // 上游执行完（新图落盘 / latent 重建）也要重解析：连线没变时 onConnectionsChange 不触发
+    assert.match(sizeSelectJs, /api\.addEventListener\("executed", _onUpstreamExecuted\);/);
+    assert.match(sizeSelectJs, /api\.removeEventListener\("executed", _onUpstreamExecuted\);/);
 });
 
 test("the button is disabled while no upstream size is known", () => {
