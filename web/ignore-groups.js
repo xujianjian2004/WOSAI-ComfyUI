@@ -23,7 +23,7 @@ import { WOSAI_COPYRIGHT, STORAGE_KEYS } from "./shared/constants.js";
 import { getWOSAIVar, getWOSAIVarNum } from "./shared/shared-utils.js";
 import { forwardWheelToCanvas } from "./shared/wheel-forward.js";
 import { registerSelectionFollower } from "./shared/selection-follow.js";
-import { readIgnoreGroupsState, writeIgnoreGroupsState } from "./shared/ignore-groups-state.js";
+import { readIgnoreGroupsState, writeIgnoreGroupsState, normalizeIgnoreGroupsScale } from "./shared/ignore-groups-state.js";
 import { ensureWosaiStyles } from "./shared/dom-widget.js";
 import { patchMethod } from "./shared/method-patch.js";
 import {
@@ -39,7 +39,7 @@ import {
    因此由 JS 自行确保样式表注入，避免 UI 渲染为无样式原生元素。 */
 (function ensureIgnoreGroupsCSS() {
     ensureWosaiStyles([
-        ["wosai-ignore-groups-css", new URL("./styles/ignore-groups.css?v=3", import.meta.url).href]
+        ["wosai-ignore-groups-css", new URL("./styles/ignore-groups.css?v=6", import.meta.url).href]
     ]);
 })();
 
@@ -199,6 +199,8 @@ function buildWosaiIgnoreGroupsUI(node) {
     }
 
     function calcHeight() {
+        /* 标题带由画布原生渲染（随缩放比放大，见 _igInstallTitleScale），
+           画在节点框原点上方、不占内容高度 ⇒ 此处不再计入标题条。 */
         const rowH   = 30;
         const rGap   = 8;
         const cnt    = visible().length;
@@ -292,7 +294,10 @@ function buildWosaiIgnoreGroupsUI(node) {
     }
 
     /* 应用整体缩放：内层 contentEl 用 CSS zoom 放大，node.size 同步按常量重算。
-       实时预览无需重建 DOM，仅更新样式与尺寸即可。 */
+       实时预览无需重建 DOM，仅更新样式与尺寸即可。
+       原生标题带随缩放比等比放大（绘制期覆盖常量，见 _igInstallTitleScale），
+       画在节点框原点上方；DOM 面板由 widget.y 静态锚在框内，天然位于标题带下方，
+       无需再上移覆盖。 */
     function _applyScale() {
         if (!contentEl) return;
         const s = (igScale && igScale > 0) ? igScale : 1;
@@ -1020,24 +1025,55 @@ function buildWosaiIgnoreGroupsUI(node) {
         bindWheelToCanvas(overlay);
         document.body.appendChild(overlay);
 
+        /* pop 只做定位锚点（fixed + max-content）；zoom 必须加在内层 body：
+           加在 fixed 上会连同 left/top 一起放大。max-content 让跟随器量到缩放后尺寸。 */
         const pop = document.createElement("div");
         pop.id = "wosai_ig_pop";
-        pop.setAttribute("data-wosai-panel", "");
-        pop.setAttribute("data-theme", getGlassTheme());
         Object.assign(pop.style, {
             position: "fixed",
+            width: "max-content",
+            height: "max-content",
+            zIndex: "99999",
+        });
+
+        const body = document.createElement("div");
+        body.className = "wosai-ig-pop-body";
+        body.setAttribute("data-wosai-panel", "");
+        body.setAttribute("data-theme", getGlassTheme());
+        Object.assign(body.style, {
             background: "var(--ws-glass-bg)",
             border: "var(--ws-glass-border)",
             borderRadius: "var(--ws-radius-lg)",
             padding: "var(--ws-panel-padding)",
-            zIndex: "99999", minWidth: "var(--ws-panel-width-sm)", maxWidth: "var(--ws-panel-width)",
+            minWidth: "var(--ws-panel-width-sm)", maxWidth: "var(--ws-panel-width)",
             boxShadow: "var(--ws-glass-shadow)",
             backdropFilter: "var(--ws-glass-blur)",
             WebkitBackdropFilter: "var(--ws-glass-blur)",
             color: "var(--ws-text)", fontFamily: "var(--ws-font-family)",
             fontSize: "var(--ws-text-base)",
         });
+        pop.appendChild(body);
         bindWheelToCanvas(pop);
+
+        /* 弹窗随缩放比放大，但以「视口可容纳」为硬上限；1× 实测基准，松手重算。 */
+        const POPUP_VIEWPORT_MARGIN = 24;
+        const POPUP_MAX_ZOOM = 2;
+        let _popZoom = 1;
+        function applyPopupScale() {
+            const wanted = (igScale && igScale > 0) ? igScale : 1;
+            if (wanted <= 1) {
+                if (_popZoom !== 1) { body.style.zoom = ""; _popZoom = 1; }
+                return;
+            }
+            // 折回 1× 量基准尺寸（getBoundingClientRect 含 zoom，必须先归零）
+            body.style.zoom = "";
+            const base = body.getBoundingClientRect();
+            const fitW = (window.innerWidth - POPUP_VIEWPORT_MARGIN) / Math.max(1, base.width);
+            const fitH = (window.innerHeight - POPUP_VIEWPORT_MARGIN) / Math.max(1, base.height);
+            const z = Math.max(1, Math.min(wanted, fitW, fitH, POPUP_MAX_ZOOM));
+            _popZoom = z;
+            body.style.zoom = z === 1 ? "" : String(z);
+        }
 
         let _followCleanup = () => {};
 
@@ -1059,7 +1095,7 @@ function buildWosaiIgnoreGroupsUI(node) {
         document.addEventListener("keydown", onEsc);
 
         /* 订阅主题变化 */
-        pop._offGlass = onGlassChange((t) => { pop.setAttribute("data-theme", t); });
+        pop._offGlass = onGlassChange((t) => { body.setAttribute("data-theme", t); });
 
         /* 待应用的离散选项（由 WOSAI 分段标签按钮更新，applyAll 读取） */
         let uiDisable = igDisable;
@@ -1200,7 +1236,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             color: "var(--ws-text)", letterSpacing: "0.02em",
         });
         titleRow.appendChild(titleEl);
-        pop.appendChild(titleRow);
+        body.appendChild(titleRow);
 
         /* 路由控制 */
         const dRow = srow(t('nodes.ignoreGroups.controller'));
@@ -1210,7 +1246,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             (v) => { uiDisable = v; applyAll(); }
         );
         dRow.valWrap.appendChild(dSeg.el);
-        pop.appendChild(dRow.row);
+        body.appendChild(dRow.row);
 
         /* 关键词筛选 */
         const fRow = srow(t('nodes.ignoreGroups.keywordFilter'));
@@ -1225,7 +1261,7 @@ function buildWosaiIgnoreGroupsUI(node) {
         fInput.addEventListener("focus", () => { fInput.style.borderColor = "var(--ws-border-accent)"; });
         fInput.addEventListener("blur",  () => { fInput.style.borderColor = "var(--ws-input-border)"; });
         fRow.valWrap.appendChild(fInput);
-        pop.appendChild(fRow.row);
+        body.appendChild(fRow.row);
         let filterTimer = null;
         fInput.addEventListener("input", () => {
             if (filterTimer) clearTimeout(filterTimer);
@@ -1329,7 +1365,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             if (cdPanel) { cdPanel.remove(); cdPanel = null; } else { buildColorOptions(); }
         });
         cRow.valWrap.appendChild(cdContainer);
-        pop.appendChild(cRow.row);
+        body.appendChild(cRow.row);
 
         const closeColorPanel = (e) => {
             if (cdPanel && !cdContainer.contains(e.target)) { cdPanel.remove(); cdPanel = null; }
@@ -1344,7 +1380,7 @@ function buildWosaiIgnoreGroupsUI(node) {
             (v) => { uiSort = v; applyAll(); }
         );
         sRow.valWrap.appendChild(sSeg.el);
-        pop.appendChild(sRow.row);
+        body.appendChild(sRow.row);
 
         /* 缩放档位（1–5 倍整体放大，拖动实时预览） */
         const zRow = srow(t('nodes.ignoreGroups.scale'));
@@ -1371,10 +1407,13 @@ function buildWosaiIgnoreGroupsUI(node) {
             _applyScale();   // 实时预览：立即缩放面板
             save();          // 持久化档位
         });
+        /* 松手（change）后再重算设置窗自身缩放：
+           拖动中重排会让滑条从指针下跳走，故只在释放时同步一次。 */
+        zSlider.addEventListener("change", applyPopupScale);
         zWrap.appendChild(zSlider);
         zWrap.appendChild(zVal);
         zRow.valWrap.appendChild(zWrap);
-        pop.appendChild(zRow.row);
+        body.appendChild(zRow.row);
 
         /* 主题颜色 */
         const tcRow = srow(t('nodes.ignoreGroups.themeColor'));
@@ -1402,7 +1441,7 @@ function buildWosaiIgnoreGroupsUI(node) {
         });
         tcRow.valWrap.appendChild(cInput);
         tcRow.valWrap.appendChild(cHex);
-        pop.appendChild(tcRow.row);
+        body.appendChild(tcRow.row);
 
         /* ── 一键恢复默认参数 ───────────────── */
         function resetAll() {
@@ -1428,8 +1467,9 @@ function buildWosaiIgnoreGroupsUI(node) {
             zSlider.value = "1"; zVal.textContent = Number(1).toFixed(1) + "×";
             dSeg.setActive(false);       // 控制器 → 绕过
             sSeg.setActive("alphabet");  // 排序 → 按字母
-            // 4) 实时缩放复位
+            // 4) 实时缩放复位（节点 + 弹窗自身）
             _applyScale();
+            applyPopupScale();
             // 5) 应用并持久化（nameColor 取默认强调色，视觉等价于初始 null）
             applyAll();
         }
@@ -1449,7 +1489,7 @@ function buildWosaiIgnoreGroupsUI(node) {
         confirmBtn.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closePopup(); });
         actions.appendChild(resetBtn);
         actions.appendChild(confirmBtn);
-        pop.appendChild(actions);
+        body.appendChild(actions);
 
         /* 底部版权 */
         const footer = document.createElement("div");
@@ -1460,12 +1500,13 @@ function buildWosaiIgnoreGroupsUI(node) {
             color: "var(--ws-text-muted)", fontSize: "var(--ws-text-xs)",
             letterSpacing: "var(--ws-ig-footer-letter-spacing)",
         });
-        pop.appendChild(footer);
+        body.appendChild(footer);
 
         document.body.appendChild(pop);
+        /* 挂载后按当前缩放比一次性应用弹窗缩放（需先有布局才能量到基准尺寸） */
+        requestAnimationFrame(applyPopupScale);
         const canvas = app.canvas;
         if (canvas?.canvas && node) {
-            pop.style.transform = "";
             const gap = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--ws-ig-popup-gap')) || 14;
             _followCleanup = registerSelectionFollower(pop, {
                 placement: "side",
@@ -1701,6 +1742,160 @@ const _IG_TYPE    = "WOSAI_IgnoreGroups";
 const _IG_TITLE   = t("nodes.ignoreGroups.nodeTitle", "IgnoreGroups");
 const _IG_DOM_PREFIX = "wosai-ig-node";
 
+/* ════════════════════════════════════════════════════════════════
+   原生标题随缩放比放大（治本）
+   ════════════════════════════════════════════════════════════════ */
+
+/* 第一性原理：ComfyUI 画布标题带的全部几何量都在「绘制期」与「帧首测量期」
+   读 LiteGraph 全局常量——
+   · 绘制期：标题背景带（drawTitleBarBackground）以 rect(0, -h, w, h) 画在节点框
+     原点上方，高度取 NODE_TITLE_HEIGHT；文字基线为 NODE_TITLE_TEXT_Y - NODE_TITLE_HEIGHT；
+     字体由 titleFontStyle 派生自 NODE_TEXT_SIZE；标题小方块（drawTitleBox）定位
+     由 title_height 推导、尺寸取 box_size（调用点硬编码 10）。
+   · 帧首测量期：computeVisibleNodes → updateArea → measure 用同一常量算
+     boundingRect（[pos[0], pos[1]-titleH, size[0], size[1]+titleH]）与 renderArea，
+     命中判定 isPointInside 直接用 boundingRect；折叠按钮热区 isPointInCollapse
+     取「pos 上方 NODE_TITLE_HEIGHT 见方」。
+   · 低缩放比 LOD：画布缩放低于「最小可读字号 / (字号 × √dpr)」时 ComfyUI 进入
+     low_quality 模式，drawTitleText 直接 return 不画标题文字（见 _igForceFullQuality）。
+   对本类型节点按 wosai_ig_scale 在这两个窗口内临时覆盖这几个量，原生标题即随
+   缩放比等比放大：不重复渲染一份 DOM 标题、不占内容高度、命中区/热区同步增大，
+   拖动/多选/参考线一律走 LiteGraph 原生路径。finally 还原 + 重入守卫
+   （嵌套调用直接放行，避免二次相乘），不影响其他节点。
+   Vue 模式下 drawNode 直接 return（标题由 Vue 覆盖层渲染），无需缩放。 */
+const _IG_TITLE_BOX_BASE = 10;   // drawNodeShape 调用点硬编码的 box_size
+
+let _igTitleScaleDispose = null;     // drawNode：绘制窗口
+let _igTitleBoxScaleDispose = null;  // drawTitleBox：小方块尺寸
+let _igTitleHitDispose = null;       // updateArea：命中区（boundingRect / renderArea）
+let _igCollapseHitDispose = null;    // isPointInCollapse：折叠按钮热区
+let _igTitleConstDepth = 0;          // 常量覆盖重入深度
+
+/* 在 fn() 执行期内把指定标题几何常量按 s 放大，退出时原值还原。
+   重入（外层已在放大窗口内）时直接放行——常量已是放大值，再乘会二次膨胀。 */
+function _igWithTitleConstants(s, keys, fn) {
+    if (s <= 1 || _igTitleConstDepth > 0) return fn();
+    const LG = window.LiteGraph;
+    if (!LG) return fn();
+    const prev = keys.map((k) => LG[k]);
+    for (let i = 0; i < keys.length; i++) {
+        if (typeof prev[i] !== "number") continue;
+        LG[keys[i]] = Math.round(prev[i] * s);
+    }
+    _igTitleConstDepth++;
+    try { return fn(); }
+    finally {
+        _igTitleConstDepth--;
+        for (let i = 0; i < keys.length; i++) LG[keys[i]] = prev[i];
+    }
+}
+const _IG_TITLE_KEYS_ALL = ["NODE_TITLE_HEIGHT", "NODE_TEXT_SIZE", "NODE_TITLE_TEXT_Y"];
+const _IG_TITLE_KEYS_H   = ["NODE_TITLE_HEIGHT"];
+
+/* 本节点当前缩放档（非本类型 / Vue 模式 / 异常值 ⇒ 1，即不干预） */
+function _igNodeScale(n) {
+    if (!n || n.type !== _IG_TYPE) return 1;
+    const LG = window.LiteGraph;
+    if (LG && LG.vueNodesMode) return 1;
+    return normalizeIgnoreGroupsScale(n.properties && n.properties.wosai_ig_scale);
+}
+
+/* 低缩放比 LOD 豁免（治本）：ComfyUI 的 LOD 在画布缩放低于
+   「最小可读字号 / (NODE_TEXT_SIZE × √dpr)」时进入 low_quality 模式——
+   drawTitleText 直接 return（标题文字消失）、标题带退化为直角简版、
+   节点圆角与徽章也被简化。该阈值只按基础字号 14px 推算，不知道本节点
+   标题已按 wosai_ig_scale 放大：5× 节点在 40% 画布缩放下标题实际屏幕
+   字号仍是基准的 2 倍（5×0.4），清晰可读却被判定「不可读」而隐藏。
+   判据改为按本节点实际屏幕字号计算：缩放比 × 画布缩放 ≥ LOD 阈值时，
+   绘制本节点期间强制全质量（finally 还原，不影响其他节点与全局 LOD）。 */
+function _igForceFullQuality(canvas, s) {
+    if (!canvas) return null;
+    const minFont = canvas.min_font_size_for_lod;
+    /* LOD 已禁用（设为 0）时全局本就是全质量，无需干预 */
+    if (typeof minFont !== "number" || minFont <= 0) return null;
+    const LG = window.LiteGraph;
+    const baseFont = (LG && LG.NODE_TEXT_SIZE) || 14;
+    const dprAdj = Math.sqrt(canvas.dpr || 1);
+    const threshold = minFont / (baseFont * dprAdj);
+    const scale = canvas.ds ? canvas.ds.scale : 1;
+    if (typeof scale !== "number" || s * scale < threshold) return null;
+    if (!canvas._isLowQuality) return null;
+    const prev = canvas._isLowQuality;
+    canvas._isLowQuality = false;
+    return () => { canvas._isLowQuality = prev; };
+}
+
+function _igInstallTitleScale() {
+    if (_igTitleScaleDispose) return;
+    const proto = app.canvas && Object.getPrototypeOf(app.canvas);
+    if (!proto || typeof proto.drawNode !== "function") return;
+    _igTitleScaleDispose = patchMethod(
+        proto,
+        "drawNode",
+        "WOSAI.IgnoreGroups.scaleNativeTitle",
+        (next) => function (n, ...rest) {
+            const s = _igNodeScale(n);
+            if (s <= 1) return next.call(this, n, ...rest);
+            const restoreLod = _igForceFullQuality(this, s);
+            try {
+                return _igWithTitleConstants(s, _IG_TITLE_KEYS_ALL, () => next.call(this, n, ...rest));
+            } finally {
+                if (restoreLod) restoreLod();
+            }
+        },
+    );
+    const nodeProto = window.LiteGraph && window.LiteGraph.LGraphNode && window.LiteGraph.LGraphNode.prototype;
+    if (!nodeProto) return;
+    /* 标题小方块：定位已随 title_height 缩放，但尺寸取调用点硬编码值，
+       不随缩放会相对标题文字越变越小。仅对本类型节点等比放大。 */
+    if (typeof nodeProto.drawTitleBox === "function") {
+        _igTitleBoxScaleDispose = patchMethod(
+            nodeProto,
+            "drawTitleBox",
+            "WOSAI.IgnoreGroups.scaleTitleBox",
+            (next) => function (ctx, opts) {
+                const s = _igNodeScale(this);
+                if (s <= 1 || !opts) return next.call(this, ctx, opts);
+                const base = typeof opts.box_size === "number" ? opts.box_size : _IG_TITLE_BOX_BASE;
+                return next.call(this, ctx, { ...opts, box_size: base * s });
+            },
+        );
+    }
+    /* 命中区：绘制窗口的覆盖到不了帧首的测量期，标题带画大了但点不中
+       （点击带内穿透到下层节点），原生拖动/多选失效 ⇒ 同窗口覆盖。 */
+    if (typeof nodeProto.updateArea === "function") {
+        _igTitleHitDispose = patchMethod(
+            nodeProto,
+            "updateArea",
+            "WOSAI.IgnoreGroups.scaleTitleHitArea",
+            (next) => function (ctx) {
+                const s = _igNodeScale(this);
+                if (s <= 1) return next.call(this, ctx);
+                return _igWithTitleConstants(s, _IG_TITLE_KEYS_ALL, () => next.call(this, ctx));
+            },
+        );
+    }
+    /* 折叠按钮热区：标题带放大后小方块画在带中央，热区仍取 30px 见方会点空。 */
+    if (typeof nodeProto.isPointInCollapse === "function") {
+        _igCollapseHitDispose = patchMethod(
+            nodeProto,
+            "isPointInCollapse",
+            "WOSAI.IgnoreGroups.scaleCollapseHit",
+            (next) => function (x, y) {
+                const s = _igNodeScale(this);
+                if (s <= 1) return next.call(this, x, y);
+                return _igWithTitleConstants(s, _IG_TITLE_KEYS_H, () => next.call(this, x, y));
+            },
+        );
+    }
+}
+function _igTryInstallTitleScale(attempts = 40) {
+    if (_igTitleScaleDispose) return;
+    const proto = app.canvas && Object.getPrototypeOf(app.canvas);
+    if (proto && typeof proto.drawNode === "function") { _igInstallTitleScale(); return; }
+    if (attempts > 0) setTimeout(() => _igTryInstallTitleScale(attempts - 1), 250);
+}
+
 (function () {
     _igStyleEl = document.createElement("style");
     _igStyleEl.id = "wosai-ig-nodes2-compat";
@@ -1886,6 +2081,9 @@ app.registerExtension({
 
     /* 全局设置：监听分组增删，自动触发节点刷新 */
     async setup() {
+        /* 原生标题随缩放比放大（绘制期覆盖 LiteGraph 标题常量） */
+        _igTryInstallTitleScale();
+
         function hookGraph() {
             if (!app.graph) { _igSetupTimer = setTimeout(hookGraph, 200); return; }
             /* 防止重复 hook（热重载场景） */
@@ -1923,6 +2121,13 @@ app.registerExtension({
     /* 扩展禁用时清理所有全局资源与 monkey-patch */
     remove() {
         if (_igSetupTimer) { clearTimeout(_igSetupTimer); _igSetupTimer = null; }
+
+        /* 标题缩放补丁：四层各自独立，逆序脱卸 */
+        if (_igCollapseHitDispose) { _igCollapseHitDispose(); _igCollapseHitDispose = null; }
+        if (_igTitleHitDispose) { _igTitleHitDispose(); _igTitleHitDispose = null; }
+        if (_igTitleBoxScaleDispose) { _igTitleBoxScaleDispose(); _igTitleBoxScaleDispose = null; }
+        if (_igTitleScaleDispose) { _igTitleScaleDispose(); _igTitleScaleDispose = null; }
+        _igTitleConstDepth = 0;
 
         _igNodeCleanup.forEach((cleanup) => { try { cleanup(); } catch (_) {} });
         _igNodeCleanup.clear();

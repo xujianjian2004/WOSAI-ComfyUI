@@ -12,7 +12,12 @@ const BUDGETS = Object.freeze({
     // （唯一候选 web/shared/dialog.js 自带“逐步替换”计划，属待采纳而非死代码），
     // 且单文件仍低于 largestMainFile 上限，故仅上调总量预算至 1_450_000
     // （≈1416 KiB，相对 84 个主 JS 文件实测 ≈1395 KiB 保留约 20 KiB 余量）。
-    mainJavaScript: 1_450_000,
+    //
+    // 2026-10-18/19 再校准：忽略编组标题根治（画布原生标题随缩放比等比放大、
+    // 命中区/折叠热区同步、低缩放比 LOD 豁免）+ 设置窗同步缩放，主 JS 实测 ≈1422 KiB。
+    // 上一版 1_450_000（1416 KiB）此时仅剩 <0.2 KiB 余量 —— 属预算已被此前功能用尽，
+    // 非新增死模块；上调至 1_472_000（≈1437.5 KiB），保留约 15 KiB 余量。
+    mainJavaScript: 1_472_000,
     largestMainFile: 107_000,
     lazyPinyin: 600_000,
     styles: 256_000,

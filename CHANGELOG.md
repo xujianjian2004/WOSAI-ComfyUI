@@ -36,9 +36,16 @@
 - 新增 `dev/frontend/README.md`：说明该目录收录「已写好、有单测、但尚未接入运行时」的前端纯函数地基（布局引擎 / 布局几何 / 功能注册表），约定不得被 `web/` 运行时模块静态 import，接线时移回 `web/shared/` 并同步本表。
 - 新增 `web/shared/draggable-contract.test.mjs`（6 项）与 `web/shared/panel-builder-contract.test.mjs`（3 项），把本轮两处结构性去重固化为回归测试（详见 Fixed / Changed 段对应条目）。
 - 新增 `web/shared/wheel-forward.js`：`forwardWheelToCanvas()` 把节点内 DOM 控件上的滚轮转发给画布，恢复「鼠标停在节点上也能缩放画布」，并由 `addSizedDOMWidget()` 对所有节点内 DOM widget 默认挂载；配套 `web/shared/wheel-forward-contract.test.mjs`（7 项）。
+- 忽略编组节点**根治「缩放比调大后标题不跟随放大」**。第一性原理：ComfyUI 画布标题带的全部几何量都在「绘制期」与「帧首测量期」读 LiteGraph 全局常量——背景带以 `rect(0,-h,w,h)` 画在节点框原点上方、高取 `NODE_TITLE_HEIGHT`，文字基线取 `NODE_TITLE_TEXT_Y - NODE_TITLE_HEIGHT`，字体派生自 `NODE_TEXT_SIZE`；帧首 `computeVisibleNodes → updateArea → measure` 用同一常量算 `boundingRect`（命中判定 `isPointInside` 直接用它），折叠热区 `isPointInCollapse` 取「pos 上方 `NODE_TITLE_HEIGHT` 见方」。缩放比调大后 `node.size` 随档位增长，而标题恒为 30 画布像素 ⇒ 标题与可点热区相对缩水。现对本类型节点按 `wosai_ig_scale` 在这两个窗口内**临时覆盖这几个常量**（`finally` 逐一还原 + 重入守卫），让**原生标题本身**等比放大：不重复渲染 DOM 标题、不占内容高度、命中区/热区同步增大，拖动/多选/参考线一律走 LiteGraph 原生路径。
+  - 四层补丁经 `patchMethod` 组合（与 rgthree/Goohai 等既有 `drawNode` 补丁共存）：`drawNode`（绘制窗口，三常量全覆盖）、`updateArea`（帧首测量窗口，`boundingRect`/`renderArea` 同步放大——只补绘制层会出现「标题带画大了仍点不中、点击穿透到下层节点」，原生拖动/多选失效）、`isPointInCollapse`（标题带放大后折叠圆点画在带中央，热区仍取 30px 见方会点空，仅覆盖 `NODE_TITLE_HEIGHT`）、`drawTitleBox`（小方块尺寸取调用点硬编码值，单独按缩放比放大）。
+  - **低缩放比 LOD 豁免**：ComfyUI 在画布缩放低于「最小可读字号 / (字号 × √dpr)」时进入 low_quality 模式，`drawTitleText` 直接 return 不画标题文字（dpr=2 时阈值 ≈40%，用户报「缩放小于 40% 标题文字不可见」）。该阈值只按基础字号推算，不知道本节点标题已放大：5× 节点在 40% 缩放下实际屏幕字号仍是基准 2 倍，清晰可读却被判「不可读」而隐藏。现按「缩放比 × 画布缩放 ≥ 阈值」在绘制本节点期间强制全质量（`finally` 还原，不影响全局 LOD 与其他节点）。
+  - Vue 模式（Nodes 2.0）标题由覆盖层渲染，自动跳过本层。配套 `web/shared/ignore-groups-title-scale-contract.test.mjs`（13 项，含阴性验证）。缓存破坏：`ignore-groups.js ?v=5 → 8`、`ignore-groups.css ?v=3 → 6`（双源）。
+- 忽略编组**设置窗口随缩放比同步放大**：把弹窗视觉样式与 `zoom` 移入内层 `.wosai-ig-pop-body`（`zoom` 直接加在 `position:fixed` 元素上会连同 `left/top` 一起放大），外层 `#wosai_ig_pop` 仅作定位锚点并保持 `max-content`，使跟随器量到缩放后的真实尺寸。缩放以「视口可容纳」为硬上限并封顶 2×（4×/5× 直接放大会把弹窗撑出屏幕），缩放比滑条松手（`change`）时重算，拖动过程中不重排以免滑条从指针下跳走。
 - `scripts/check-i18n.mjs` 新增**反向检查**（此前只检查「用到的键必须存在」，不检查「定义了却没人用」）：以 `web/**/*.{js,mjs,json}` 与 `wosai_core` / `nodes` 的 Python 源为语料，键名只要以①完整字符串形式出现，或②以「字面量前缀 + 运行时拼接」形式出现（`"saveText." + key`、`` `nodeDefs.${type}.display_name` ``），即视为已消费——动态键因此不会被误判。其余记为死键；**新增死键会让检查失败**，历史遗留登记在 `UNUSED_KEY_BASELINE`（218 项）里，只减不增，键被重新启用时也必须同步从基线移除（否则检查同样失败，避免基线腐烂）。判据经阴性验证（临时注入 `common.zzzTestDead` 后按预期报错并指名）。
 
 ### Changed
+
+- **体积与预算**：本轮为忽略编组根治标题缩放（原生标题随缩放比等比放大 + 命中区/折叠热区同步 + LOD 豁免）与设置窗同步缩放，主 JavaScript **1415.9 → 1422.2 KiB**（工作区磁盘字节口径）。原预算 `1_450_000 B`（1416.0 KiB）在此前功能累计后仅剩 <0.2 KiB 余量，属预算用尽而非新增死码；按既有再校准惯例上调至 `1_472_000 B`（≈1437.5 KiB，余约 15.3 KiB），原因记录在 `scripts/check-frontend-performance.mjs`。样式 **236.7 → 236.8 KiB**（余约 19.2 KiB）。预算内。
 
 - **尺寸选择节点消除底部多余的一行空白。** 上一轮为「适配 / 缩放」加了第二行（长边短边 / 倍数滑条）并让它只在用得上它的模式出现，但**节点高度仍按最高状态定值**（预设 455 / 自定义 375）：Crop 模式下第二行整行收起、内容自然高度少了 32px，这 32px 就沉到节点底部变成一条空白——用户反馈「节点底部始终多余一行空白，需要进行优化」。根因是 **ComfyUI 会把 DOM widget 拉伸占满「节点高 − 标题 − 端口行 − 两个组合控件 − 上下留白」之后的全部剩余空间（该固定占用实测恒为 174px）**，而 `.ss-wrap` 是 `height:100%` 的弹性列 ⇒ 定高一旦高于内容自然高度，差值全部变成底部空白。现 `getFixedHeight()` 按「第二行是否出现」分四档（= 174 + 内容自然高 + 4px 余量）：
 
@@ -216,6 +223,7 @@
 
 ### Fixed
 
+- 修复**标题便签节点（TitleNote）最小尺寸钳制静默失效**的问题。新版 litegraph 的 `node.size` 已是 **Float64Array**（`Object.prototype.toString` 实测确认），`Array.isArray()` 对它恒为 `false`；`title-note.js` 的 `onResize` 守卫 `Array.isArray(size)` 因此永不成立，`Math.max(size, 5)` 最小尺寸钳制整段失效。现改用 `size.length >= 2` 判定（读写 `size[0]`/`size[1]` 对 Float64Array 同样有效）。缓存破坏：`title-note.js ?v=10 → 11`。
 - 修复**进入画布时整个界面卡死**的问题。上一轮为隐藏原生颜色选择器弹窗下的操作栏，新增的 `_observeNativeColorPicker()` 用 `MutationObserver` 监听了整个 `document.body` 的 `childList` 变动，但回调 `_syncNativeColorPickerPopupState()` **没有做节流**。ComfyUI 启动挂载整个 Vue 应用时，body 子树高频发生 DOM 增删，每次变动都同步跑一遍 `querySelectorAll` + 遍历 toolbox，主线程被淹没 → 进入画布即卡死。现与文件内已有的 `_tooltipObserver`(`_queueTooltipRefresh`) 保持一致，给回调加 `requestAnimationFrame` + 标志位节流（每帧最多同步一次），并新增契约测试锁定「observer 回调必须走节流函数、禁止同步直调」。缓存破坏：`hub-bar.js` `?v=83 → 84`。
 - 修复**选中子图节点后，操作栏「编辑组件」「发布子图」中文标签过长、与相邻按钮文字连成一片**的问题。将两个标签分别缩短为两字「编辑」/「发布」，与英文「Edit Widgets」/「Publish」保持语义对应，同时更新 `hub-bar-native-popup-contract.test.mjs` 的断言。
 - 修复**点击原生「颜色」按钮弹出颜色选择器后，下方操作栏仍可见**的问题。该弹窗由 ComfyUI 原生 `ColorPickerButton` 直接渲染，不走 WOSAI `color-bar.js` 的 HUD，因此此前操作栏没有跟随隐藏。上轮改为用 `MutationObserver` 检测弹窗并调用 `hideMiniBarForPopup`，但隐藏规则使用 `opacity:0`——原生弹窗本身是 `selection-toolbox` 的子元素，结果弹窗随操作栏一起被隐藏，实测「菜单没有变化」。现改为 `visibility:hidden` 隐藏操作栏，并通过 `button[data-testid="color-picker-button"] ~ .absolute { visibility:visible }` 例外规则保持弹窗可见；检测条件也不再要求弹窗内必须包含 `<button>`（PrimeVue 的色板列表使用 `<i>` 图标），改为判断弹窗存在且可见（`offsetParent !== null` / computed visibility）。缓存破坏：`hub-bar.js` `?v=84 → 85`。

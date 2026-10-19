@@ -1500,7 +1500,9 @@ class TitleNoteNode extends TitleNoteBaseNode {
     }
 
     onResize (size) {
-        if (size && Array.isArray(size) && size.length >= 2) {
+        // 判据用 length 而非 Array.isArray：新版 litegraph 的 size 是 Float64Array，
+        // Array.isArray 恒 false 会让最小尺寸钳制整段失效
+        if (size && size.length >= 2) {
             this.size[0] = Math.max(size[0], 5);
             this.size[1] = Math.max(size[1], 5);
             app.graph.setDirtyCanvas(true);

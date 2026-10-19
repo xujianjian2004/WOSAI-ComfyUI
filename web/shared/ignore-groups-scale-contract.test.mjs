@@ -34,8 +34,10 @@ test("_applyScale 存在且包含缩放样式更新", () => {
     assert.ok(APPLY_SCALE_BODY, "必须能抽取出 _applyScale 函数体");
     assert.match(APPLY_SCALE_BODY, /contentEl\.style\.zoom\s*=\s*.*String\(s\)/,
         "必须设置 contentEl.style.zoom 为当前档位");
-    assert.match(APPLY_SCALE_BODY, /rootEl\.style\.height\s*=\s*\(bh\s*\*\s*s\)\s*\+\s*"px"/,
-        "必须按缩放后的高度更新 rootEl");
+    assert.match(APPLY_SCALE_BODY, /rootEl\.style\.height\s*=\s*\(\s*bh\s*\*\s*s\s*\)\s*\+\s*"px"/,
+        "必须按缩放后的内容高度更新 rootEl（原生标题带随缩放比放大，不再需要覆盖位移）");
+    assert.ok(!APPLY_SCALE_BODY.includes("marginTop"),
+        "面板由 widget.y 静态锚在框内，不得再用负 marginTop 上移");
 });
 
 test("_applyScale 必须直接按 scaledSize() 设置 node.size（不只是保证最小尺寸）", () => {

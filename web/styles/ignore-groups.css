@@ -29,8 +29,10 @@
   text-rendering: optimizeLegibility;
 }
 
-/* 缩放内层包裹：整体 transform:scale(s) 实现 1–3 倍放大，node.size 同步增长。
-   will-change 由 JS 在缩放 >1× 时动态开启，1× 时关闭，避免不必要的合成层导致文字发虚。 */
+/* 缩放内层包裹：整体 zoom(s) 实现 1–5 倍放大，node.size 同步增长。
+   will-change 由 JS 在缩放 >1× 时动态开启，1× 时关闭，避免不必要的合成层导致文字发虚。
+   画布原生标题带随缩放比等比放大（绘制期覆盖 LiteGraph 常量，见 ignore-groups.js
+   _igInstallTitleScale），故本面板不再自带标题条，内容从 tabs 起排。 */
 .wosai-ig-content {
   position: relative;
   box-sizing: border-box;
