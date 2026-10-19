@@ -202,7 +202,11 @@
   transform: translateX(-50%);
 }
 
-/* 只有滑动视图提供分割拖拽：拖拽光标与交互能力同时开启 / 关闭 */
+/* 只有滑动视图提供分割对比：悬停即可左右滑动（rgthree 式，无需点击），
+   光标提示「可水平滑动」；拖拽光标与交互能力同时开启 / 关闭 */
+.wosai-image-compare-stage.is-view-slide {
+  cursor: ew-resize;
+}
 .wosai-image-compare-stage.is-view-slide .wosai-image-compare-grab {
   cursor: ew-resize;
 }

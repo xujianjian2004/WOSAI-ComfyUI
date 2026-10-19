@@ -160,6 +160,17 @@ test("分割拖拽只在滑动视图生效", () => {
     assert.equal(guards.length, 2, "pointerdown 与 pointermove 都要拦截");
 });
 
+test("rgthree 式悬停对比：pointermove 无需按下即可移动分割线", () => {
+    // 旧的拖拽实现要求 event.buttons（按住）才算移动，现在改为悬停即跟随，
+    // 反映 rgthree「鼠标在图像区滑动即可对比，无需点击」的交互
+    assert.doesNotMatch(JS, /if \(event\.buttons\) setSplitFromPointer/, "不得再要求按住鼠标");
+    // pointermove 处理器里：① 仅在滑动视图生效，② 悬停在控件上时不跟手，
+    // ③ 其余情况调用 setSplitFromPointer 实时更新分割线
+    assert.match(JS, /if \(!isSplittable\(\)\) return;/, "pointermove 仍只在滑动视图生效");
+    assert.match(JS, /if \(isOverControl\(event\.clientX, event\.clientY\)\) return;/, "悬停在控件上时不跟手");
+    assert.match(JS, /setSplitFromPointer\(event\);/, "悬停移动时实时更新分割线");
+});
+
 test("非滑动视图把隐藏滑块移出 tab 序列", () => {
     assert.match(JS, /slider\.disabled = !splittable;/);
     assert.match(JS, /slider\.tabIndex = splittable \? 0 : -1;/);

@@ -36,7 +36,7 @@ const cleanups = new WeakMap();
 const patchedNodeTypes = new Set();
 let offLanguage = null;
 const MEDIA_STYLES = [
-    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=22", import.meta.url).href],
+    ["wosai-media-tools-style", new URL("./styles/media-tools.css?v=23", import.meta.url).href],
 ];
 
 // 视图切换按钮图标（内联 SVG，仅描述几何形状，颜色全部交给 currentColor）。
@@ -502,7 +502,7 @@ function createImageCompare(node) {
     // → 隐藏的原生滑块
     stage.append(first, secondWrap, divider, line, grab);
     // 原生滑块不再单独占一行（视觉隐藏，1px）：只承担键盘操作与无障碍语义，
-    // 分割位置完全由图像区内的拖拽控制
+    // 分割位置由图像区内的悬停（rgthree 式，无需点击）或拖拽控制
     const slider = document.createElement("input");
     slider.type = "range";
     slider.className = "wosai-image-compare-range";
@@ -964,6 +964,9 @@ function createImageCompare(node) {
     };
     // 分割拖拽只在滑动视图生效：双拼视图没有分割线，任意拖动都会变成「误触滑块」
     const isSplittable = () => state.viewMode === COMPARE_VIEW_DEFAULT;
+    // rgthree 式悬停对比：指针在图像区左右移动即实时移动分割线，无需按下鼠标。
+    // 悬停在底部控件（视图 / 交换按钮）上时浮标不跟手，避免误移分割线；触摸设备
+    // 没有悬停，按下拖拽路径照常工作（pointerdown 仍会捕获指针并设定初值）。
     stage.addEventListener("pointerdown", (event) => {
         if (!isSplittable()) return;
         // 拖拽期间锁住闲置：分辨率低时拖到一半控件消失会让人以为操作中断了
@@ -975,7 +978,8 @@ function createImageCompare(node) {
     }, { signal });
     stage.addEventListener("pointermove", (event) => {
         if (!isSplittable()) return;
-        if (event.buttons) setSplitFromPointer(event);
+        if (isOverControl(event.clientX, event.clientY)) return;
+        setSplitFromPointer(event);
     }, { signal });
     const endSplitDrag = () => {
         stage.classList.remove("is-dragging");
