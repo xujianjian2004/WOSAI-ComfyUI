@@ -486,12 +486,50 @@ test("上游解析在节点销毁时摘得干净", () => {
 test("上游素材取自前端执行缓存的多种定位符键，URL 只算一次", () => {
     assert.match(
         JS,
-        /for \(const key of nodeOutputLocatorKeys\(upstream\.id, app\.graph\?\.rootGraph\?\.id\)\)/,
+        /for \(const key of nodeOutputLocatorKeys\(nodeId, app\.graph\?\.rootGraph\?\.id\)\)/,
     );
     // 探针与随后的渲染必须复用同一个 URL：imageUrl 每次都会加时间戳，
     // 分别计算会让同一份文件被请求两次
     assert.match(JS, /const url = imageUrl\(media\);/);
     assert.match(JS, /if \(data\.url\) return opaqueImageUrl\(data\.url\);/);
+});
+
+// ── 张量上游的实时预览（2026-10-19）────────────────────────────────────
+// VAE 解码、缩放这类纯计算节点不写前端缓存，直读必然落空。三层回退保证
+// 「执行过一次就总能看到」：上游自身缓存 → 同源兄弟缓存 → 本节点上次载荷。
+test("张量上游的预览走三层回退，且顺序不可乱", () => {
+    // 第一层：上游自身缓存（含 imgs 兜底）
+    assert.match(JS, /const cached = mediaFromOutputCache\(upstream\.id\);/);
+    assert.match(JS, /if \(cached\) return cached;/);
+    // 第二层：同源兄弟——沿链接向下找第一个带缓存的节点借用
+    assert.match(JS, /const siblingMedia = \(name\) => \{/);
+    assert.match(
+        JS,
+        /for \(const targetId of collectDownstreamTargets\(links, origin\.id, origin\.slot\)\)/,
+    );
+    // 第三层：本节点自己的 ui.wosai_compare 载荷（undo/任务恢复时 onExecuted 不重放）
+    assert.match(JS, /const ownComparePayload = \(\) => \{/);
+    assert.match(JS, /Array\.isArray\(entry\?\.wosai_compare\) \? entry\.wosai_compare\[0\] : null/);
+    // resolveSide 里直读优先于兄弟，兜底只能补空位
+    const resolveSide = JS.match(/const resolveSide = async \(name\) => \{[\s\S]*?\n {4}\};/)[0];
+    assert.match(resolveSide, /upstreamMedia\(upstream\) : null\) \?\? siblingMedia\(name\)/);
+    const refresh = JS.match(/const refreshFromUpstream = async \(\) => \{[\s\S]*?\n {4}\};/)[0];
+    assert.match(refresh, /const own = ownComparePayload\(\);/);
+    assert.match(refresh, /next = \{ a: next\.a \?\? own\.a, b: next\.b \?\? own\.b \};/);
+    // 纯函数层只认 LiteGraph 的 snake_case 链接字段
+    assert.match(
+        PREVIEW,
+        /nodeSlotKey\(link\?\.origin_id, link\?\.origin_slot\)/,
+    );
+});
+
+test("同源兄弟执行也会带动预览刷新", () => {
+    const listener = JS.match(/const onUpstreamExecuted = \(message\) => \{[\s\S]*?\n {4}\};/)[0];
+    // 直上游命中照旧
+    assert.match(listener, /String\(upstreamNodeOf\(name\)\?\.id \?\? ""\) === executed\) return true;/);
+    // 兄弟判定复用同一条 BFS：执行节点在输入同源的下游集合里即命中
+    assert.match(listener, /const origin = inputOriginOf\(name\);/);
+    assert.match(listener, /collectDownstreamTargets\(links, origin\.id, origin\.slot\)\.includes\(executed\)/);
 });
 
 test("连线被连续改动时只落地最后一次解析结果", () => {

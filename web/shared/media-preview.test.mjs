@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
     COMPARE_STAGE_RATIO_BOUNDS,
     COMPARE_VIEW_MODES,
+    collectDownstreamTargets,
     compareDisplayPair,
     hasCompareMedia,
     mediaFromNodeOutput,
@@ -159,5 +160,68 @@ test("mediaFromNodeOutput normalizes the frontend cache shape", () => {
     for (const entry of [undefined, null, {}, { images: [] }, { images: [null] }, { images: [{}] }]) {
         assert.equal(mediaFromNodeOutput(entry), null);
     }
+});
+
+/** 构造 LiteGraph 形状的链接表：Map 容器 + snake_case 字段。 */
+function linkMap(entries) {
+    const map = new Map();
+    entries.forEach(([id, originId, originSlot, targetId]) => {
+        map.set(id, { id, origin_id: originId, origin_slot: originSlot, target_id: targetId });
+    });
+    return map;
+}
+
+test("collectDownstreamTargets walks the same-source downstream in BFS order", () => {
+    // 拓扑：7:0 ─→ 8(保存) 与 9(reroute)；9 ─→ 10(保存)。7:1 ─→ 11 不与 7:0 同源。
+    const links = linkMap([
+        ["l1", 7, 0, 8],
+        ["l2", 7, 0, 9],
+        ["l3", 9, 0, 10],
+        ["l4", 7, 1, 11],
+        ["l5", 5, 0, 12],
+    ]);
+    assert.deepEqual(collectDownstreamTargets(links, 7, 0), ["8", "9", "10"]);
+    // 第一跳精确到输出槽：7:1 的下游只有 11
+    assert.deepEqual(collectDownstreamTargets(links, 7, 1), ["11"]);
+});
+
+test("collectDownstreamTargets dedupes across paths and caps the depth", () => {
+    // 菱形 + 长链：7:0 → 8 / 9，8 → 10，9 → 10（去重），10 → 13 → 14
+    const links = linkMap([
+        ["l1", 7, 0, 8],
+        ["l2", 7, 0, 9],
+        ["l3", 8, 0, 10],
+        ["l4", 9, 0, 10],
+        ["l5", 10, 0, 13],
+        ["l6", 13, 0, 14],
+    ]);
+    // 深度预算 4：0跳=8,9 → 1跳=10 → 2跳=13 → 3跳=14，恰好走完
+    assert.deepEqual(collectDownstreamTargets(links, 7, 0), ["8", "9", "10", "13", "14"]);
+    // 收紧到 3 层：14 被裁掉；10 只出现一次（两条路径汇聚）
+    assert.deepEqual(collectDownstreamTargets(links, 7, 0, 3), ["8", "9", "10", "13"]);
+});
+
+test("collectDownstreamTargets accepts object and array link containers", () => {
+    const asMap = linkMap([["l1", 3, 0, 4], ["l2", 4, 0, 5]]);
+    const asObject = Object.fromEntries([...asMap.entries()]);
+    const asArray = [...asMap.values()];
+    const expected = ["4", "5"];
+    assert.deepEqual(collectDownstreamTargets(asMap, 3, 0), expected);
+    assert.deepEqual(collectDownstreamTargets(asObject, 3, 0), expected);
+    assert.deepEqual(collectDownstreamTargets(asArray, 3, 0), expected);
+});
+
+test("collectDownstreamTargets returns empty for degenerate inputs", () => {
+    const links = linkMap([["l1", 1, 0, 2]]);
+    for (const [graphLinks, originId] of [
+        [null, 1], [undefined, 1], [links, null], [links, ""], [links, undefined],
+    ]) {
+        assert.deepEqual(collectDownstreamTargets(graphLinks, originId, 0), []);
+    }
+    // 链接缺 origin_id / target_id 的脏数据不应抛错
+    assert.deepEqual(
+        collectDownstreamTargets(new Map([["bad", { id: "bad" }]]), 1, 0),
+        [],
+    );
 });
 

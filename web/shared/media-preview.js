@@ -109,3 +109,65 @@ export function mediaFromNodeOutput(entry) {
         type: String(first.type || "temp"),
     };
 }
+
+/** 节点定位键：`"<id>:<slot>"`；id 为空返回 null。 */
+function nodeSlotKey(id, slot) {
+    const text = String(id ?? "");
+    if (text === "") return null;
+    const slotNumber = Number(slot ?? 0);
+    return `${text}:${Number.isFinite(slotNumber) ? slotNumber : 0}`;
+}
+
+/**
+ * 遍历链接容器：LiteGraph 各版本用过 Map、普通对象与数组三种形态，
+ * 元素一律按「含 origin_id / target_id 的对象」过滤后交给回调。
+ */
+function forEachLink(graphLinks, callback) {
+    if (!graphLinks) return;
+    if (typeof graphLinks.forEach === "function") {
+        graphLinks.forEach((value) => {
+            if (value && typeof value === "object") callback(value);
+        });
+        return;
+    }
+    if (typeof graphLinks === "object") {
+        for (const key of Object.keys(graphLinks)) {
+            const value = graphLinks[key];
+            if (value && typeof value === "object") callback(value);
+        }
+    }
+}
+
+/**
+ * 沿链接向下游收集「与 origin 输出同源」的目标节点 id（BFS 层序，去重）。
+ *
+ * 对比节点的直读只认「上游节点自身有前端缓存」的素材；上游是纯计算节点
+ * （VAE 解码、缩放等）时缓存永远为空，但同源下游的保存 / 预览节点往往已把
+ * 同一份图像落盘。这里从链接的 origin 输出出发逐层向下：第一跳精确匹配
+ * ``(origin_id, origin_slot)``，之后按 origin_id 匹配该节点的全部输出——
+ * reroute 之类的直通节点会被自动穿过（它们本就没有缓存可供命中）。
+ * 返回按层序排列的节点 id 字符串列表，调用方从中取第一个带媒体缓存的节点。
+ */
+export function collectDownstreamTargets(graphLinks, originId, originSlot, maxDepth = 4) {
+    const originKey = nodeSlotKey(originId, originSlot);
+    if (!originKey) return [];
+    const visited = new Set();
+    const order = [];
+    let matchKeys = [originKey];
+    for (let depth = 0; depth < maxDepth && matchKeys.length > 0; depth += 1) {
+        const nextKeys = new Set();
+        forEachLink(graphLinks, (link) => {
+            const linkKey = depth === 0
+                ? nodeSlotKey(link?.origin_id, link?.origin_slot)
+                : String(link?.origin_id ?? "");
+            if (linkKey === "" || !matchKeys.includes(linkKey)) return;
+            const targetKey = String(link?.target_id ?? "");
+            if (targetKey === "" || visited.has(targetKey)) return;
+            visited.add(targetKey);
+            order.push(targetKey);
+            nextKeys.add(targetKey);
+        });
+        matchKeys = [...nextKeys];
+    }
+    return order;
+}

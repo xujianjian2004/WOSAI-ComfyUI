@@ -17,6 +17,7 @@ import {
 import {
     COMPARE_VIEW_DEFAULT,
     COMPARE_VIEW_MODES,
+    collectDownstreamTargets,
     compareDisplayPair,
     hasCompareMedia,
     mediaFromNodeOutput,
@@ -797,20 +798,69 @@ function createImageCompare(node) {
         return node.graph?.getNodeById?.(originId) ?? null;
     };
 
-    const upstreamMedia = (upstream) => {
+    const mediaFromOutputCache = (nodeId) => {
         const outputs = app.nodeOutputs;
-        if (outputs) {
-            for (const key of nodeOutputLocatorKeys(upstream.id, app.graph?.rootGraph?.id)) {
-                const media = mediaFromNodeOutput(outputs[key]);
-                if (media) return media;
-            }
+        if (!outputs) return null;
+        for (const key of nodeOutputLocatorKeys(nodeId, app.graph?.rootGraph?.id)) {
+            const media = mediaFromNodeOutput(outputs[key]);
+            if (media) return media;
         }
+        return null;
+    };
+
+    const upstreamMedia = (upstream) => {
+        const cached = mediaFromOutputCache(upstream.id);
+        if (cached) return cached;
         // 缓存键改名、或上游只画了预览而没写缓存时的兜底：节点自己的预览元素。
         // 两种渲染模式都会把最近一次产出挂到 imgs 上，src 就是可直接引用的 URL。
         const preview = upstream.imgs?.[0];
         const url = typeof preview === "string" ? preview : preview?.src;
         if (url) return { kind: "image", url };
         return mediaFromNodeOutput(upstream);
+    };
+
+    /** 本节点某输入链接的 origin 输出（节点 id + 输出槽）。 */
+    const inputOriginOf = (name) => {
+        const index = inputSlotIndex(name);
+        if (index < 0) return null;
+        const linkRef = node.inputs?.[index]?.link;
+        if (linkRef == null) return null;
+        const links = node.graph?.links;
+        const link = typeof linkRef === "object"
+            ? linkRef
+            : (links?.get?.(linkRef) ?? links?.[linkRef]);
+        if (!link) return null;
+        return { id: String(link.origin_id ?? ""), slot: Number(link.origin_slot ?? 0) };
+    };
+
+    // 纯计算上游（VAE 解码、缩放等）不写前端缓存，直读必然落空；但同源下游的
+    // 保存 / 预览节点往往已把同一份图像落盘。沿链接向下找第一个带缓存的兄弟
+    // 节点借用它——这是张量上游在不执行本节点的前提下唯一的现成图源。
+    const siblingMedia = (name) => {
+        const origin = inputOriginOf(name);
+        if (!origin || origin.id === "") return null;
+        const links = node.graph?.links;
+        for (const targetId of collectDownstreamTargets(links, origin.id, origin.slot)) {
+            const media = mediaFromOutputCache(targetId);
+            if (media) return media;
+        }
+        return null;
+    };
+
+    // 本节点自己最近一次执行的载荷（ui.wosai_compare）：undo/redo、工作流切换、
+    // 任务恢复都会把 nodeOutputs 原样回填，但 onExecuted 不会重放——两侧直读都
+    // 落空时拿它兜底，避免这些场景下张量上游的预览凭空消失。
+    const ownComparePayload = () => {
+        const outputs = app.nodeOutputs;
+        if (!outputs) return null;
+        for (const key of nodeOutputLocatorKeys(node.id, app.graph?.rootGraph?.id)) {
+            const entry = outputs[key];
+            const payload = Array.isArray(entry?.wosai_compare) ? entry.wosai_compare[0] : null;
+            if (payload && (payload.a || payload.b)) {
+                return { a: payload.a ?? null, b: payload.b ?? null };
+            }
+        }
+        return null;
     };
 
     // 探针只为拿像素尺寸：节点高度要靠「舞台宽高比」换算，而前端缓存里只有文件名。
@@ -824,8 +874,8 @@ function createImageCompare(node) {
 
     const resolveSide = async (name) => {
         const upstream = upstreamNodeOf(name);
-        if (!upstream) return null;
-        const media = upstreamMedia(upstream);
+        // 先读上游自身缓存，落空再找同源兄弟（张量上游没有自己的缓存可读）
+        const media = (upstream ? upstreamMedia(upstream) : null) ?? siblingMedia(name);
         if (!media) return null;
         const url = imageUrl(media);
         const size = await probeSize(url);
@@ -840,7 +890,11 @@ function createImageCompare(node) {
         const resolved = await Promise.all(INPUT_SLOTS.map(resolveSide));
         // 解析期间节点可能已被删除，或者工作流又跑了一轮（后端载荷更权威）
         if (token !== upstreamToken || !root.isConnected) return;
-        const next = { a: resolved[0] ?? payload.a, b: resolved[1] ?? payload.b };
+        let next = { a: resolved[0] ?? payload.a, b: resolved[1] ?? payload.b };
+        // 自身载荷逐侧补空位：直读/兄弟已命中的侧不动（那是更新的数据），
+        // 空位才从本节点上次执行的载荷里补
+        const own = ownComparePayload();
+        if (own) next = { a: next.a ?? own.a, b: next.b ?? own.b };
         if (!hasCompareMedia(next)) return;
         // 只认「换了一张图」这一个变化：同一张图重复解析（拖线抖动、重复触发的
         // 执行事件）不该反复重排尺寸
@@ -861,12 +915,17 @@ function createImageCompare(node) {
     };
     // 只跑了上游那一支（局部执行）时本节点不会被执行，后端载荷也就不会更新；
     // 订阅执行事件就能让预览跟着上游一起刷新，这才叫「实时预览」。
+    // 直上游与同源兄弟（保存 / 预览节点）执行都会更新同一份缓存，都要跟进。
     const onUpstreamExecuted = (message) => {
         const executed = plainNodeId(message?.display_node ?? message?.node);
         if (!executed || executed === String(node.id)) return;
-        const hit = INPUT_SLOTS.some(
-            (name) => String(upstreamNodeOf(name)?.id ?? "") === executed,
-        );
+        const hit = INPUT_SLOTS.some((name) => {
+            if (String(upstreamNodeOf(name)?.id ?? "") === executed) return true;
+            const origin = inputOriginOf(name);
+            if (!origin || origin.id === "") return false;
+            const links = node.graph?.links;
+            return collectDownstreamTargets(links, origin.id, origin.slot).includes(executed);
+        });
         if (hit) refreshFromUpstream();
     };
     api.addEventListener("executed", onUpstreamExecuted);

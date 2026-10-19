@@ -226,6 +226,11 @@
 
 ### Fixed
 
+- 修复**图像对比节点接收来自 VAE 解码（VAEDecode）等纯计算节点的数据时实时预览失效**的问题。上游直读只认「上游节点自身有前端缓存」的素材（`app.nodeOutputs` / `imgs`）；VAE 解码、缩放这类张量进张量出的节点永远不写缓存，接线后舞台必然空白——即使同一份解码输出已流入下游的保存图像节点（缓存里就有这张图）。现补三层回退：
+  1. **上游自身缓存**（原有行为，含 `imgs` 兜底）；
+  2. **同源兄弟**：直读落空时沿本输入链接的 origin 输出向下游 BFS（第一跳精确匹配 `(origin_id, origin_slot)`，之后按 origin_id 自动穿过 reroute 类直通节点，深度上限 4），取第一个带媒体缓存的下游节点借用其文件——保存 / 预览节点与对比节点共享同一份上游产物，命中即「连线即出图」；
+  3. **本节点上次载荷**：以上两层都补不上的空位，从 `app.nodeOutputs` 里本节点自己的 `ui.wosai_compare` 载荷逐侧补齐——undo/redo、工作流切换、任务恢复都会回填 nodeOutputs，但 `onExecuted` 不会重放，没有这层这些场景下张量上游的预览会凭空消失。已命中的侧优先于兜底（那是更新的数据）。
+  同时把 `executed` 事件的刷新范围从「直上游」扩展到「与本输入同源的下游兄弟」：部分重跑只重跑了保存分支时，预览也会跟着缓存一起更新。新增纯函数 `collectDownstreamTargets()`（`web/shared/media-preview.js`，链接容器兼容 Map / 对象 / 数组三种形态，5 项单测）与契约测试 2 项（三层回退的顺序与手段、兄弟执行带动刷新）。**已在运行中的 ComfyUI 实例上端到端验收**（真实 Chrome）：LoadImage 直连出图（回归）／执行后重接张量上游立即借兄弟缓存出图（`type=output` 文件引用）／无兄弟时自身载荷逐侧补空，三场景全过。缓存破坏：`media-tools.js ?v=23 → 24`。
 - 修复**标题便签节点（TitleNote）最小尺寸钳制静默失效**的问题。新版 litegraph 的 `node.size` 已是 **Float64Array**（`Object.prototype.toString` 实测确认），`Array.isArray()` 对它恒为 `false`；`title-note.js` 的 `onResize` 守卫 `Array.isArray(size)` 因此永不成立，`Math.max(size, 5)` 最小尺寸钳制整段失效。现改用 `size.length >= 2` 判定（读写 `size[0]`/`size[1]` 对 Float64Array 同样有效）。缓存破坏：`title-note.js ?v=10 → 11`。
 - 修复**进入画布时整个界面卡死**的问题。上一轮为隐藏原生颜色选择器弹窗下的操作栏，新增的 `_observeNativeColorPicker()` 用 `MutationObserver` 监听了整个 `document.body` 的 `childList` 变动，但回调 `_syncNativeColorPickerPopupState()` **没有做节流**。ComfyUI 启动挂载整个 Vue 应用时，body 子树高频发生 DOM 增删，每次变动都同步跑一遍 `querySelectorAll` + 遍历 toolbox，主线程被淹没 → 进入画布即卡死。现与文件内已有的 `_tooltipObserver`(`_queueTooltipRefresh`) 保持一致，给回调加 `requestAnimationFrame` + 标志位节流（每帧最多同步一次），并新增契约测试锁定「observer 回调必须走节流函数、禁止同步直调」。缓存破坏：`hub-bar.js` `?v=83 → 84`。
 - 修复**选中子图节点后，操作栏「编辑组件」「发布子图」中文标签过长、与相邻按钮文字连成一片**的问题。将两个标签分别缩短为两字「编辑」/「发布」，与英文「Edit Widgets」/「Publish」保持语义对应，同时更新 `hub-bar-native-popup-contract.test.mjs` 的断言。
