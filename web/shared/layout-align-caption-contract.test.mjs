@@ -36,7 +36,9 @@ test("标签常驻可见，不再靠悬停切换", () => {
     // 常驻标签不允许自己带过渡性隐藏，也不许被 pointer-events 之外的规则藏起来
     const rule = css.match(/\.wosai-al-tian-cap,\s*\n\.wosai-al-center-cap \{[^}]*\}/)?.[0] ?? "";
     assert.ok(rule, "未找到常驻标签样式");
-    assert.match(rule, /font-size: var\(--ws-text-sm\);/);
+    // 与下方「等宽 / 等高 / 等尺寸」按钮同字号（面板基准 --ws-text-md），
+    // 同一面板里不该出现两种正文大小
+    assert.match(rule, /font-size: var\(--ws-text-md\);/);
     assert.doesNotMatch(rule, /opacity:\s*0/, "常驻标签不得默认透明");
 });
 

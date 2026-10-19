@@ -73,12 +73,14 @@
 }
 .wosai-al-tian-btn svg { width:var(--ws-lt-quick-icon-size); height:var(--ws-lt-quick-icon-size); }
 .wosai-al-tian-btn:hover { background: var(--ws-accent-dim); color: var(--ws-accent); }
-/* 常驻动作名：图标下方始终可见，悬停不再替换文字 */
+/* 常驻动作名：图标下方始终可见，悬停不再替换文字。
+   字号与下方「等宽 / 等高 / 等尺寸」按钮一致（面板基准 --ws-text-md），
+   同一块面板里不该出现两种正文大小 */
 .wosai-al-tian-cap,
 .wosai-al-center-cap {
   color: inherit;
   font-family: var(--ws-font-family);
-  font-size: var(--ws-text-sm);
+  font-size: var(--ws-text-md);
   line-height: 1;
   white-space: nowrap;
   pointer-events: none;
