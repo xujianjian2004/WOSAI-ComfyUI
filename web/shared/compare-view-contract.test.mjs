@@ -46,7 +46,7 @@ test("CSS 里所有视图规则都以 .wosai-image-compare-stage 限定", () => 
 });
 
 // 图像对比节点里的图片不再带圆角：用户在深色/暖色调图片上更需要看到完整画幅，
-// 且舞台本身的圆角会在分割线走到边缘时裁掉十字手柄/热区。
+// 且舞台本身的圆角会在分割线走到边缘时裁掉箭头手柄/热区。
 test("舞台与图片层四角为直角", () => {
     assert.match(CSS, /\.wosai-image-compare-stage \{\n[^}]*border-radius: 0;/s);
     assert.match(CSS, /\.wosai-image-compare-top \{\n[^}]*border-radius: 0;/s);
@@ -58,8 +58,8 @@ test("分割线与活跃控件颜色使用主文本色而非橙色强调色", ()
     const lineRule = CSS.match(/\.wosai-image-compare-line \{[^}]*\}/s)?.[0] ?? "";
     assert.match(lineRule, /background:\s*var\(--ws-text\)/, "分割线必须用主文本色");
     const handleRule = CSS.match(/\.wosai-image-compare-grab:hover \+ \.wosai-image-compare-handle[^}]*\}/s)?.[0] ?? "";
-    assert.match(handleRule, /color:\s*var\(--ws-text\)/, "十字手柄必须用主文本色");
-    assert.match(handleRule, /border-color:\s*var\(--ws-text\)/, "十字手柄边框必须用主文本色");
+    assert.match(handleRule, /color:\s*var\(--ws-text\)/, "箭头手柄必须用主文本色");
+    assert.match(handleRule, /border-color:\s*var\(--ws-text\)/, "箭头手柄边框必须用主文本色");
     const viewRule = CSS.match(/\.wosai-image-compare-view\.is-active \{[^}]*\}/s)?.[0] ?? "";
     assert.match(viewRule, /color:\s*var\(--ws-text\)/, "视图按钮 active 必须用主文本色");
     assert.doesNotMatch(viewRule, /color:\s*var\(--ws-accent\)/, "视图按钮 active 不得再用橙色");
@@ -84,7 +84,7 @@ test("双拼视图所有圆角为直角", () => {
     assert.match(CSS, /is-view-stack \.wosai-image-compare-top \{[^}]*border-radius: 0;/s);
 });
 
-test("双拼视图隐藏分割线 / 热区 / 十字手柄，只留分隔缝", () => {
+test("双拼视图隐藏分割线 / 热区 / 箭头手柄，只留分隔缝", () => {
     for (const view of ["is-view-side", "is-view-stack"]) {
         for (const part of ["-line", "-grab", "-handle"]) {
             assert.ok(
@@ -194,7 +194,7 @@ test("闲置只隐藏控件，分割线保持可见", () => {
     const rule = CSS.match(/\.wosai-image-compare-stage\.is-idle\s+\.wosai-image-compare-bottom[\s\S]*?\}/);
     assert.ok(rule, "未找到闲置隐藏规则");
     assert.ok(rule[0].includes(".wosai-image-compare-bottom"), "闲置清单应以底部工具栏为整体");
-    // 分割线 / 热区 / 十字手柄是「这是一张对比图」的语义表达，不是操作项：
+    // 分割线 / 热区 / 箭头手柄是「这是一张对比图」的语义表达，不是操作项：
     // 把分割线一起隐掉，节点会退化成一张普通图片
     for (const part of ["-line", "-grab", "-handle"]) {
         assert.ok(

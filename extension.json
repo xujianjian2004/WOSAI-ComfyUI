@@ -29,7 +29,7 @@
     "web/selector.js?v=14",
     "web/common-color.js?v=17",
     "web/route-switch.js?v=3",
-    "web/media-tools.js?v=24",
+    "web/media-tools.js?v=25",
     "web/get-widget.js?v=8",
     "web/size-select.js?v=10",
     "web/preset-prompt.js?v=14",
@@ -49,7 +49,7 @@
     "web/styles/os-size.css?v=4",
     "web/styles/save-node.css",
     "web/styles/selector.css?v=5",
-    "web/styles/media-tools.css?v=20",
+    "web/styles/media-tools.css?v=21",
     "web/styles/preset-prompt.css?v=52",
     "web/styles/device-info.css?v=13"
   ],

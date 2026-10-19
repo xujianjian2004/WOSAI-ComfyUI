@@ -12,7 +12,7 @@
   font: 500 var(--ws-text-sm)/1.2 var(--ws-font-family);
 }
 
-/* 左右各留半个手柄宽：分割线与十字手柄的圆心可以走到图像区的 0% / 100%，
+/* 左右各留半个手柄宽：分割线与箭头手柄的圆心可以走到图像区的 0% / 100%，
    此时手柄圆盘会溢出行边界，这里必须留出足够余量，否则会被 root 的
    overflow:hidden 裁掉一块。取 max 是为了兼容 gap 令牌变小的情况。 */
 .wosai-image-compare {
@@ -133,7 +133,7 @@
      否则 DOM 控件高度估算的误差会把它拉伸，图像上下出现留白 */
   flex: 0 0 auto;
   box-sizing: border-box;
-  /* 这里不能用 overflow:hidden：分割线 / 热区 / 十字手柄的圆心要走满 0%–100%，
+  /* 这里不能用 overflow:hidden：分割线 / 热区 / 箭头手柄的圆心要走满 0%–100%，
      圆盘必然溢出舞台边界，被裁就成了残缺的 D 形。圆角裁切改由下方图像图层自己承担。 */
   overflow: visible;
   width: 100%;
@@ -207,7 +207,7 @@
   cursor: ew-resize;
 }
 
-/* 十字准心手柄：悬停热区或拖动时淡入，提示此处可拖动分割线 */
+/* 左右箭头手柄：悬停热区或拖动时淡入，提示此处可拖动分割线 */
 .wosai-image-compare-handle {
   position: absolute;
   top: 50%;
@@ -255,11 +255,6 @@
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-
-.wosai-image-compare-handle-dot {
-  fill: currentColor;
-  stroke: none;
 }
 
 /* 交换 / 切换视图时把图像整体压暗，掩盖图层换位的瞬时跳变 */
@@ -331,7 +326,7 @@
   transform: translateY(-50%);
 }
 
-/* 双拼视图没有「分割位置」这个概念，隐藏分割线、热区与十字手柄，
+/* 双拼视图没有「分割位置」这个概念，隐藏分割线、热区与箭头手柄，
    避免出现一条拖不动、也说不清含义的线 */
 .wosai-image-compare-stage.is-view-side .wosai-image-compare-line,
 .wosai-image-compare-stage.is-view-side .wosai-image-compare-grab,
@@ -505,8 +500,8 @@
 
 /* 图像对比已不再单独占一行滑块：原生 input 降级为 1px 隐藏控件，
    只承担键盘操作（方向键微调）与无障碍语义；鼠标/触摸改由图像区上的
-   拖拽与十字准心手柄承担。pointer-events:none 避免它在左下角抢走拖拽起点，
-   键盘聚焦时则点亮十字手柄作为可见焦点提示（见上方 :focus-visible 规则）。 */
+   拖拽与左右箭头手柄承担。pointer-events:none 避免它在左下角抢走拖拽起点，
+   键盘聚焦时则点亮箭头手柄作为可见焦点提示（见上方 :focus-visible 规则）。 */
 .wosai-image-compare-range {
   position: absolute;
   left: 0;
